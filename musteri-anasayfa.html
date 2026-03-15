@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yakinda Ne Var?</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:'Segoe UI',sans-serif}
+.phone{width:390px;min-height:844px;background:#f9f9f9;border-radius:40px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.25);display:flex;flex-direction:column}
+.header{background:#fff;padding:16px 20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.header-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.location{display:flex;align-items:center;gap:6px;font-weight:700;font-size:1rem}
+.location span{color:#ff6b35}
+.search{background:#f5f5f5;border-radius:12px;padding:11px 16px;display:flex;align-items:center;gap:10px}
+.search input{border:none;background:transparent;outline:none;width:100%;font-size:.92rem;color:#222}
+.content{flex:1;overflow-y:auto;padding:16px}
+.cats{display:flex;gap:10px;margin-bottom:20px;overflow-x:auto;padding-bottom:4px}
+.cats::-webkit-scrollbar{display:none}
+.cat-btn{background:#fff;border-radius:14px;padding:14px 18px;text-align:center;min-width:80px;box-shadow:0 2px 10px rgba(0,0,0,0.07);cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:.2s}
+.cat-btn.active{background:#fff8f5;border-color:#ff6b35}
+.cat-btn .icon{font-size:1.6rem;margin-bottom:4px}
+.cat-btn p{font-size:.72rem;font-weight:600;color:#444}
+.section-title{font-weight:800;font-size:.95rem;margin-bottom:12px}
+.esnaf-grid{display:flex;flex-direction:column;gap:12px;margin-bottom:20px}
+.esnaf-card{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.07);display:flex;cursor:pointer;transition:.2s}
+.esnaf-card:hover{transform:translateY(-2px)}
+.esnaf-img{width:90px;height:90px;display:flex;align-items:center;justify-content:center;font-size:2.4rem;flex-shrink:0;background:linear-gradient(135deg,#ffe5d9,#fff8f5)}
+.esnaf-info{padding:12px 14px;flex:1}
+.esnaf-info h4{font-weight:700;font-size:.95rem;margin-bottom:4px}
+.esnaf-meta{display:flex;gap:10px;font-size:.78rem;color:#888;margin-bottom:6px}
+.esnaf-tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{background:#f5f5f5;color:#666;font-size:.7rem;padding:3px 8px;border-radius:20px}
+.tag.open{background:#e8f5e9;color:#2e7d32}
+.yukleniyor{text-align:center;padding:40px;color:#aaa}
+.hata{text-align:center;padding:40px;color:#e53935}
+.bottom-nav{background:#fff;padding:12px 0 20px;display:flex;justify-content:space-around;box-shadow:0 -2px 10px rgba(0,0,0,0.07)}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:.68rem;color:#aaa;cursor:pointer}
+.nav-item.active{color:#ff6b35}
+.nav-icon{font-size:1.3rem}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="header">
+    <div class="header-top">
+      <div class="location">
+        <span>📍</span>
+        <div>
+          <div style="font-size:.75rem;color:#aaa;font-weight:400">Konumunuz</div>
+          <div>Marmaris, Mugla</div>
+        </div>
+      </div>
+      <div style="font-size:1.3rem">🔔</div>
+    </div>
+    <div class="search">
+      <span>🔍</span>
+      <input type="text" id="arama" placeholder="Yemek, urun veya hizmet ara..." oninput="aramaYap()">
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="cats">
+      <div class="cat-btn active" onclick="kategoriSec('tumu', this)"><div class="icon">🏠</div><p>Tumu</p></div>
+      <div class="cat-btn" onclick="kategoriSec('yemek', this)"><div class="icon">🍽️</div><p>Yemek</p></div>
+      <div class="cat-btn" onclick="kategoriSec('urun', this)"><div class="icon">🛒</div><p>Urunler</p></div>
+      <div class="cat-btn" onclick="kategoriSec('hizmet', this)"><div class="icon">🔧</div><p>Hizmetler</p></div>
+    </div>
+    <div class="section-title">🔥 Yakin Esnaflar</div>
+    <div class="esnaf-grid" id="esnaf-listesi">
+      <div class="yukleniyor">⏳ Yukleniyor...</div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <div class="nav-item active"><div class="nav-icon">🏠</div><span>Ana Sayfa</span></div>
+    <div class="nav-item"><div class="nav-icon">🔍</div><span>Kesfet</span></div>
+    <div class="nav-item"><div class="nav-icon">🛒</div><span>Sepet</span></div>
+    <div class="nav-item"><div class="nav-icon">❤️</div><span>Favoriler</span></div>
+    <div class="nav-item"><div class="nav-icon">👤</div><span>Profil</span></div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:3000';
+let tumEsnaflar = [];
+const ikonlar = { yemek: '🍽️', urun: '🛒', hizmet: '🔧' };
+
+async function esnaflariYukle(kategori) {
+  const liste = document.getElementById('esnaf-listesi');
+  liste.innerHTML = '<div class="yukleniyor">⏳ Yukleniyor...</div>';
+  try {
+    let url = API + '/api/esnaflar?ilce=Marmaris';
+    if (kategori && kategori !== 'tumu') url += '&kategori=' + kategori;
+    const res = await fetch(url);
+    const data = await res.json();
+    tumEsnaflar = data.veri;
+    esnaflariGoster(tumEsnaflar);
+  } catch(e) {
+    liste.innerHTML = '<div class="hata">❌ API baglantisi kurulamadi.</div>';
+  }
+}
+
+function esnaflariGoster(esnaflar) {
+  const liste = document.getElementById('esnaf-listesi');
+  if (!esnaflar.length) {
+    liste.innerHTML = '<div class="yukleniyor">Esnaf bulunamadi.</div>';
+    return;
+  }
+  liste.innerHTML = esnaflar.map(e => `
+    <div class="esnaf-card" onclick="window.location='esnaf-detay.html?id=${e.id}'">
+      <div class="esnaf-img">${ikonlar[e.kategori] || '🏪'}</div>
+      <div class="esnaf-info">
+        <h4>${e.ad}</h4>
+        <div class="esnaf-meta">
+          <span>⭐ ${e.puan}</span>
+          <span>📍 ${e.ilce}</span>
+          <span>${e.urunler ? e.urunler.length + ' urun' : ''}</span>
+        </div>
+        <div class="esnaf-tags">
+          <span class="tag open">${e.acik ? '🟢 Acik' : '🔴 Kapali'}</span>
+          <span class="tag">${e.kategori}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function kategoriSec(kategori, el) {
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  esnaflariYukle(kategori);
+}
+
+function aramaYap() {
+  const q = document.getElementById('arama').value.toLowerCase();
+  const filtre = tumEsnaflar.filter(e =>
+    e.ad.toLowerCase().includes(q) ||
+    e.kategori.toLowerCase().includes(q)
+  );
+  esnaflariGoster(filtre);
+}
+
+esnaflariYukle();
+</script>
+</body>
+</html>
