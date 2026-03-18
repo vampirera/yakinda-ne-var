@@ -58,8 +58,9 @@ function profilSayfasiGoster() {
       durum.profilHarita.invalidateSize();
       if (durum.profilHaritaMarker) durum.profilHaritaMarker.remove();
       durum.profilHaritaMarker = L.marker([profil.lat, profil.lng]).addTo(durum.profilHarita).bindPopup('Konumunuz').openPopup();
-      document.getElementById('profil-konum-bilgi').textContent =
-        '📍 ' + parseFloat(profil.lat).toFixed(5) + ', ' + parseFloat(profil.lng).toFixed(5);
+      reverseGeocode(profil.lat, profil.lng, function(adres) {
+        document.getElementById('profil-konum-bilgi').textContent = '📍 ' + adres;
+      });
     }, 150);
   } else {
     document.getElementById('profil-harita-wrap').style.display = 'none';
@@ -118,15 +119,18 @@ function profilFormuBaslat() {
             profil.lat = latlng[0]; profil.lng = latlng[1];
             profilKaydet(profil);
             durum.lat = latlng[0]; durum.lng = latlng[1];
-            document.getElementById('profil-konum-bilgi').textContent = '📍 ' + latlng[0].toFixed(5) + ', ' + latlng[1].toFixed(5);
+            reverseGeocode(latlng[0], latlng[1], function(adres) {
+              document.getElementById('profil-konum-bilgi').textContent = '📍 ' + adres;
+            });
           });
         }
         durum.profilHarita.setView([lat, lng], 16);
         durum.profilHarita.invalidateSize();
         if (durum.profilHaritaMarker) durum.profilHaritaMarker.remove();
         durum.profilHaritaMarker = L.marker([lat, lng]).addTo(durum.profilHarita).bindPopup('Konumunuz').openPopup();
-        document.getElementById('profil-konum-bilgi').textContent =
-          '📍 ' + lat.toFixed(5) + ', ' + lng.toFixed(5);
+        reverseGeocode(lat, lng, function(adres) {
+          document.getElementById('profil-konum-bilgi').textContent = '📍 ' + adres;
+        });
       }, 100);
 
       // localStorage'a kaydet
@@ -479,6 +483,21 @@ function siralaSec(s) {
 // KONUM
 // =============================================================
 
+function reverseGeocode(lat, lng, callback) {
+  fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json&accept-language=tr')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var a = data.address || {};
+      var mahalle = a.suburb || a.neighbourhood || a.quarter || '';
+      var ilce    = a.district || a.town || a.city_district || a.county || '';
+      var sonuc   = [mahalle, ilce].filter(Boolean).join(', ') || (lat.toFixed(4) + ', ' + lng.toFixed(4));
+      callback(sonuc);
+    })
+    .catch(function() {
+      callback(lat.toFixed(4) + ', ' + lng.toFixed(4));
+    });
+}
+
 function varsayilanKonum() {
   durum.lat = 36.8550;
   durum.lng = 28.2753;
@@ -497,7 +516,10 @@ function konumAl() {
   navigator.geolocation.getCurrentPosition(function(pos) {
     durum.lat = pos.coords.latitude;
     durum.lng = pos.coords.longitude;
-    document.getElementById('konum-text').textContent = 'Konumunuz';
+    document.getElementById('konum-text').textContent = 'Konum alindi';
+    reverseGeocode(durum.lat, durum.lng, function(adres) {
+      document.getElementById('konum-text').textContent = adres;
+    });
     esnaflarYukle();
     if (durum.anaHarita) {
       durum.anaHarita.setView([durum.lat, durum.lng], 13);
@@ -584,8 +606,9 @@ function kayitHaritaBaslat() {
     durum.kayitLng = e.latlng.lng;
     document.getElementById('k-lat').value = durum.kayitLat;
     document.getElementById('k-lng').value = durum.kayitLng;
-    document.getElementById('kayit-konum-text').textContent =
-      durum.kayitLat.toFixed(4) + ', ' + durum.kayitLng.toFixed(4);
+    reverseGeocode(durum.kayitLat, durum.kayitLng, function(adres) {
+      document.getElementById('kayit-konum-text').textContent = adres;
+    });
   });
   konumButonuEkle(durum.kayitHarita, function(latlng) {
     if (marker) durum.kayitHarita.removeLayer(marker);
@@ -593,8 +616,9 @@ function kayitHaritaBaslat() {
     durum.kayitLat = latlng[0]; durum.kayitLng = latlng[1];
     document.getElementById('k-lat').value = durum.kayitLat;
     document.getElementById('k-lng').value = durum.kayitLng;
-    document.getElementById('kayit-konum-text').textContent =
-      durum.kayitLat.toFixed(4) + ', ' + durum.kayitLng.toFixed(4);
+    reverseGeocode(latlng[0], latlng[1], function(adres) {
+      document.getElementById('kayit-konum-text').textContent = adres;
+    });
   });
 }
 
