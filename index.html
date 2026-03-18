@@ -2,12 +2,12 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Yakinda Ne Var?</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"><title>Yakinda Ne Var?</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:'Segoe UI',sans-serif}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:'Segoe UI',sans-serif;overscroll-behavior:none}
 .phone{width:390px;min-height:844px;background:#f9f9f9;border-radius:40px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.25);display:flex;flex-direction:column}
 .sayfa{display:none;flex-direction:column;flex:1;overflow:hidden}
 .sayfa.aktif{display:flex}
@@ -16,14 +16,14 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
 .location{display:flex;align-items:center;gap:6px;font-weight:700;font-size:.95rem;cursor:pointer}
 .location span{color:#ff6b35}
 .search{background:#f5f5f5;border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:10px}
-.search input{border:none;background:transparent;outline:none;width:100%;font-size:.9rem;color:#222}
+.search input{border:none;background:transparent;outline:none;width:100%;font-size:16px;color:#222}
 .siralama-row{display:flex;gap:8px;padding:8px 16px 0;flex-shrink:0;overflow-x:auto}
 .siralama-row::-webkit-scrollbar{display:none}
-.siralama-btn{background:#fff;border:2px solid #eee;border-radius:20px;padding:5px 12px;font-size:.73rem;font-weight:600;color:#666;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.siralama-btn{background:#fff;border:2px solid #eee;border-radius:20px;padding:5px 12px;font-size:.73rem;font-weight:600;color:#666;cursor:pointer;white-space:nowrap;flex-shrink:0;min-height:36px}
 .siralama-btn.active{background:#ff6b35;border-color:#ff6b35;color:#fff}
 .cats{display:flex;gap:8px;padding:8px 16px 0;overflow-x:auto;flex-shrink:0}
 .cats::-webkit-scrollbar{display:none}
-.cat-btn{background:#fff;border-radius:12px;padding:8px 12px;text-align:center;min-width:65px;box-shadow:0 2px 8px rgba(0,0,0,0.07);cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:.2s}
+.cat-btn{background:#fff;border-radius:12px;padding:8px 12px;text-align:center;min-width:65px;min-height:44px;box-shadow:0 2px 8px rgba(0,0,0,0.07);cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:.2s}
 .cat-btn.active{background:#fff8f5;border-color:#ff6b35}
 .cat-btn .icon{font-size:1.3rem;margin-bottom:2px}
 .cat-btn p{font-size:.65rem;font-weight:600;color:#444}
@@ -31,7 +31,7 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
 #tam-harita{flex:1;z-index:1}
 #detay-harita{height:160px;flex-shrink:0;z-index:1}
 #kayit-harita{height:180px;z-index:1}
-.content{flex:1;overflow-y:auto;padding:12px}
+.content{flex:1;overflow-y:auto;padding:12px;-webkit-overflow-scrolling:touch}
 .section-title{font-weight:800;font-size:.9rem;margin-bottom:10px}
 .esnaf-grid{display:flex;flex-direction:column;gap:10px}
 .esnaf-card{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.07);cursor:pointer;transition:.2s}
@@ -54,8 +54,8 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
 .meta{display:flex;gap:8px;font-size:.75rem;color:#666;margin-bottom:8px;flex-wrap:wrap}
 .open-badge{background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:600}
 .action-btns{display:flex;gap:8px;margin-top:8px}
-.btn-p{flex:1;background:#ff6b35;color:#fff;border:none;border-radius:10px;padding:10px;font-weight:700;font-size:.85rem;cursor:pointer}
-.btn-s{flex:1;background:#fff8f5;color:#ff6b35;border:2px solid #ff6b35;border-radius:10px;padding:10px;font-weight:700;font-size:.85rem;cursor:pointer}
+.btn-p{flex:1;background:#ff6b35;color:#fff;border:none;border-radius:10px;padding:10px;font-weight:700;font-size:.85rem;cursor:pointer;min-height:44px}
+.btn-s{flex:1;background:#fff8f5;color:#ff6b35;border:2px solid #ff6b35;border-radius:10px;padding:10px;font-weight:700;font-size:.85rem;cursor:pointer;min-height:44px}
 .btn-p.secili,.btn-s.secili{box-shadow:0 0 0 3px #222}
 .ulasim-bar{display:flex;gap:8px;padding:10px 14px;background:#f9f9f9;border-bottom:1px solid #f0f0f0;flex-shrink:0;align-items:center}
 .ulasim-btn{flex:1;background:#fff;border:2px solid #eee;border-radius:10px;padding:7px 4px;text-align:center;cursor:pointer;transition:.2s}
@@ -67,7 +67,7 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
 .detay-tabs{display:flex;background:#f5f5f5;border-radius:10px;padding:3px;margin:10px 14px 0;flex-shrink:0}
 .detay-tab{flex:1;text-align:center;padding:7px;border-radius:8px;font-size:.78rem;font-weight:600;color:#888;cursor:pointer}
 .detay-tab.active{background:#fff;color:#ff6b35;box-shadow:0 2px 6px rgba(0,0,0,0.08)}
-.detay-scroll{flex:1;overflow-y:auto;padding:10px 14px}
+.detay-scroll{flex:1;overflow-y:auto;padding:10px 14px;-webkit-overflow-scrolling:touch}
 .menu-item{background:#fff;border-radius:12px;padding:11px;display:flex;align-items:center;margin-bottom:7px;box-shadow:0 2px 6px rgba(0,0,0,0.05)}
 .menu-item-info{flex:1}
 .menu-item-info h5{font-weight:700;font-size:.87rem;margin-bottom:2px}
@@ -82,16 +82,16 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
 .yorum-text{font-size:.8rem;color:#666;line-height:1.5}
 .yorum-form{background:#f9f9f9;border-radius:12px;padding:12px}
 .yorum-form h4{font-size:.85rem;font-weight:700;margin-bottom:8px}
-.yorum-form input,.yorum-form textarea,.form-input{width:100%;background:#fff;border:2px solid #eee;border-radius:10px;padding:9px 12px;font-size:.85rem;margin-bottom:8px;outline:none;font-family:inherit}
+.yorum-form input,.yorum-form textarea,.form-input{width:100%;background:#fff;border:2px solid #eee;border-radius:10px;padding:9px 12px;font-size:16px;margin-bottom:8px;outline:none;font-family:inherit}
 .form-input{margin-bottom:12px}
-.form-select{width:100%;background:#fff;border:2px solid #eee;border-radius:10px;padding:9px 12px;font-size:.85rem;margin-bottom:12px;outline:none;font-family:inherit}
+.form-select{width:100%;background:#fff;border:2px solid #eee;border-radius:10px;padding:9px 12px;font-size:16px;margin-bottom:12px;outline:none;font-family:inherit}
 .yorum-form textarea{height:65px;resize:none}
 .puan-secici{display:flex;gap:5px;margin-bottom:8px}
 .puan-yildiz{font-size:1.3rem;cursor:pointer;opacity:.4}
 .puan-yildiz.aktif{opacity:1}
-.yorum-gonder{width:100%;background:#ff6b35;color:#fff;border:none;border-radius:9px;padding:9px;font-weight:700;cursor:pointer;font-size:.88rem}
+.yorum-gonder{width:100%;background:#ff6b35;color:#fff;border:none;border-radius:9px;padding:9px;font-weight:700;cursor:pointer;font-size:.88rem;min-height:44px}
 .sepet-bar{background:#fff;padding:10px 14px 20px;box-shadow:0 -2px 8px rgba(0,0,0,0.07);flex-shrink:0}
-.sepet-btn{width:100%;background:#ff6b35;color:#fff;border:none;border-radius:12px;padding:12px 16px;font-weight:700;font-size:.9rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.sepet-btn{width:100%;background:#ff6b35;color:#fff;border:none;border-radius:12px;padding:12px 16px;font-weight:700;font-size:.9rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;min-height:44px}
 .sepet-btn.gizli{opacity:.4;pointer-events:none}
 .panel-header{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:20px 18px 14px;color:#fff;flex-shrink:0}
 .panel-header h2{font-size:1rem;font-weight:800;margin-bottom:3px}
@@ -110,8 +110,8 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
 .order-footer{display:flex;justify-content:space-between;align-items:center}
 .order-price{font-weight:800;color:#ff6b35;font-size:.88rem}
 .btn-accept{background:#e8f5e9;color:#2e7d32;border:none;border-radius:7px;padding:5px 10px;font-size:.73rem;font-weight:700;cursor:pointer}
-.bottom-nav{background:#fff;padding:8px 0 16px;display:flex;justify-content:space-around;box-shadow:0 -2px 8px rgba(0,0,0,0.07);flex-shrink:0}
-.nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:.63rem;color:#aaa;cursor:pointer}
+.bottom-nav{background:#fff;padding:8px 0 16px;display:flex;justify-content:space-around;box-shadow:0 -2px 8px rgba(0,0,0,0.07);flex-shrink:0;position:relative;z-index:10}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:.63rem;color:#aaa;cursor:pointer;min-height:44px;justify-content:center;padding:0 6px}
 .nav-item.active{color:#ff6b35}
 .nav-icon{font-size:1.2rem}
 .yukleniyor{text-align:center;padding:30px;color:#aaa;font-size:.88rem}

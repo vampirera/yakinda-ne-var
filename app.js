@@ -1279,6 +1279,20 @@ function siparisKabul(id) {
 // BAŞLATMA
 // =============================================================
 
+// Touchstart/click hybrid — 300ms iOS gecikmeyi kaldır
+function hizliTikla(el, fn) {
+  var dokunuldu = false;
+  el.addEventListener('touchstart', function(e) {
+    dokunuldu = true;
+    fn(e);
+    e.preventDefault();
+  }, { passive: false });
+  el.addEventListener('click', function(e) {
+    if (dokunuldu) { dokunuldu = false; return; }
+    fn(e);
+  });
+}
+
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') lightboxKapat();
 });
