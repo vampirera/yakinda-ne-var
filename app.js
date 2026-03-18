@@ -111,6 +111,15 @@ function profilFormuBaslat() {
         if (!durum.profilHarita) {
           durum.profilHarita = L.map('profil-harita', { zoomControl: false, attributionControl: false });
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(durum.profilHarita);
+          konumButonuEkle(durum.profilHarita, function(latlng) {
+            if (durum.profilHaritaMarker) durum.profilHaritaMarker.remove();
+            durum.profilHaritaMarker = L.marker(latlng).addTo(durum.profilHarita).bindPopup('Konumunuz').openPopup();
+            var profil = profilYukle() || {};
+            profil.lat = latlng[0]; profil.lng = latlng[1];
+            profilKaydet(profil);
+            durum.lat = latlng[0]; durum.lng = latlng[1];
+            document.getElementById('profil-konum-bilgi').textContent = '📍 ' + latlng[0].toFixed(5) + ', ' + latlng[1].toFixed(5);
+          });
         }
         durum.profilHarita.setView([lat, lng], 16);
         durum.profilHarita.invalidateSize();
@@ -505,11 +514,41 @@ function konumAl() {
 // HARİTALAR
 // =============================================================
 
+function konumButonuEkle(harita, callback) {
+  var KonumKontrol = L.Control.extend({
+    options: { position: 'bottomright' },
+    onAdd: function() {
+      var btn = L.DomUtil.create('button', '');
+      btn.innerHTML = '📍';
+      btn.title = 'Konumuma git';
+      btn.style.cssText = 'width:40px;height:40px;border-radius:50%;border:none;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.3);font-size:1.1rem;cursor:pointer;margin-bottom:8px';
+      L.DomEvent.disableClickPropagation(btn);
+      L.DomEvent.on(btn, 'click', function() {
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(function(pos) {
+          var latlng = [pos.coords.latitude, pos.coords.longitude];
+          harita.setView(latlng, 15);
+          if (callback) callback(latlng);
+        });
+      });
+      return btn;
+    }
+  });
+  new KonumKontrol().addTo(harita);
+}
+
 function anaHaritaBaslat() {
   if (durum.anaHarita) return;
   durum.anaHarita = L.map('ana-harita', { zoomControl: false, attributionControl: false });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(durum.anaHarita);
   durum.anaHarita.setView([36.8550, 28.2753], 13);
+  var konumMarkerAna = null;
+  konumButonuEkle(durum.anaHarita, function(latlng) {
+    if (konumMarkerAna) durum.anaHarita.removeLayer(konumMarkerAna);
+    konumMarkerAna = L.circleMarker(latlng, { radius: 10, color: '#1565c0', fillColor: '#1e88e5', fillOpacity: 0.8, weight: 2 })
+      .addTo(durum.anaHarita).bindPopup('Konumunuz');
+    durum.lat = latlng[0]; durum.lng = latlng[1];
+  });
 }
 
 function tamHaritaBaslat() {
@@ -517,6 +556,13 @@ function tamHaritaBaslat() {
   durum.tamHarita = L.map('tam-harita', { attributionControl: false });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(durum.tamHarita);
   durum.tamHarita.setView([36.8550, 28.2753], 13);
+  var konumMarkerTam = null;
+  konumButonuEkle(durum.tamHarita, function(latlng) {
+    if (konumMarkerTam) durum.tamHarita.removeLayer(konumMarkerTam);
+    konumMarkerTam = L.circleMarker(latlng, { radius: 10, color: '#1565c0', fillColor: '#1e88e5', fillOpacity: 0.8, weight: 2 })
+      .addTo(durum.tamHarita).bindPopup('Konumunuz');
+    durum.lat = latlng[0]; durum.lng = latlng[1];
+  });
 }
 
 function tamHaritaGuncelle() {
@@ -536,6 +582,15 @@ function kayitHaritaBaslat() {
     marker = L.marker(e.latlng).addTo(durum.kayitHarita);
     durum.kayitLat = e.latlng.lat;
     durum.kayitLng = e.latlng.lng;
+    document.getElementById('k-lat').value = durum.kayitLat;
+    document.getElementById('k-lng').value = durum.kayitLng;
+    document.getElementById('kayit-konum-text').textContent =
+      durum.kayitLat.toFixed(4) + ', ' + durum.kayitLng.toFixed(4);
+  });
+  konumButonuEkle(durum.kayitHarita, function(latlng) {
+    if (marker) durum.kayitHarita.removeLayer(marker);
+    marker = L.marker(latlng).addTo(durum.kayitHarita);
+    durum.kayitLat = latlng[0]; durum.kayitLng = latlng[1];
     document.getElementById('k-lat').value = durum.kayitLat;
     document.getElementById('k-lng').value = durum.kayitLng;
     document.getElementById('kayit-konum-text').textContent =
