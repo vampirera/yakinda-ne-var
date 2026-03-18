@@ -29,7 +29,8 @@ async function tablolarOlustur() {
   await pool.query(`CREATE TABLE IF NOT EXISTS urunler (id SERIAL PRIMARY KEY, esnaf_id INTEGER REFERENCES esnaflar(id), ad VARCHAR(255) NOT NULL, fiyat DECIMAL(10,2) DEFAULT 0, aciklama TEXT, fotograf_url TEXT)`);
   await pool.query(`ALTER TABLE urunler ADD COLUMN IF NOT EXISTS fotograf_url TEXT`);
   await pool.query(`CREATE TABLE IF NOT EXISTS yorumlar (id SERIAL PRIMARY KEY, esnaf_id INTEGER REFERENCES esnaflar(id), kullanici VARCHAR(255), puan INTEGER, yorum TEXT, tarih DATE DEFAULT NOW())`);
-  await pool.query(`CREATE TABLE IF NOT EXISTS siparisler (id SERIAL PRIMARY KEY, esnaf_id INTEGER, esnaf_adi VARCHAR(255), urunler JSONB, teslimat_turu VARCHAR(50), adres TEXT, ara_toplam DECIMAL(10,2), kurye_ucreti DECIMAL(10,2), komisyon DECIMAL(10,2), genel_toplam DECIMAL(10,2), durum VARCHAR(50) DEFAULT 'bekliyor', tarih TIMESTAMP DEFAULT NOW())`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS siparisler (id SERIAL PRIMARY KEY, esnaf_id INTEGER, esnaf_adi VARCHAR(255), musteri_telefon VARCHAR(20), urunler JSONB, teslimat_turu VARCHAR(50), adres TEXT, ara_toplam DECIMAL(10,2), kurye_ucreti DECIMAL(10,2), komisyon DECIMAL(10,2), genel_toplam DECIMAL(10,2), durum VARCHAR(50) DEFAULT 'bekliyor', tarih TIMESTAMP DEFAULT NOW())`);
+  await pool.query(`ALTER TABLE siparisler ADD COLUMN IF NOT EXISTS musteri_telefon VARCHAR(20)`);
 
   var sayac = await pool.query('SELECT COUNT(*) FROM esnaflar');
   if (parseInt(sayac.rows[0].count) === 0) {
@@ -212,7 +213,7 @@ app.post('/api/siparisler', async function(req, res) {
     req.body.urunler.forEach(function(u){toplam+=u.fiyat*u.adet;});
     var kurye = req.body.teslimat_turu === 'kurye' ? 15 : 0;
     var komisyon = Math.round(toplam*0.05);
-    var result = await pool.query('INSERT INTO siparisler (esnaf_id,esnaf_adi,urunler,teslimat_turu,adres,ara_toplam,kurye_ucreti,komisyon,genel_toplam) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *', [req.body.esnaf_id, esnaf.rows[0].ad, JSON.stringify(req.body.urunler), req.body.teslimat_turu||'gel-al', req.body.adres||'', toplam, kurye, komisyon, toplam+kurye+komisyon]);
+    var result = await pool.query('INSERT INTO siparisler (esnaf_id,esnaf_adi,musteri_telefon,urunler,teslimat_turu,adres,ara_toplam,kurye_ucreti,komisyon,genel_toplam) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *', [req.body.esnaf_id, esnaf.rows[0].ad, req.body.musteri_telefon||null, JSON.stringify(req.body.urunler), req.body.teslimat_turu||'gel-al', req.body.adres||'', toplam, kurye, komisyon, toplam+kurye+komisyon]);
     var siparis = result.rows[0];
     var urunSatiri = req.body.urunler.map(function(u) { return u.ad + ' x' + u.adet; }).join(', ');
     var teslimatBilgi = (siparis.teslimat_turu || 'gel-al') + (siparis.adres ? ' - ' + siparis.adres : '');
@@ -234,6 +235,15 @@ app.get('/api/siparisler/:id', async function(req, res) {
     var result = await pool.query('SELECT * FROM siparisler WHERE id=$1', [req.params.id]);
     if (!result.rows.length) return res.status(404).json({ basari: false, mesaj: 'Siparis bulunamadi' });
     res.json({ basari: true, veri: result.rows[0] });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+app.get('/api/siparislerim', async function(req, res) {
+  try {
+    var telefon = req.query.telefon;
+    if (!telefon) return res.status(400).json({ basari: false, mesaj: 'Telefon gerekli' });
+    var result = await pool.query('SELECT * FROM siparisler WHERE musteri_telefon=$1 ORDER BY tarih DESC', [telefon]);
+    res.json({ basari: true, veri: result.rows });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 

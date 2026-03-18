@@ -234,6 +234,54 @@ function siparisDetayGoster(s) {
     '<div style="text-align:center;font-size:.75rem;color:#bbb;margin-top:8px">🔄 Her 10 saniyede otomatik güncellenir</div>';
 }
 
+function siparislerListele() {
+  var profil = profilYukle();
+  var icerik = document.getElementById('siparislerim-icerik');
+  if (!icerik) return;
+
+  // Aktif takip varsa önce onu göster
+  if (siparisTakip.siparisId) {
+    siparisGuncelle();
+    return;
+  }
+
+  if (!profil || !profil.telefon) {
+    icerik.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa">Siparişlerinizi görmek için profilinizde telefon numarası kaydedin.</div>';
+    return;
+  }
+
+  icerik.innerHTML = '<div style="text-align:center;padding:20px;color:#aaa">Yükleniyor...</div>';
+
+  fetch(API_URL + '/api/siparislerim?telefon=' + encodeURIComponent(profil.telefon))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.basari) throw new Error(data.mesaj);
+      var siparisler = data.veri;
+      if (!siparisler.length) {
+        icerik.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa">Henüz siparişiniz yok.</div>';
+        return;
+      }
+      icerik.innerHTML = siparisler.map(function(s) {
+        var tarih = new Date(s.tarih).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+        var renk = durumRenk[s.durum] || '#aaa';
+        return '<div style="background:#fff;border-radius:14px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:10px;cursor:pointer" onclick="siparisTakip.siparisId=' + s.id + ';siparisGuncelle()">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
+            '<span style="font-weight:800;font-size:.95rem">Siparis #' + s.id + '</span>' +
+            '<span style="background:' + renk + ';color:#fff;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700">' + (durumIkon[s.durum] || '') + ' ' + (s.durum || '') + '</span>' +
+          '</div>' +
+          '<div style="font-size:.82rem;color:#666;margin-bottom:4px">' + (s.esnaf_adi || '') + '</div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:center">' +
+            '<span style="font-size:.75rem;color:#bbb">' + tarih + '</span>' +
+            '<span style="font-weight:800;color:#ff6b35">₺' + (parseFloat(s.genel_toplam) || 0) + '</span>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    })
+    .catch(function(err) {
+      icerik.innerHTML = '<div class="hata">Siparisler alinamadi: ' + err.message + '</div>';
+    });
+}
+
 // =============================================================
 // FAVORİLER
 // =============================================================
@@ -363,7 +411,7 @@ function navTikla(id) {
     tamHaritaGuncelle();
   } else if (id === 'siparislerim') {
     sayfaGoster('siparislerim');
-    if (siparisTakip.siparisId) siparisGuncelle();
+    siparislerListele();
   } else if (id === 'profil') {
     profilSayfasiGoster();
   } else if (id === 'favoriler') {
@@ -822,7 +870,8 @@ function siparisVer() {
       esnaf_id: durum.secilenEsnaf.id,
       urunler: durum.sepet,
       teslimat_turu: durum.teslimat,
-      adres: adres
+      adres: adres,
+      musteri_telefon: profil.telefon || null
     })
   })
     .then(function(r) { return r.json(); })
