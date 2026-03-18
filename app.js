@@ -606,6 +606,13 @@ function aramaBaslat() {
   var input = document.getElementById('arama');
   if (!input) return;
   var t;
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      clearTimeout(t);
+      durum.arama = input.value.trim();
+      esnaflarYukle();
+    }
+  });
   input.addEventListener('input', function() {
     clearTimeout(t);
     t = setTimeout(function() {
