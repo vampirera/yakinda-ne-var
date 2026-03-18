@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -212,6 +213,26 @@ app.post('/api/siparisler', async function(req, res) {
     var kurye = req.body.teslimat_turu === 'kurye' ? 15 : 0;
     var komisyon = Math.round(toplam*0.05);
     var result = await pool.query('INSERT INTO siparisler (esnaf_id,esnaf_adi,urunler,teslimat_turu,adres,ara_toplam,kurye_ucreti,komisyon,genel_toplam) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *', [req.body.esnaf_id, esnaf.rows[0].ad, JSON.stringify(req.body.urunler), req.body.teslimat_turu||'gel-al', req.body.adres||'', toplam, kurye, komisyon, toplam+kurye+komisyon]);
+    var siparis = result.rows[0];
+    var urunSatiri = req.body.urunler.map(function(u) { return u.ad + ' x' + u.adet; }).join(', ');
+    var teslimatBilgi = (siparis.teslimat_turu || 'gel-al') + (siparis.adres ? ' - ' + siparis.adres : '');
+    var waMesaj = encodeURIComponent(
+      '🆕 Yeni Sipariş #' + siparis.id + '\n' +
+      '📦 ' + urunSatiri + '\n' +
+      '💰 Toplam: ₺' + (toplam + kurye + komisyon) + '\n' +
+      '📍 Teslimat: ' + teslimatBilgi
+    );
+    var telefon = (esnaf.rows[0].telefon || '').replace(/\D/g, '');
+    if (telefon.startsWith('0')) telefon = '90' + telefon.slice(1);
+    var whatsapp_url = telefon ? 'https://wa.me/' + telefon + '?text=' + waMesaj : null;
+    res.json({ basari: true, veri: siparis, whatsapp_url: whatsapp_url });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+app.get('/api/siparisler/:id', async function(req, res) {
+  try {
+    var result = await pool.query('SELECT * FROM siparisler WHERE id=$1', [req.params.id]);
+    if (!result.rows.length) return res.status(404).json({ basari: false, mesaj: 'Siparis bulunamadi' });
     res.json({ basari: true, veri: result.rows[0] });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });

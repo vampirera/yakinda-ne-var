@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Yakinda Ne Var?</title>
-<link rel="stylesheet" href="leaflet.css">
-<script src="leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:'Segoe UI',sans-serif}
@@ -324,6 +324,69 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
       <div id="panel-urunler"></div>
     </div>
     <div class="bottom-nav" id="panel-nav"></div>
+  </div>
+
+
+  <!-- PROFİL SAYFASI -->
+  <div class="sayfa" id="sayfa-profil" style="overflow-y:auto">
+    <div class="header">
+      <div class="header-top">
+        <button id="profil-geri" style="background:#f5f5f5;color:#222;width:34px;height:34px;border-radius:50%;border:none;font-size:1rem;cursor:pointer">←</button>
+        <div style="font-weight:800;font-size:1rem">👤 Profilim</div>
+        <div></div>
+      </div>
+    </div>
+    <div style="padding:16px">
+      <div style="background:linear-gradient(135deg,#ff6b35,#f7c948);border-radius:16px;padding:20px;color:#fff;text-align:center;margin-bottom:20px">
+        <div style="font-size:3rem">👤</div>
+        <div id="profil-hosgeldin" style="font-weight:800;font-size:1rem;margin-top:6px">Hosgeldiniz!</div>
+      </div>
+      <label class="form-label">Adiniz Soyadiniz *</label>
+      <input type="text" id="profil-isim" placeholder="Ali Yilmaz" class="form-input">
+      <label class="form-label">Telefon Numaraniz *</label>
+      <input type="tel" id="profil-telefon" placeholder="05XX XXX XX XX" class="form-input">
+      <label class="form-label">Adres (Cadde, Sokak, No)</label>
+      <input type="text" id="profil-adres1" placeholder="Atatürk Cad. No:12 D:3" class="form-input">
+      <button id="profil-konum-al" style="width:100%;background:#1a1a2e;color:#fff;border:none;border-radius:12px;padding:11px;font-weight:700;font-size:.9rem;cursor:pointer;margin-bottom:8px">📍 Konumumu Kullan</button>
+      <div id="profil-harita-wrap" style="display:none;border-radius:12px;overflow:hidden;margin-bottom:12px;border:2px solid #eee">
+        <div id="profil-harita" style="height:200px"></div>
+        <div id="profil-konum-bilgi" style="padding:6px 10px;font-size:.72rem;color:#888;background:#f9f9f9"></div>
+      </div>
+      <input type="hidden" id="profil-lat">
+      <input type="hidden" id="profil-lng">
+      <button id="profil-kaydet" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:14px;padding:14px;font-weight:700;font-size:1rem;cursor:pointer;margin-bottom:10px">Kaydet</button>
+      <button id="profil-sifirla" style="width:100%;background:#f5f5f5;color:#888;border:none;border-radius:14px;padding:12px;font-weight:600;font-size:.9rem;cursor:pointer">Profili Sifirla</button>
+    </div>
+    <div class="bottom-nav" id="profil-nav"></div>
+  </div>
+
+  <!-- SİPARİŞLERİM SAYFASI -->
+  <div class="sayfa" id="sayfa-siparislerim">
+    <div class="header">
+      <div class="header-top">
+        <button id="siparislerim-geri" style="background:#f5f5f5;color:#222;width:34px;height:34px;border-radius:50%;border:none;font-size:1rem;cursor:pointer">←</button>
+        <div style="font-weight:800;font-size:1rem">🛵 Siparişlerim</div>
+        <div></div>
+      </div>
+    </div>
+    <div class="content" id="siparislerim-icerik">
+      <div class="yukleniyor">Yukleniyor...</div>
+    </div>
+    <div class="bottom-nav" id="siparislerim-nav"></div>
+  </div>
+
+  <!-- FAVORİLER SAYFASI -->
+  <div class="sayfa" id="sayfa-favoriler">
+    <div class="header">
+      <div class="header-top">
+        <div style="font-weight:800;font-size:1rem">❤️ Favorilerim</div>
+        <div></div>
+      </div>
+    </div>
+    <div class="content">
+      <div class="esnaf-grid" id="favori-listesi"><div class="yukleniyor">Favori esnaf yok.</div></div>
+    </div>
+    <div class="bottom-nav" id="favoriler-nav"></div>
   </div>
 
 </div>
