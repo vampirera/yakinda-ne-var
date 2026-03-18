@@ -641,6 +641,20 @@ function kamuKurumlariniYukle(lat, lng, harita, markerListesi) {
         if (!bilgi) return;
 
         var isim = (el.tags && (el.tags.name || el.tags['name:tr'])) || bilgi.ikon;
+        var dest = elLat + ',' + elLng;
+        var origin = (durum.lat && durum.lng) ? '&origin=' + durum.lat + ',' + durum.lng : '';
+        var mapsBase = 'https://www.google.com/maps/dir/?api=1&destination=' + dest + origin + '&travelmode=';
+        var btnStyle = 'display:inline-block;padding:5px 8px;border-radius:7px;font-size:.75rem;font-weight:700;cursor:pointer;border:none;margin:2px;';
+        var popupHtml =
+          '<div style="min-width:180px">' +
+            '<b style="font-size:.9rem">' + isim + '</b><br>' +
+            '<span style="color:#888;font-size:.75rem">' + bilgi.ikon + ' ' + tip + '</span>' +
+            '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">' +
+              '<a href="' + mapsBase + 'driving" target="_blank" style="' + btnStyle + 'background:#e3f2fd;color:#1565c0;text-decoration:none">🚗 Araçla</a>' +
+              '<a href="' + mapsBase + 'walking" target="_blank" style="' + btnStyle + 'background:#e8f5e9;color:#2e7d32;text-decoration:none">🚶 Yaya</a>' +
+              '<a href="' + mapsBase + 'transit" target="_blank" style="' + btnStyle + 'background:#f3e5f5;color:#6a1b9a;text-decoration:none">🚌 Toplu</a>' +
+            '</div>' +
+          '</div>';
         var marker = L.marker([elLat, elLng], {
           icon: L.divIcon({
             html: '<div style="font-size:1.2rem;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))">' + bilgi.ikon + '</div>',
@@ -648,7 +662,7 @@ function kamuKurumlariniYukle(lat, lng, harita, markerListesi) {
             iconSize: [24, 24],
             iconAnchor: [12, 12]
           })
-        }).addTo(harita).bindPopup('<b>' + isim + '</b><br><span style="color:#888;font-size:.8rem">' + tip + '</span>');
+        }).addTo(harita).bindPopup(popupHtml, { maxWidth: 220 });
 
         markerListesi.push(marker);
       });
