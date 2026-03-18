@@ -2,7 +2,7 @@
 // Yakinda Ne Var - Frontend App
 // =============================================================
 
-var API_URL = 'http://localhost:3000';
+var API_URL = 'https://yakinda-ne-var-backend-production.up.railway.app';
 
 var durum = {
   lat: null,
