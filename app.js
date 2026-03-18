@@ -302,6 +302,16 @@ function ikon(kategori) {
   return katIkon[kategori] || '🏪';
 }
 
+function lightboxAc(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.add('aktif');
+}
+
+function lightboxKapat() {
+  document.getElementById('lightbox').classList.remove('aktif');
+  document.getElementById('lightbox-img').src = '';
+}
+
 // =============================================================
 // NAVİGASYON
 // =============================================================
@@ -714,7 +724,7 @@ function menuGoster(urunler) {
   con.innerHTML = urunler.map(function(u) {
     var fiyat = parseFloat(u.fiyat) || 0;
     return '<div class="menu-item">' +
-      (u.fotograf_url ? '<img src="' + u.fotograf_url + '" style="width:50px;height:50px;object-fit:cover;border-radius:8px;margin-right:10px">' : '') +
+      (u.fotograf_url ? '<img src="' + u.fotograf_url + '" onclick="event.stopPropagation();lightboxAc(\'' + u.fotograf_url + '\')" style="width:50px;height:50px;object-fit:cover;border-radius:8px;margin-right:10px;cursor:zoom-in">' : '') +
       '<div class="menu-item-info">' +
         '<h5>' + u.ad + '</h5>' +
         '<p>' + (u.aciklama || '') + '</p>' +
@@ -1069,6 +1079,10 @@ function siparisKabul(id) {
 // =============================================================
 // BAŞLATMA
 // =============================================================
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') lightboxKapat();
+});
 
 document.addEventListener('DOMContentLoaded', function() {
   if (window.L) L.Icon.Default.imagePath = 'images/';

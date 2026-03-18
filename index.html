@@ -128,9 +128,17 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
 .form-file{display:flex;align-items:center;gap:8px;background:#f9f9f9;border:2px dashed #ddd;border-radius:10px;padding:12px;cursor:pointer;margin-bottom:12px}
 .kayit-banner{background:linear-gradient(135deg,#ff6b35,#f7c948);border-radius:16px;padding:16px;color:#fff;margin-bottom:16px}
 .admin-card{background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.07)}
+.lightbox-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center}
+.lightbox-overlay.aktif{display:flex}
+.lightbox-img{max-width:90%;max-height:85vh;border-radius:12px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,.6)}
+.lightbox-kapat{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.6rem;width:40px;height:40px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
 </style>
 </head>
 <body>
+<div class="lightbox-overlay" id="lightbox" onclick="lightboxKapat()">
+  <button class="lightbox-kapat" onclick="lightboxKapat()">✕</button>
+  <img class="lightbox-img" id="lightbox-img" src="" alt="" onclick="event.stopPropagation()">
+</div>
 <div class="phone">
 
   <!-- ANA SAYFA -->
