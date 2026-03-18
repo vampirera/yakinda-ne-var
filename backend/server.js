@@ -31,6 +31,7 @@ async function tablolarOlustur() {
   await pool.query(`CREATE TABLE IF NOT EXISTS yorumlar (id SERIAL PRIMARY KEY, esnaf_id INTEGER REFERENCES esnaflar(id), kullanici VARCHAR(255), puan INTEGER, yorum TEXT, tarih DATE DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS siparisler (id SERIAL PRIMARY KEY, esnaf_id INTEGER, esnaf_adi VARCHAR(255), musteri_telefon VARCHAR(20), urunler JSONB, teslimat_turu VARCHAR(50), adres TEXT, ara_toplam DECIMAL(10,2), kurye_ucreti DECIMAL(10,2), komisyon DECIMAL(10,2), genel_toplam DECIMAL(10,2), durum VARCHAR(50) DEFAULT 'bekliyor', tarih TIMESTAMP DEFAULT NOW())`);
   await pool.query(`ALTER TABLE siparisler ADD COLUMN IF NOT EXISTS musteri_telefon VARCHAR(20)`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS kuryeler (id SERIAL PRIMARY KEY, ad VARCHAR(255) NOT NULL, telefon VARCHAR(20) NOT NULL, arac_tipi VARCHAR(50), ilce VARCHAR(100), onaylandi BOOLEAN DEFAULT false, kayit_tarihi TIMESTAMP DEFAULT NOW())`);
 
   var sayac = await pool.query('SELECT COUNT(*) FROM esnaflar');
   if (parseInt(sayac.rows[0].count) === 0) {
@@ -184,6 +185,43 @@ app.delete('/api/admin/sil/:id', async function(req, res) {
     await pool.query('DELETE FROM yorumlar WHERE esnaf_id=$1', [req.params.id]);
     await pool.query('DELETE FROM esnaflar WHERE id=$1', [req.params.id]);
     res.json({ basari: true, mesaj: 'Esnaf silindi.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Kurye kayıt
+app.post('/api/kurye-kayit', async function(req, res) {
+  try {
+    var { ad, telefon, arac_tipi, ilce } = req.body;
+    if (!ad || !telefon || !arac_tipi || !ilce) return res.status(400).json({ basari: false, mesaj: 'Tum alanlar zorunlu' });
+    await pool.query('INSERT INTO kuryeler (ad,telefon,arac_tipi,ilce) VALUES ($1,$2,$3,$4)', [ad, telefon, arac_tipi, ilce]);
+    res.json({ basari: true, mesaj: 'Basvuru alindi.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Admin kurye listesi
+app.get('/api/admin/kuryeler', async function(req, res) {
+  if (req.query.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  try {
+    var result = await pool.query('SELECT * FROM kuryeler ORDER BY kayit_tarihi DESC');
+    res.json({ basari: true, veri: result.rows });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Admin kurye onayla
+app.post('/api/admin/kurye-onayla/:id', async function(req, res) {
+  if (req.body.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  try {
+    await pool.query('UPDATE kuryeler SET onaylandi=true WHERE id=$1', [req.params.id]);
+    res.json({ basari: true, mesaj: 'Kurye onaylandi.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Admin kurye sil
+app.delete('/api/admin/kurye-sil/:id', async function(req, res) {
+  if (req.query.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  try {
+    await pool.query('DELETE FROM kuryeler WHERE id=$1', [req.params.id]);
+    res.json({ basari: true, mesaj: 'Kurye silindi.' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 

@@ -296,6 +296,80 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
     </div>
   </div>
 
+  <!-- KAYIT SEÇİM -->
+  <div class="sayfa" id="sayfa-kayit-secim" style="overflow-y:auto">
+    <div class="header">
+      <div class="header-top">
+        <button onclick="sayfaGoster('ana')" style="background:#f5f5f5;color:#222;width:34px;height:34px;border-radius:50%;border:none;font-size:1rem;cursor:pointer">←</button>
+        <div style="font-weight:800;font-size:1rem">Kayıt Ol</div>
+        <div></div>
+      </div>
+    </div>
+    <div style="padding:24px 16px">
+      <div style="background:linear-gradient(135deg,#ff6b35,#f7c948);border-radius:16px;padding:20px;color:#fff;text-align:center;margin-bottom:24px">
+        <div style="font-size:2.5rem;margin-bottom:8px">👋</div>
+        <h3 style="font-size:1.1rem;margin-bottom:4px">Platforma Katıl!</h3>
+        <p style="font-size:.82rem;opacity:.9">Nasıl kayıt olmak istiyorsunuz?</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <button onclick="sayfaGoster('kayit')" style="background:#fff;border:2px solid #ff6b35;border-radius:16px;padding:20px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:14px">
+          <span style="font-size:2.2rem">🏪</span>
+          <div>
+            <div style="font-weight:800;font-size:.95rem;color:#222">Esnaf Olarak Kayıt Ol</div>
+            <div style="font-size:.78rem;color:#888;margin-top:3px">İşletmenizi listeyin, siparişleri yönetin</div>
+          </div>
+        </button>
+        <button onclick="sayfaGoster('kurye-kayit')" style="background:#fff;border:2px solid #1a1a2e;border-radius:16px;padding:20px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:14px">
+          <span style="font-size:2.2rem">🛵</span>
+          <div>
+            <div style="font-weight:800;font-size:.95rem;color:#222">Kurye Olarak Kayıt Ol</div>
+            <div style="font-size:.78rem;color:#888;margin-top:3px">Teslimat yapın, kazanç elde edin</div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KURYE KAYIT -->
+  <div class="sayfa" id="sayfa-kurye-kayit" style="overflow-y:auto">
+    <div class="header">
+      <div class="header-top">
+        <button onclick="sayfaGoster('kayit-secim')" style="background:#f5f5f5;color:#222;width:34px;height:34px;border-radius:50%;border:none;font-size:1rem;cursor:pointer">←</button>
+        <div style="font-weight:800;font-size:1rem">🛵 Kurye Kayıt</div>
+        <div></div>
+      </div>
+    </div>
+    <div style="padding:16px">
+      <div class="kayit-banner" style="background:linear-gradient(135deg,#1a1a2e,#16213e)">
+        <h3 style="font-size:1rem;margin-bottom:4px">Kurye Ağına Katıl!</h3>
+        <p style="font-size:.8rem;opacity:.9">Başvurunuz incelendikten sonra onaylanacak.</p>
+      </div>
+      <label class="form-label">Ad Soyad *</label>
+      <input type="text" id="kur-ad" placeholder="Ali Yilmaz" class="form-input">
+      <label class="form-label">Telefon *</label>
+      <input type="tel" id="kur-telefon" placeholder="05XX XXX XX XX" class="form-input">
+      <label class="form-label">Araç Tipi *</label>
+      <select id="kur-arac" class="form-select">
+        <option value="">Seçin...</option>
+        <option value="motor">Motor</option>
+        <option value="bisiklet">Bisiklet</option>
+        <option value="araba">Araba</option>
+      </select>
+      <label class="form-label">Çalışmak İstediğiniz İlçe *</label>
+      <select id="kur-ilce" class="form-select">
+        <option value="">Seçin...</option>
+        <option value="Marmaris">Marmaris</option>
+        <option value="Bodrum">Bodrum</option>
+        <option value="Fethiye">Fethiye</option>
+        <option value="Datca">Datca</option>
+        <option value="Milas">Milas</option>
+        <option value="Mugla Merkez">Mugla Merkez</option>
+      </select>
+      <button id="kurye-kayit-gonder" style="width:100%;background:#1a1a2e;color:#fff;border:none;border-radius:14px;padding:14px;font-weight:700;font-size:1rem;cursor:pointer;min-height:44px;margin-top:8px">Başvur</button>
+      <p id="kurye-kayit-mesaj" style="text-align:center;font-size:.8rem;color:#aaa;margin-top:10px"></p>
+    </div>
+  </div>
+
   <!-- ADMİN -->
   <div class="sayfa" id="sayfa-admin" style="overflow-y:auto">
     <div class="header">

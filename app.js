@@ -399,6 +399,9 @@ function sayfaGoster(id) {
   if (id === 'kayit') {
     setTimeout(kayitHaritaBaslat, 150);
   }
+  if (id === 'admin') {
+    // admin şifre sorulacak, adminGoster() ayrıca çağrılıyor
+  }
 }
 
 function navOlustur(containerId, aktif) {
@@ -432,7 +435,7 @@ function navTikla(id) {
   } else if (id === 'favoriler') {
     favorilerSayfasiGoster();
   } else if (id === 'kayit') {
-    sayfaGoster('kayit');
+    sayfaGoster('kayit-secim');
   } else if (id === 'panel') {
     sayfaGoster('panel');
     panelYukle();
@@ -1179,6 +1182,57 @@ function kayitFormuBaslat() {
 // ADMİN PANELİ
 // =============================================================
 
+// =============================================================
+// KURYE KAYIT
+// =============================================================
+
+function kuryeKayitGonder() {
+  var ad      = document.getElementById('kur-ad').value.trim();
+  var telefon = document.getElementById('kur-telefon').value.trim();
+  var arac    = document.getElementById('kur-arac').value;
+  var ilce    = document.getElementById('kur-ilce').value;
+  var mesaj   = document.getElementById('kurye-kayit-mesaj');
+
+  if (!ad || !telefon || !arac || !ilce) {
+    mesaj.style.color = '#e53935';
+    mesaj.textContent = 'Lütfen tüm alanları doldurun.';
+    return;
+  }
+
+  var btn = document.getElementById('kurye-kayit-gonder');
+  btn.disabled = true;
+  btn.textContent = 'Gönderiliyor...';
+  mesaj.textContent = '';
+
+  fetch(API_URL + '/api/kurye-kayit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ad: ad, telefon: telefon, arac_tipi: arac, ilce: ilce })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btn.textContent = 'Başvur';
+      if (data.basari) {
+        mesaj.style.color = '#2e7d32';
+        mesaj.textContent = '✅ Başvurunuz alındı! Onaylandığında size ulaşacağız.';
+        document.getElementById('kur-ad').value = '';
+        document.getElementById('kur-telefon').value = '';
+        document.getElementById('kur-arac').value = '';
+        document.getElementById('kur-ilce').value = '';
+      } else {
+        mesaj.style.color = '#e53935';
+        mesaj.textContent = 'Hata: ' + data.mesaj;
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Başvur';
+      mesaj.style.color = '#e53935';
+      mesaj.textContent = 'Bağlantı hatası.';
+    });
+}
+
 function adminGoster() {
   var key = prompt('Admin sifresi:');
   if (!key) return;
@@ -1188,14 +1242,15 @@ function adminGoster() {
 
   Promise.all([
     fetch(API_URL + '/api/admin/bekleyenler?key=' + key).then(function(r) { return r.json(); }),
-    fetch(API_URL + '/api/admin/aktifler?key='    + key).then(function(r) { return r.json(); })
+    fetch(API_URL + '/api/admin/aktifler?key='    + key).then(function(r) { return r.json(); }),
+    fetch(API_URL + '/api/admin/kuryeler?key='    + key).then(function(r) { return r.json(); })
   ]).then(function(results) {
     if (!results[0].basari) { icerik.innerHTML = '<div class="hata">Yetkisiz erisim.</div>'; return; }
-    adminPanelGoster(results[0].veri, results[1].veri || [], key);
+    adminPanelGoster(results[0].veri, results[1].veri || [], results[2].veri || [], key);
   }).catch(function() { icerik.innerHTML = '<div class="hata">Baglanamadi.</div>'; });
 }
 
-function adminPanelGoster(bekleyenler, aktifler, key) {
+function adminPanelGoster(bekleyenler, aktifler, kuryeler, key) {
   var html = '<div class="s-title">Bekleyen Onaylar (' + bekleyenler.length + ')</div>';
   html += bekleyenler.map(function(e) {
     return '<div class="admin-card">' +
@@ -1224,7 +1279,35 @@ function adminPanelGoster(bekleyenler, aktifler, key) {
       '</div></div>';
   }).join('');
 
+  // Kurye başvuruları
+  html += '<div class="s-title" style="margin-top:16px">🛵 Kurye Başvuruları (' + kuryeler.length + ')</div>';
+  if (!kuryeler.length) {
+    html += '<div style="color:#aaa;font-size:.82rem;padding:8px 0">Bekleyen kurye başvurusu yok.</div>';
+  } else {
+    html += kuryeler.map(function(k) {
+      return '<div class="admin-card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<div><b>' + k.ad + '</b><br><small>' + k.telefon + ' · ' + k.arac_tipi + ' · ' + k.ilce + ' · ' +
+            (k.onaylandi ? '✅ Onaylı' : '⏳ Bekliyor') + '</small></div>' +
+          '<div style="display:flex;gap:5px;flex-wrap:wrap">' +
+            (!k.onaylandi
+              ? '<button onclick="kuryeIslem(\'onayla\',' + k.id + ',\'' + key + '\')" style="background:#e8f5e9;color:#2e7d32;border:none;border-radius:7px;padding:5px 10px;font-size:.73rem;font-weight:700;cursor:pointer">Onayla</button>'
+              : '') +
+            '<button onclick="kuryeIslem(\'sil\',' + k.id + ',\'' + key + '\')" style="background:#ffebee;color:#c62828;border:none;border-radius:7px;padding:5px 10px;font-size:.73rem;font-weight:700;cursor:pointer">Sil</button>' +
+          '</div>' +
+        '</div></div>';
+    }).join('');
+  }
+
   document.getElementById('admin-icerik').innerHTML = html;
+}
+
+function kuryeIslem(tip, id, key) {
+  if (tip === 'sil' && !confirm('Kurye silinecek. Emin misiniz?')) return;
+  var istek;
+  if (tip === 'onayla') istek = fetch(API_URL + '/api/admin/kurye-onayla/' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) });
+  else if (tip === 'sil') istek = fetch(API_URL + '/api/admin/kurye-sil/' + id + '?key=' + key, { method: 'DELETE' });
+  istek.then(function() { adminGoster(); });
 }
 
 function adminIslem(tip, id, key) {
@@ -1343,7 +1426,8 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('back-btn').addEventListener('click', function() { sayfaGoster('ana'); });
   document.getElementById('admin-geri').addEventListener('click', function() { sayfaGoster('ana'); });
   document.getElementById('siparislerim-geri').addEventListener('click', function() { sayfaGoster('ana'); });
-  document.getElementById('kayit-geri').addEventListener('click', function() { sayfaGoster('ana'); });
+  document.getElementById('kayit-geri').addEventListener('click', function() { sayfaGoster('kayit-secim'); });
+  document.getElementById('kurye-kayit-gonder').addEventListener('click', kuryeKayitGonder);
 
   document.getElementById('btn-kurye').addEventListener('click', function() {
     durum.teslimat = 'kurye';
