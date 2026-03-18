@@ -22,6 +22,8 @@ var durum = {
   kayitLng: null,
   anaMarkers: [],
   tamMarkers: [],
+  kamuMarkersAna: [],
+  kamuMarkersTam: [],
   profilHarita: null,
   profilHaritaMarker: null
 };
@@ -526,6 +528,10 @@ function konumAl() {
       L.circleMarker([durum.lat, durum.lng], {
         radius: 10, color: '#1565c0', fillColor: '#1e88e5', fillOpacity: 0.8, weight: 2
       }).addTo(durum.anaHarita).bindPopup('Konumunuz');
+      kamuKurumlariniYukle(durum.lat, durum.lng, durum.anaHarita, durum.kamuMarkersAna);
+    }
+    if (durum.tamHarita) {
+      kamuKurumlariniYukle(durum.lat, durum.lng, durum.tamHarita, durum.kamuMarkersTam);
     }
   }, function() {
     varsayilanKonum();
@@ -589,7 +595,65 @@ function tamHaritaBaslat() {
 
 function tamHaritaGuncelle() {
   if (!durum.tamHarita) tamHaritaBaslat();
-  setTimeout(function() { durum.tamHarita.invalidateSize(); }, 100);
+  setTimeout(function() {
+    durum.tamHarita.invalidateSize();
+    if (durum.lat && durum.lng && !durum.kamuMarkersTam.length) {
+      kamuKurumlariniYukle(durum.lat, durum.lng, durum.tamHarita, durum.kamuMarkersTam);
+    }
+  }, 100);
+}
+
+var kamuTurleri = {
+  hospital:     { ikon: '🏥', renk: '#e53935' },
+  school:       { ikon: '🏫', renk: '#fb8c00' },
+  police:       { ikon: '🚔', renk: '#1e88e5' },
+  courthouse:   { ikon: '⚖️', renk: '#6d4c41' },
+  fire_station: { ikon: '🚒', renk: '#f4511e' },
+  post_office:  { ikon: '📮', renk: '#fdd835' },
+  townhall:     { ikon: '🏛️', renk: '#5e35b1' }
+};
+
+function kamuKurumlariniYukle(lat, lng, harita, markerListesi) {
+  // Mevcut kamu markerlarını temizle
+  markerListesi.forEach(function(m) { harita.removeLayer(m); });
+  markerListesi.length = 0;
+
+  var amenityListesi = Object.keys(kamuTurleri).map(function(tip) {
+    return 'node["amenity"="' + tip + '"](around:5000,' + lat + ',' + lng + ');' +
+           'way["amenity"="' + tip + '"](around:5000,' + lat + ',' + lng + ');';
+  }).join('');
+
+  var sorgu = '[out:json][timeout:20];(' + amenityListesi + ');out center;';
+
+  fetch('https://overpass-api.de/api/interpreter', {
+    method: 'POST',
+    body: 'data=' + encodeURIComponent(sorgu)
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      data.elements.forEach(function(el) {
+        var elLat = el.lat || (el.center && el.center.lat);
+        var elLng = el.lon || (el.center && el.center.lon);
+        if (!elLat || !elLng) return;
+
+        var tip    = el.tags && el.tags.amenity;
+        var bilgi  = kamuTurleri[tip];
+        if (!bilgi) return;
+
+        var isim = (el.tags && (el.tags.name || el.tags['name:tr'])) || bilgi.ikon;
+        var marker = L.marker([elLat, elLng], {
+          icon: L.divIcon({
+            html: '<div style="font-size:1.2rem;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))">' + bilgi.ikon + '</div>',
+            className: '',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          })
+        }).addTo(harita).bindPopup('<b>' + isim + '</b><br><span style="color:#888;font-size:.8rem">' + tip + '</span>');
+
+        markerListesi.push(marker);
+      });
+    })
+    .catch(function() {}); // Sessizce hata yut
 }
 
 function kayitHaritaBaslat() {
