@@ -324,6 +324,7 @@ app.post('/api/gorsel-ara', upload.single('fotograf'), async function(req, res) 
         FROM esnaflar e
         LEFT JOIN urunler u ON e.id = u.esnaf_id
         WHERE e.onaylandi = true
+        ${kategori ? "AND e.kategori = $1" : ""}
         ${eslesenIdler.length > 0 ? "AND e.id NOT IN (" + eslesenIdler.join(',') + ")" : ""}
         GROUP BY e.id
         HAVING (${anahtarKelimeler.map(function(k) {
@@ -332,7 +333,7 @@ app.post('/api/gorsel-ara', upload.single('fotograf'), async function(req, res) 
         }).join(') OR (')})
         ORDER BY e.puan DESC
       `;
-      var kalanResult = await pool.query(kalanQuery, []);
+      var kalanResult = await pool.query(kalanQuery, kategori ? [kategori] : []);
 
       esnaflar = eslesenResult.rows.concat(kalanResult.rows).map(function(e) {
         e.urunler = e.urunler || [];
