@@ -314,7 +314,7 @@ app.post('/api/gorsel-ara', upload.single('fotograf'), async function(req, res) 
       var params = kategori ? [kategori] : [];
       var eslesenResult = await pool.query(skorQuery, params);
 
-      // Eşleşmeyen ama aynı kategorideki esnafları da ekle
+      // Esnaf adı/açıklamasında veya ürünlerinde anahtar kelime geçenleri de ekle
       var eslesenIdler = eslesenResult.rows.map(function(r) { return r.id; });
       var kalanQuery = `
         SELECT e.*,
@@ -324,12 +324,15 @@ app.post('/api/gorsel-ara', upload.single('fotograf'), async function(req, res) 
         FROM esnaflar e
         LEFT JOIN urunler u ON e.id = u.esnaf_id
         WHERE e.onaylandi = true
-        ${kategori ? "AND e.kategori = $1" : ""}
         ${eslesenIdler.length > 0 ? "AND e.id NOT IN (" + eslesenIdler.join(',') + ")" : ""}
         GROUP BY e.id
+        HAVING (${anahtarKelimeler.map(function(k) {
+          var kk = k.toLowerCase().replace(/'/g, "''");
+          return "bool_or(LOWER(u.ad) LIKE '%" + kk + "%') OR bool_or(LOWER(COALESCE(u.aciklama,'')) LIKE '%" + kk + "%')";
+        }).join(') OR (')})
         ORDER BY e.puan DESC
       `;
-      var kalanResult = await pool.query(kalanQuery, params);
+      var kalanResult = await pool.query(kalanQuery, []);
 
       esnaflar = eslesenResult.rows.concat(kalanResult.rows).map(function(e) {
         e.urunler = e.urunler || [];
