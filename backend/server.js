@@ -9,6 +9,17 @@ const OpenAI = require('openai');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+const twilio = require('twilio');
+const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+function whatsappGonder(telefon, mesaj) {
+  if (!telefon || !process.env.TWILIO_WHATSAPP_FROM) return;
+  var to = telefon.startsWith('whatsapp:') ? telefon : 'whatsapp:' + telefon;
+  twilioClient.messages.create({ from: process.env.TWILIO_WHATSAPP_FROM, to: to, body: mesaj })
+    .then(function(m) { console.log('[WhatsApp] Gönderildi:', m.sid); })
+    .catch(function(e) { console.log('[WhatsApp] Hata:', e.message); });
+}
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -194,6 +205,12 @@ app.post('/api/kurye-kayit', async function(req, res) {
     var { ad, telefon, arac_tipi, ilce } = req.body;
     if (!ad || !telefon || !arac_tipi || !ilce) return res.status(400).json({ basari: false, mesaj: 'Tum alanlar zorunlu' });
     await pool.query('INSERT INTO kuryeler (ad,telefon,arac_tipi,ilce) VALUES ($1,$2,$3,$4)', [ad, telefon, arac_tipi, ilce]);
+
+    // Admine bildirim
+    if (process.env.ADMIN_TELEFON) {
+      whatsappGonder(process.env.ADMIN_TELEFON, '🛵 Yeni kurye başvurusu: ' + ad + ', ' + ilce + ', ' + arac_tipi);
+    }
+
     res.json({ basari: true, mesaj: 'Basvuru alindi.' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
@@ -264,6 +281,22 @@ app.post('/api/siparisler', async function(req, res) {
     var telefon = (esnaf.rows[0].telefon || '').replace(/\D/g, '');
     if (telefon.startsWith('0')) telefon = '90' + telefon.slice(1);
     var whatsapp_url = telefon ? 'https://wa.me/' + telefon + '?text=' + waMesaj : null;
+
+    // Esnafa bildirim
+    if (telefon) {
+      var musteriTelefon = req.body.musteri_telefon || '-';
+      var esnafMesaj = '🛵 Yeni sipariş! Müşteri: ' + musteriTelefon + ', Tutar: ' + (toplam + kurye + komisyon) + '₺. Ürünler: ' + urunSatiri + '. Müşteri telefon: ' + musteriTelefon;
+      whatsappGonder('+' + telefon, esnafMesaj);
+    }
+
+    // Müşteriye bildirim
+    if (req.body.musteri_telefon) {
+      var musteriNo = (req.body.musteri_telefon || '').replace(/\D/g, '');
+      if (musteriNo.startsWith('0')) musteriNo = '90' + musteriNo.slice(1);
+      var musteriMesaj = '✅ Siparişiniz alındı! ' + esnaf.rows[0].ad + '\'na iletildi. Toplam: ' + (toplam + kurye + komisyon) + '₺';
+      whatsappGonder('+' + musteriNo, musteriMesaj);
+    }
+
     res.json({ basari: true, veri: siparis, whatsapp_url: whatsapp_url });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
