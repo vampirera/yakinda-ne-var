@@ -12,6 +12,28 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const twilio = require('twilio');
 const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
+// =============================================================
+// IN-MEMORY CACHE
+// =============================================================
+
+var _cache = {};
+var CACHE_TTL = { esnaflar: 2*60*1000, ilceler: 60*60*1000, esnaf_detay: 5*60*1000 };
+
+function cacheAl(key) {
+  var e = _cache[key];
+  if (!e) return null;
+  if (Date.now() > e.exp) { delete _cache[key]; return null; }
+  return e.data;
+}
+function cacheKaydet(key, data, ttl) {
+  _cache[key] = { data: data, exp: Date.now() + ttl };
+}
+function cacheSil(prefix) {
+  Object.keys(_cache).forEach(function(k) { if (k.startsWith(prefix)) delete _cache[k]; });
+}
+
+// =============================================================
+
 function whatsappGonder(telefon, mesaj) {
   if (!telefon || !process.env.TWILIO_WHATSAPP_FROM) return;
   var to = telefon.startsWith('whatsapp:') ? telefon : 'whatsapp:' + telefon;
@@ -74,12 +96,30 @@ function mesafeHesapla(lat1, lng1, lat2, lng2) {
 }
 
 app.get('/', function(req, res) { res.json({ mesaj: 'Yakinda Ne Var API calisiyor!', versiyon: '5.0' }); });
+app.get('/api/ping', function(req, res) { res.sendStatus(200); });
 
 app.get('/api/esnaflar', async function(req, res) {
   try {
     var ilce = req.query.ilce, kategori = req.query.kategori, siralama = req.query.siralama || 'mesafe';
     var lat = parseFloat(req.query.lat), lng = parseFloat(req.query.lng);
     var arama = req.query.arama ? req.query.arama.toLowerCase() : null;
+
+    // Cache key: konum hariç parametreler (konum bazlı sıralama/mesafe client'ta da yapılabilir)
+    var cacheKey = 'esnaflar:' + (ilce||'') + ':' + (kategori||'') + ':' + (arama||'');
+    var cached = cacheAl(cacheKey);
+    if (cached) {
+      var esnaflar = cached.map(function(e) {
+        e = Object.assign({}, e);
+        if (lat && lng) { var km = mesafeHesapla(lat, lng, parseFloat(e.lat), parseFloat(e.lng)); e.mesafe_km = Math.round(km*10)/10; e.mesafe_text = km < 1 ? Math.round(km*1000)+'m' : km.toFixed(1)+'km'; }
+        else { e.mesafe_km = 0; e.mesafe_text = null; }
+        return e;
+      });
+      if (siralama === 'mesafe') esnaflar.sort(function(a,b){return a.mesafe_km-b.mesafe_km;});
+      else if (siralama === 'puan') esnaflar.sort(function(a,b){return b.puan-a.puan;});
+      else if (siralama === 'fiyat') esnaflar.sort(function(a,b){ var ma=a.urunler.length?Math.min.apply(null,a.urunler.map(function(u){return u.fiyat;})):999; var mb=b.urunler.length?Math.min.apply(null,b.urunler.map(function(u){return u.fiyat;})):999; return ma-mb; });
+      return res.json({ basari: true, veri: esnaflar, _cache: true });
+    }
+
     var query = `SELECT e.*, json_agg(DISTINCT jsonb_build_object('id',u.id,'ad',u.ad,'fiyat',u.fiyat,'aciklama',u.aciklama,'fotograf_url',u.fotograf_url)) FILTER (WHERE u.id IS NOT NULL) as urunler FROM esnaflar e LEFT JOIN urunler u ON e.id=u.esnaf_id WHERE e.onaylandi=true`;
     var params = [], pi = 1;
     if (ilce) { query += ' AND LOWER(e.ilce)=$'+pi; params.push(ilce.toLowerCase()); pi++; }
@@ -87,8 +127,11 @@ app.get('/api/esnaflar', async function(req, res) {
     if (arama) { query += ' AND (LOWER(e.ad) LIKE $'+pi+' OR LOWER(e.kategori) LIKE $'+pi+' OR EXISTS (SELECT 1 FROM urunler u2 WHERE u2.esnaf_id=e.id AND LOWER(u2.ad) LIKE $'+pi+'))'; params.push('%'+arama+'%'); pi++; }
     query += ' GROUP BY e.id';
     var result = await pool.query(query, params);
-    var esnaflar = result.rows.map(function(e) {
-      e.urunler = e.urunler || [];
+    var base = result.rows.map(function(e) { e.urunler = e.urunler || []; return e; });
+    cacheKaydet(cacheKey, base, CACHE_TTL.esnaflar);
+
+    var esnaflar = base.map(function(e) {
+      e = Object.assign({}, e);
       if (lat && lng) { var km = mesafeHesapla(lat, lng, parseFloat(e.lat), parseFloat(e.lng)); e.mesafe_km = Math.round(km*10)/10; e.mesafe_text = km < 1 ? Math.round(km*1000)+'m' : km.toFixed(1)+'km'; }
       else { e.mesafe_km = 0; e.mesafe_text = null; }
       return e;
@@ -102,10 +145,16 @@ app.get('/api/esnaflar', async function(req, res) {
 
 app.get('/api/esnaflar/:id', async function(req, res) {
   try {
-    var result = await pool.query(`SELECT e.*, json_agg(DISTINCT jsonb_build_object('id',u.id,'ad',u.ad,'fiyat',u.fiyat,'aciklama',u.aciklama,'fotograf_url',u.fotograf_url)) FILTER (WHERE u.id IS NOT NULL) as urunler, json_agg(DISTINCT jsonb_build_object('id',y.id,'kullanici',y.kullanici,'puan',y.puan,'yorum',y.yorum,'tarih',y.tarih)) FILTER (WHERE y.id IS NOT NULL) as yorumlar FROM esnaflar e LEFT JOIN urunler u ON e.id=u.esnaf_id LEFT JOIN yorumlar y ON e.id=y.esnaf_id WHERE e.id=$1 GROUP BY e.id`, [req.params.id]);
-    if (!result.rows.length) return res.status(404).json({ basari: false, mesaj: 'Esnaf bulunamadi' });
-    var e = result.rows[0];
-    e.urunler = e.urunler || []; e.yorumlar = e.yorumlar || [];
+    var cacheKey = 'esnaf_detay:' + req.params.id;
+    var cached = cacheAl(cacheKey);
+    var e = cached ? Object.assign({}, cached) : null;
+    if (!e) {
+      var result = await pool.query(`SELECT e.*, json_agg(DISTINCT jsonb_build_object('id',u.id,'ad',u.ad,'fiyat',u.fiyat,'aciklama',u.aciklama,'fotograf_url',u.fotograf_url)) FILTER (WHERE u.id IS NOT NULL) as urunler, json_agg(DISTINCT jsonb_build_object('id',y.id,'kullanici',y.kullanici,'puan',y.puan,'yorum',y.yorum,'tarih',y.tarih)) FILTER (WHERE y.id IS NOT NULL) as yorumlar FROM esnaflar e LEFT JOIN urunler u ON e.id=u.esnaf_id LEFT JOIN yorumlar y ON e.id=y.esnaf_id WHERE e.id=$1 GROUP BY e.id`, [req.params.id]);
+      if (!result.rows.length) return res.status(404).json({ basari: false, mesaj: 'Esnaf bulunamadi' });
+      e = result.rows[0];
+      e.urunler = e.urunler || []; e.yorumlar = e.yorumlar || [];
+      cacheKaydet(cacheKey, e, CACHE_TTL.esnaf_detay);
+    }
     var lat = parseFloat(req.query.lat), lng = parseFloat(req.query.lng);
     if (lat && lng) { var km = mesafeHesapla(lat, lng, parseFloat(e.lat), parseFloat(e.lng)); e.mesafe_km = Math.round(km*10)/10; e.mesafe_text = km < 1 ? Math.round(km*1000)+'m' : km.toFixed(1)+'km'; }
     res.json({ basari: true, veri: e });
@@ -161,6 +210,7 @@ app.post('/api/admin/onayla/:id', async function(req, res) {
   if (req.body.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
     await pool.query('UPDATE esnaflar SET onaylandi=true WHERE id=$1', [req.params.id]);
+    cacheSil('esnaflar:'); cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Esnaf onaylandi!' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
@@ -169,6 +219,7 @@ app.post('/api/admin/pasif/:id', async function(req, res) {
   if (req.body.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
     await pool.query('UPDATE esnaflar SET onaylandi=false WHERE id=$1', [req.params.id]);
+    cacheSil('esnaflar:'); cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Esnaf yayindan kaldirildi.' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
@@ -177,6 +228,7 @@ app.post('/api/admin/aktif/:id', async function(req, res) {
   if (req.body.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
     await pool.query('UPDATE esnaflar SET onaylandi=true WHERE id=$1', [req.params.id]);
+    cacheSil('esnaflar:'); cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Esnaf yayina alindi!' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
@@ -186,6 +238,7 @@ app.delete('/api/admin/reddet/:id', async function(req, res) {
   try {
     await pool.query('DELETE FROM urunler WHERE esnaf_id=$1', [req.params.id]);
     await pool.query('DELETE FROM esnaflar WHERE id=$1', [req.params.id]);
+    cacheSil('esnaflar:'); cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Esnaf reddedildi.' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
@@ -196,6 +249,7 @@ app.delete('/api/admin/sil/:id', async function(req, res) {
     await pool.query('DELETE FROM urunler WHERE esnaf_id=$1', [req.params.id]);
     await pool.query('DELETE FROM yorumlar WHERE esnaf_id=$1', [req.params.id]);
     await pool.query('DELETE FROM esnaflar WHERE id=$1', [req.params.id]);
+    cacheSil('esnaflar:'); cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Esnaf silindi.' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
@@ -257,6 +311,8 @@ app.post('/api/esnaflar/:id/yorumlar', async function(req, res) {
     var toplam = yorumlar.rows.reduce(function(t,y){return t+y.puan;},0);
     var ort = Math.round((toplam/yorumlar.rows.length)*10)/10;
     await pool.query('UPDATE esnaflar SET puan=$1, yorum_sayisi=$2 WHERE id=$3', [ort, yorumlar.rows.length, req.params.id]);
+    cacheSil('esnaf_detay:' + req.params.id);
+    cacheSil('esnaflar:');
     res.json({ basari: true, mesaj: 'Yorum eklendi!' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
@@ -309,6 +365,7 @@ app.post('/api/siparisler', async function(req, res) {
       });
     }
 
+    cacheSil('esnaflar:');
     res.json({ basari: true, veri: siparis, whatsapp_url: whatsapp_url });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
@@ -510,7 +567,11 @@ app.post('/api/gorsel-ara', upload.single('fotograf'), async function(req, res) 
 });
 
 app.get('/api/ilceler', function(req, res) {
-  res.json({ basari: true, veri: ['Marmaris','Bodrum','Fethiye','Datca','Milas','Mugla Merkez'] });
+  var cached = cacheAl('ilceler');
+  if (cached) return res.json({ basari: true, veri: cached });
+  var liste = ['Marmaris','Bodrum','Fethiye','Datca','Milas','Mugla Merkez'];
+  cacheKaydet('ilceler', liste, CACHE_TTL.ilceler);
+  res.json({ basari: true, veri: liste });
 });
 
 tablolarOlustur().then(function() {

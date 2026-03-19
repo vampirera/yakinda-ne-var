@@ -29,6 +29,32 @@ var durum = {
 };
 
 // =============================================================
+// FRONTEND CACHE (localStorage, 5 dakika)
+// =============================================================
+
+var FRONTEND_CACHE_TTL = 5 * 60 * 1000;
+
+function fcAl(key) {
+  try {
+    var e = JSON.parse(localStorage.getItem('fc_' + key) || 'null');
+    if (!e) return null;
+    if (Date.now() > e.exp) { localStorage.removeItem('fc_' + key); return null; }
+    return e.data;
+  } catch(err) { return null; }
+}
+
+function fcKaydet(key, data) {
+  try { localStorage.setItem('fc_' + key, JSON.stringify({ data: data, exp: Date.now() + FRONTEND_CACHE_TTL })); }
+  catch(err) {}
+}
+
+function fcSil(prefix) {
+  Object.keys(localStorage).forEach(function(k) {
+    if (k.startsWith('fc_' + prefix)) localStorage.removeItem(k);
+  });
+}
+
+// =============================================================
 // MÜŞTERİ PROFİLİ
 // =============================================================
 
@@ -739,6 +765,29 @@ function haritaMarkerlariGuncelle(esnaflar) {
 
 function esnaflarYukle() {
   var listesi = document.getElementById('esnaf-listesi');
+
+  var cacheKey = 'esnaflar:' + (durum.kategori||'') + ':' + (durum.siralama||'') + ':' + (durum.arama||'');
+  var cached = fcAl(cacheKey);
+  if (cached) {
+    // Konum varsa mesafeyi client'ta hesapla
+    if (durum.lat && durum.lng) {
+      cached = cached.map(function(e) {
+        var lat2 = parseFloat(e.lat), lng2 = parseFloat(e.lng);
+        var dLat = (lat2 - durum.lat) * Math.PI / 180;
+        var dLng = (lng2 - durum.lng) * Math.PI / 180;
+        var a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(durum.lat*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
+        var km = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        e.mesafe_km = Math.round(km*10)/10;
+        e.mesafe_text = km < 1 ? Math.round(km*1000)+'m' : km.toFixed(1)+'km';
+        return e;
+      });
+      if (durum.siralama === 'mesafe') cached.sort(function(a,b){return a.mesafe_km-b.mesafe_km;});
+    }
+    esnaflarGoster(cached);
+    haritaMarkerlariGuncelle(cached);
+    return;
+  }
+
   listesi.innerHTML = '<div class="yukleniyor">Yukleniyor...</div>';
 
   var params = new URLSearchParams();
@@ -747,13 +796,11 @@ function esnaflarYukle() {
   if (durum.siralama) { params.append('siralama', durum.siralama); }
   if (durum.arama)    { params.append('arama', durum.arama); }
 
-  var url = API_URL + '/api/esnaflar?' + params.toString();
-  console.log('[esnaflarYukle]', url);
-
-  fetch(url)
+  fetch(API_URL + '/api/esnaflar?' + params.toString())
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (!data.basari) throw new Error(data.mesaj);
+      fcKaydet(cacheKey, data.veri);
       esnaflarGoster(data.veri);
       haritaMarkerlariGuncelle(data.veri);
     })
@@ -939,7 +986,7 @@ function menuGoster(urunler) {
   con.innerHTML = urunler.map(function(u) {
     var fiyat = parseFloat(u.fiyat) || 0;
     return '<div class="menu-item">' +
-      (u.fotograf_url ? '<img src="' + u.fotograf_url + '" onclick="event.stopPropagation();lightboxAc(\'' + u.fotograf_url + '\')" style="width:50px;height:50px;object-fit:cover;border-radius:8px;margin-right:10px;cursor:zoom-in">' : '') +
+      (u.fotograf_url ? '<img src="' + u.fotograf_url + '" loading="lazy" onclick="event.stopPropagation();lightboxAc(\'' + u.fotograf_url + '\')" style="width:50px;height:50px;object-fit:cover;border-radius:8px;margin-right:10px;cursor:zoom-in">' : '') +
       '<div class="menu-item-info">' +
         '<h5>' + u.ad + '</h5>' +
         '<p>' + (u.aciklama || '') + '</p>' +
@@ -1038,6 +1085,7 @@ function siparisVer() {
     .then(function(data) {
       if (data.basari) {
         if (data.whatsapp_url) window.open(data.whatsapp_url, '_blank');
+        fcSil('esnaflar:');
         durum.sepet = [];
         sepetGuncelle();
         siparislerimSayfasiAc(data.veri.id);
@@ -1068,6 +1116,7 @@ function yorumGonder() {
         alert('Yorumunuz eklendi!');
         document.getElementById('yorum-kullanici').value = '';
         document.getElementById('yorum-metin').value = '';
+        fcSil('esnaflar:');
         esnafDetay(durum.secilenEsnaf.id);
       } else { alert('Hata: ' + data.mesaj); }
     })
