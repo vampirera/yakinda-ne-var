@@ -73,7 +73,7 @@ function mesafeHesapla(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-app.get('/', function(req, res) { res.json({ mesaj: 'Yakinda Ne Var API calisiyor!', versiyon: '4.2' }); });
+app.get('/', function(req, res) { res.json({ mesaj: 'Yakinda Ne Var API calisiyor!', versiyon: '5.0' }); });
 
 app.get('/api/esnaflar', async function(req, res) {
   try {
