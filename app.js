@@ -1006,8 +1006,8 @@ function sepetGuncelle() {
 function siparisVer() {
   if (!durum.sepet.length || !durum.secilenEsnaf) return;
   var profil = profilYukle();
-  if (!profil) {
-    alert('Siparis verebilmek icin once profilinizi olusturun.');
+  if (!profil || !profil.telefon) {
+    alert('Siparis vermek icin once profilinize telefon numarasi ekleyin.');
     profilSayfasiGoster();
     return;
   }
