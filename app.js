@@ -186,7 +186,7 @@ function siparislerimSayfasiAc(siparisId) {
 
 function siparisGuncelle() {
   if (!siparisTakip.siparisId) return;
-  fetch(API_URL + '/api/siparisler/' + siparisTakip.siparisId)
+  fetch(API_URL + '/api/siparis-detay/' + siparisTakip.siparisId)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (!data.basari) throw new Error(data.mesaj);

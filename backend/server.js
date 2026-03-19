@@ -361,7 +361,7 @@ app.post('/api/kurye-kabul', async function(req, res) {
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
-app.get('/api/siparisler/:id', async function(req, res) {
+app.get('/api/siparis-detay/:id', async function(req, res) {
   try {
     var result = await pool.query('SELECT * FROM siparisler WHERE id=$1', [req.params.id]);
     if (!result.rows.length) return res.status(404).json({ basari: false, mesaj: 'Siparis bulunamadi' });
