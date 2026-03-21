@@ -10,6 +10,7 @@ var durum = {
   kategori: null,
   siralama: 'mesafe',
   arama: '',
+  mesafeFiltre: 2,
   teslimat: 'kurye',
   secilenEsnaf: null,
   sepet: [],
@@ -510,6 +511,26 @@ function siralaSec(s) {
   esnaflarYukle();
 }
 
+function mesafeButonlariniOlustur() {
+  var secenekler = [
+    { km: 0.5, label: '500m' },
+    { km: 1,   label: '1km'  },
+    { km: 2,   label: '2km'  },
+    { km: 5,   label: '5km'  },
+    { km: null, label: 'Tümü' }
+  ];
+  document.getElementById('mesafe-filtre-row').innerHTML = secenekler.map(function(o) {
+    var aktif = durum.mesafeFiltre === o.km ? ' active' : '';
+    return '<button class="mesafe-btn' + aktif + '" onclick="mesafeSec(' + (o.km === null ? 'null' : o.km) + ')">' + o.label + '</button>';
+  }).join('');
+}
+
+function mesafeSec(km) {
+  durum.mesafeFiltre = km;
+  mesafeButonlariniOlustur();
+  esnaflarYukle();
+}
+
 // =============================================================
 // KONUM
 // =============================================================
@@ -763,6 +784,11 @@ function haritaMarkerlariGuncelle(esnaflar) {
 // ESNAF LİSTESİ
 // =============================================================
 
+function mesafeFiltrele(liste) {
+  if (!durum.lat || !durum.lng || !durum.mesafeFiltre) return liste;
+  return liste.filter(function(e) { return (e.mesafe_km || 0) <= durum.mesafeFiltre; });
+}
+
 function esnaflarYukle() {
   var listesi = document.getElementById('esnaf-listesi');
 
@@ -783,8 +809,9 @@ function esnaflarYukle() {
       });
       if (durum.siralama === 'mesafe') cached.sort(function(a,b){return a.mesafe_km-b.mesafe_km;});
     }
-    esnaflarGoster(cached);
-    haritaMarkerlariGuncelle(cached);
+    var filtrelenmis = mesafeFiltrele(cached);
+    esnaflarGoster(filtrelenmis);
+    haritaMarkerlariGuncelle(filtrelenmis);
     return;
   }
 
@@ -801,8 +828,9 @@ function esnaflarYukle() {
     .then(function(data) {
       if (!data.basari) throw new Error(data.mesaj);
       fcKaydet(cacheKey, data.veri);
-      esnaflarGoster(data.veri);
-      haritaMarkerlariGuncelle(data.veri);
+      var filtrelenmis = mesafeFiltrele(data.veri);
+      esnaflarGoster(filtrelenmis);
+      haritaMarkerlariGuncelle(filtrelenmis);
     })
     .catch(function(err) {
       listesi.innerHTML = '<div class="hata">Baglanamadi: ' + err.message + '</div>';
@@ -1457,6 +1485,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Filtre UI
   kategorilerOlustur();
   siralamaOlustur();
+  mesafeButonlariniOlustur();
 
   // Haritalar
   anaHaritaBaslat();
