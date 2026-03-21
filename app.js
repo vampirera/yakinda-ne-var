@@ -16,15 +16,13 @@ var durum = {
   sepet: [],
   secilenPuan: 0,
   anaHarita: null,
-  tamHarita: null,
   detayHarita: null,
   kayitHarita: null,
   kayitLat: null,
   kayitLng: null,
+  anaHaritaTamEkran: false,
   anaMarkers: [],
-  tamMarkers: [],
   kamuMarkersAna: [],
-  kamuMarkersTam: [],
   profilHarita: null,
   profilHaritaMarker: null
 };
@@ -412,12 +410,6 @@ function sayfaGoster(id) {
   });
   document.getElementById('sayfa-' + id).classList.add('aktif');
 
-  if (id === 'harita') {
-    setTimeout(function() {
-      if (!durum.tamHarita) tamHaritaBaslat();
-      durum.tamHarita.invalidateSize();
-    }, 100);
-  }
   if (id === 'detay') {
     setTimeout(function() {
       if (durum.detayHarita) durum.detayHarita.invalidateSize();
@@ -433,8 +425,7 @@ function sayfaGoster(id) {
 
 function navOlustur(containerId, aktif) {
   var items = [
-    { id: 'ana',       icon: '🏠', label: 'Ana Sayfa' },
-    { id: 'harita',    icon: '🗺️', label: 'Harita'    },
+    { id: 'ana',          icon: '🏠', label: 'Ana Sayfa'  },
     { id: 'favoriler',    icon: '❤️', label: 'Favoriler'  },
     { id: 'siparislerim', icon: '🛵', label: 'Siparisim'  },
     { id: 'profil',       icon: '👤', label: 'Profilim'   },
@@ -451,9 +442,6 @@ function navOlustur(containerId, aktif) {
 function navTikla(id) {
   if (id === 'ana') {
     sayfaGoster('ana');
-  } else if (id === 'harita') {
-    sayfaGoster('harita');
-    tamHaritaGuncelle();
   } else if (id === 'siparislerim') {
     sayfaGoster('siparislerim');
     siparislerListele();
@@ -525,9 +513,15 @@ function mesafeButonlariniOlustur() {
   }).join('');
 }
 
+var MESAFE_ZOOM = { 0.5: 15, 1: 14, 2: 13, 5: 12 };
+
 function mesafeSec(km) {
   durum.mesafeFiltre = km;
   mesafeButonlariniOlustur();
+  if (durum.anaHarita && durum.lat && durum.lng) {
+    var zoom = km ? (MESAFE_ZOOM[km] || 11) : 11;
+    durum.anaHarita.setView([durum.lat, durum.lng], zoom);
+  }
   esnaflarYukle();
 }
 
@@ -580,9 +574,6 @@ function konumAl() {
       }).addTo(durum.anaHarita).bindPopup('Konumunuz');
       kamuKurumlariniYukle(durum.lat, durum.lng, durum.anaHarita, durum.kamuMarkersAna);
     }
-    if (durum.tamHarita) {
-      kamuKurumlariniYukle(durum.lat, durum.lng, durum.tamHarita, durum.kamuMarkersTam);
-    }
   }, function() {
     varsayilanKonum();
   });
@@ -627,30 +618,31 @@ function anaHaritaBaslat() {
       .addTo(durum.anaHarita).bindPopup('Konumunuz');
     durum.lat = latlng[0]; durum.lng = latlng[1];
   });
-}
 
-function tamHaritaBaslat() {
-  if (durum.tamHarita) return;
-  durum.tamHarita = L.map('tam-harita', { attributionControl: false });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(durum.tamHarita);
-  durum.tamHarita.setView([36.8550, 28.2753], 13);
-  var konumMarkerTam = null;
-  konumButonuEkle(durum.tamHarita, function(latlng) {
-    if (konumMarkerTam) durum.tamHarita.removeLayer(konumMarkerTam);
-    konumMarkerTam = L.circleMarker(latlng, { radius: 10, color: '#1565c0', fillColor: '#1e88e5', fillOpacity: 0.8, weight: 2 })
-      .addTo(durum.tamHarita).bindPopup('Konumunuz');
-    durum.lat = latlng[0]; durum.lng = latlng[1];
-  });
-}
-
-function tamHaritaGuncelle() {
-  if (!durum.tamHarita) tamHaritaBaslat();
-  setTimeout(function() {
-    durum.tamHarita.invalidateSize();
-    if (durum.lat && durum.lng && !durum.kamuMarkersTam.length) {
-      kamuKurumlariniYukle(durum.lat, durum.lng, durum.tamHarita, durum.kamuMarkersTam);
+  // Tam ekran butonu (sağ üst)
+  var TamEkranKontrol = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd: function() {
+      var btn = L.DomUtil.create('button', 'harita-tamekran-btn');
+      btn.innerHTML = '⛶';
+      btn.title = 'Tam ekran';
+      L.DomEvent.disableClickPropagation(btn);
+      L.DomEvent.on(btn, 'click', function() {
+        var el = document.getElementById('ana-harita');
+        durum.anaHaritaTamEkran = !durum.anaHaritaTamEkran;
+        if (durum.anaHaritaTamEkran) {
+          el.style.height = window.innerHeight + 'px';
+          btn.innerHTML = '✕';
+        } else {
+          el.style.height = '200px';
+          btn.innerHTML = '⛶';
+        }
+        durum.anaHarita.invalidateSize();
+      });
+      return btn;
     }
-  }, 100);
+  });
+  durum.anaHarita.addControl(new TamEkranKontrol());
 }
 
 var kamuTurleri = {
@@ -757,7 +749,6 @@ function markerlariTemizle(liste) {
 
 function haritaMarkerlariGuncelle(esnaflar) {
   markerlariTemizle(durum.anaMarkers);
-  markerlariTemizle(durum.tamMarkers);
 
   esnaflar.forEach(function(e) {
     if (!e.lat || !e.lng) return;
@@ -765,19 +756,11 @@ function haritaMarkerlariGuncelle(esnaflar) {
     var popup = '<b>' + e.ad + '</b>' + (e.mesafe_text ? '<br>' + e.mesafe_text : '');
 
     if (durum.anaHarita) {
-      var m1 = L.marker([lat, lng]).addTo(durum.anaHarita).bindPopup(popup);
-      m1.on('click', function() { esnafDetay(e.id); });
-      durum.anaMarkers.push(m1);
-    }
-    if (durum.tamHarita) {
-      var m2 = L.marker([lat, lng]).addTo(durum.tamHarita).bindPopup(popup);
-      m2.on('click', function() { esnafDetay(e.id); });
-      durum.tamMarkers.push(m2);
+      var m = L.marker([lat, lng]).addTo(durum.anaHarita).bindPopup(popup);
+      m.on('click', function() { esnafDetay(e.id); });
+      durum.anaMarkers.push(m);
     }
   });
-
-  var sayac = document.getElementById('harita-sayac');
-  if (sayac) sayac.textContent = esnaflar.length + ' esnaf';
 }
 
 // =============================================================
@@ -1476,7 +1459,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Alt navigasyonlar
   navOlustur('ana-nav',          'ana');
-  navOlustur('harita-nav',       'harita');
   navOlustur('favoriler-nav',    'favoriler');
   navOlustur('siparislerim-nav', 'siparislerim');
   navOlustur('profil-nav',       'profil');
@@ -1489,7 +1471,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Haritalar
   anaHaritaBaslat();
-  tamHaritaBaslat();
 
   // Arama
   aramaBaslat();
