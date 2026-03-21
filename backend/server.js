@@ -66,6 +66,7 @@ async function tablolarOlustur() {
   await pool.query(`ALTER TABLE siparisler ADD COLUMN IF NOT EXISTS musteri_telefon VARCHAR(20)`);
   await pool.query(`CREATE TABLE IF NOT EXISTS kuryeler (id SERIAL PRIMARY KEY, ad VARCHAR(255) NOT NULL, telefon VARCHAR(20) NOT NULL, arac_tipi VARCHAR(50), ilce VARCHAR(100), onaylandi BOOLEAN DEFAULT false, kayit_tarihi TIMESTAMP DEFAULT NOW())`);
   await pool.query(`ALTER TABLE siparisler ADD COLUMN IF NOT EXISTS kurye_id INTEGER REFERENCES kuryeler(id)`);
+  await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS calisma_saatleri JSONB`);
 
   var sayac = await pool.query('SELECT COUNT(*) FROM esnaflar');
   if (parseInt(sayac.rows[0].count) === 0) {
@@ -572,6 +573,17 @@ app.get('/api/ilceler', function(req, res) {
   var liste = ['Marmaris','Bodrum','Fethiye','Datca','Milas','Mugla Merkez'];
   cacheKaydet('ilceler', liste, CACHE_TTL.ilceler);
   res.json({ basari: true, veri: liste });
+});
+
+app.put('/api/esnaf-panel/:id/calisma-saatleri', async function(req, res) {
+  try {
+    var saatler = req.body.calisma_saatleri;
+    if (!saatler || typeof saatler !== 'object') return res.status(400).json({ basari: false, mesaj: 'Gecersiz veri' });
+    await pool.query('UPDATE esnaflar SET calisma_saatleri=$1 WHERE id=$2', [JSON.stringify(saatler), req.params.id]);
+    cacheSil('esnaf_detay:' + req.params.id);
+    cacheSil('esnaflar:');
+    res.json({ basari: true, mesaj: 'Calisma saatleri guncellendi.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
 tablolarOlustur().then(function() {
