@@ -133,6 +133,14 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
 .lightbox-overlay.aktif{display:flex}
 .lightbox-img{max-width:90%;max-height:85vh;border-radius:12px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,.6)}
 .lightbox-kapat{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.6rem;width:40px;height:40px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
+.kampanya-banner{background:linear-gradient(90deg,#f7c948,#ffb300);color:#333;font-weight:700;font-size:.82rem;padding:9px 16px;text-align:center;flex-shrink:0}
+.kart-kampanya-rozet{position:absolute;top:4px;right:4px;font-size:.85rem;line-height:1}
+.esnaf-img{position:relative}
+.kampanya-satir{display:flex;align-items:center;justify-content:space-between;background:#fff;border-radius:10px;padding:9px 11px;margin-bottom:6px;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+.kampanya-satir-bilgi{flex:1;font-size:.83rem}
+.kampanya-rozet{background:#fff3cd;color:#856404;font-size:.7rem;padding:1px 6px;border-radius:20px;font-weight:700}
+.kampanya-sil-btn{background:none;border:none;font-size:1.1rem;cursor:pointer;padding:4px;opacity:.6}
+.kampanya-form{background:#f9f9f9;border-radius:12px;padding:12px;margin-top:4px}
 .saat-satir{display:flex;align-items:center;gap:6px;margin-bottom:7px}
 .saat-gun-label{font-size:.78rem;font-weight:700;color:#444;min-width:28px}
 .saat-input{border:2px solid #eee;border-radius:8px;padding:5px 7px;font-size:.78rem;width:82px;outline:none;font-family:inherit}
@@ -190,6 +198,7 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
       <button class="back-btn" id="back-btn">←</button>
       <span id="hero-icon">🍽️</span>
     </div>
+    <div id="kampanya-banner" class="kampanya-banner" style="display:none"></div>
     <div class="info-card">
       <h2 id="detay-adi">Yukleniyor...</h2>
       <div class="meta">
@@ -416,6 +425,17 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
       </div>
       <div id="panel-saatler-form"></div>
       <button class="btn-p" id="saatler-kaydet-btn" onclick="calismaSaatleriKaydet()" style="margin-top:8px;margin-bottom:12px">💾 Saatleri Kaydet</button>
+      <div class="s-title" style="margin-top:16px"><span>🏷️ Kampanyalar</span></div>
+      <div id="panel-kampanyalar-liste" style="margin-bottom:10px"></div>
+      <div class="kampanya-form">
+        <input type="text" id="kamp-baslik" class="form-input" placeholder="Kampanya basligi (zorunlu)">
+        <input type="text" id="kamp-aciklama" class="form-input" placeholder="Aciklama (opsiyonel)">
+        <div style="display:flex;gap:8px">
+          <input type="number" id="kamp-oran" class="form-input" placeholder="İndirim %" min="0" max="100" style="width:50%">
+          <input type="date" id="kamp-bitis" class="form-input" style="width:50%">
+        </div>
+        <button class="btn-p" onclick="kampanyaEkle()" style="margin-top:4px">+ Kampanya Ekle</button>
+      </div>
     </div>
     <div class="bottom-nav" id="panel-nav"></div>
   </div>
