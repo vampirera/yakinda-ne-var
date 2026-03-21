@@ -68,6 +68,7 @@ async function tablolarOlustur() {
   await pool.query(`ALTER TABLE siparisler ADD COLUMN IF NOT EXISTS kurye_id INTEGER REFERENCES kuryeler(id)`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS calisma_saatleri JSONB`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS sifre VARCHAR(100)`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS kullanicilar (id SERIAL PRIMARY KEY, ad VARCHAR(100), telefon VARCHAR(20) UNIQUE NOT NULL, sifre VARCHAR(100) NOT NULL, tip VARCHAR(20) DEFAULT 'musteri', esnaf_id INTEGER REFERENCES esnaflar(id), kurye_id INTEGER REFERENCES kuryeler(id), olusturma TIMESTAMP DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS kampanyalar (id SERIAL PRIMARY KEY, esnaf_id INTEGER REFERENCES esnaflar(id) ON DELETE CASCADE, baslik VARCHAR(255) NOT NULL, aciklama TEXT, indirim_orani INTEGER DEFAULT 0, bitis_tarihi DATE, aktif BOOLEAN DEFAULT true, olusturma_tarihi TIMESTAMP DEFAULT NOW())`);
 
   var sayac = await pool.query('SELECT COUNT(*) FROM esnaflar');
@@ -170,6 +171,10 @@ app.post('/api/esnaf-kayit', upload.fields([{name:'vergi_levhasi',maxCount:1},{n
     if (!body.ad||!body.kategori||!body.ilce||!body.telefon||!body.vergi_no) return res.status(400).json({ basari: false, mesaj: 'Lutfen tum zorunlu alanlari doldurun' });
     var result = await pool.query('INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,email,vergi_no,lat,lng,onaylandi,sifre) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,$10) RETURNING id', [body.ad, body.kategori, body.ilce, body.adres||'', body.telefon, body.email||'', body.vergi_no, parseFloat(body.lat)||36.8550, parseFloat(body.lng)||28.2753, body.sifre||null]);
     var esnafId = result.rows[0].id;
+    if (body.sifre) {
+      try { await pool.query('INSERT INTO kullanicilar (ad,telefon,sifre,tip,esnaf_id) VALUES ($1,$2,$3,$4,$5)', [body.ad, body.telefon, body.sifre, 'esnaf', esnafId]); }
+      catch(e) { /* telefon zaten varsa yoksay */ }
+    }
     if (body.urun_adlari) {
       var adlar = Array.isArray(body.urun_adlari) ? body.urun_adlari : [body.urun_adlari];
       var fiyatlar = Array.isArray(body.urun_fiyatlari) ? body.urun_fiyatlari : [body.urun_fiyatlari];
@@ -194,7 +199,7 @@ app.post('/api/esnaf-kayit', upload.fields([{name:'vergi_levhasi',maxCount:1},{n
 });
 
 app.get('/api/admin/bekleyenler', async function(req, res) {
-  if (req.query.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
     var result = await pool.query(`SELECT e.*, json_agg(DISTINCT jsonb_build_object('id',u.id,'ad',u.ad,'fiyat',u.fiyat,'fotograf_url',u.fotograf_url)) FILTER (WHERE u.id IS NOT NULL) as urunler FROM esnaflar e LEFT JOIN urunler u ON e.id=u.esnaf_id WHERE e.onaylandi=false GROUP BY e.id ORDER BY e.kayit_tarihi DESC`);
     res.json({ basari: true, veri: result.rows });
@@ -202,7 +207,7 @@ app.get('/api/admin/bekleyenler', async function(req, res) {
 });
 
 app.get('/api/admin/aktifler', async function(req, res) {
-  if (req.query.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
     var result = await pool.query('SELECT * FROM esnaflar ORDER BY kayit_tarihi DESC');
     res.json({ basari: true, veri: result.rows });
@@ -210,7 +215,7 @@ app.get('/api/admin/aktifler', async function(req, res) {
 });
 
 app.post('/api/admin/onayla/:id', async function(req, res) {
-  if (req.body.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  if (req.body.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
     await pool.query('UPDATE esnaflar SET onaylandi=true WHERE id=$1', [req.params.id]);
     cacheSil('esnaflar:'); cacheSil('esnaf_detay:' + req.params.id);
@@ -219,7 +224,7 @@ app.post('/api/admin/onayla/:id', async function(req, res) {
 });
 
 app.post('/api/admin/pasif/:id', async function(req, res) {
-  if (req.body.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  if (req.body.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
     await pool.query('UPDATE esnaflar SET onaylandi=false WHERE id=$1', [req.params.id]);
     cacheSil('esnaflar:'); cacheSil('esnaf_detay:' + req.params.id);
@@ -228,7 +233,7 @@ app.post('/api/admin/pasif/:id', async function(req, res) {
 });
 
 app.post('/api/admin/aktif/:id', async function(req, res) {
-  if (req.body.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  if (req.body.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
     await pool.query('UPDATE esnaflar SET onaylandi=true WHERE id=$1', [req.params.id]);
     cacheSil('esnaflar:'); cacheSil('esnaf_detay:' + req.params.id);
@@ -237,7 +242,7 @@ app.post('/api/admin/aktif/:id', async function(req, res) {
 });
 
 app.delete('/api/admin/reddet/:id', async function(req, res) {
-  if (req.query.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
     await pool.query('DELETE FROM urunler WHERE esnaf_id=$1', [req.params.id]);
     await pool.query('DELETE FROM esnaflar WHERE id=$1', [req.params.id]);
@@ -247,7 +252,7 @@ app.delete('/api/admin/reddet/:id', async function(req, res) {
 });
 
 app.delete('/api/admin/sil/:id', async function(req, res) {
-  if (req.query.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
     await pool.query('DELETE FROM urunler WHERE esnaf_id=$1', [req.params.id]);
     await pool.query('DELETE FROM yorumlar WHERE esnaf_id=$1', [req.params.id]);
@@ -260,22 +265,24 @@ app.delete('/api/admin/sil/:id', async function(req, res) {
 // Kurye kayıt
 app.post('/api/kurye-kayit', async function(req, res) {
   try {
-    var { ad, telefon, arac_tipi, ilce } = req.body;
+    var { ad, telefon, arac_tipi, ilce, sifre } = req.body;
     if (!ad || !telefon || !arac_tipi || !ilce) return res.status(400).json({ basari: false, mesaj: 'Tum alanlar zorunlu' });
-    await pool.query('INSERT INTO kuryeler (ad,telefon,arac_tipi,ilce) VALUES ($1,$2,$3,$4)', [ad, telefon, arac_tipi, ilce]);
-
-    // Admine bildirim
+    var kr = await pool.query('INSERT INTO kuryeler (ad,telefon,arac_tipi,ilce) VALUES ($1,$2,$3,$4) RETURNING id', [ad, telefon, arac_tipi, ilce]);
+    var kuryeId = kr.rows[0].id;
+    if (sifre) {
+      try { await pool.query('INSERT INTO kullanicilar (ad,telefon,sifre,tip,kurye_id) VALUES ($1,$2,$3,$4,$5)', [ad, telefon, sifre, 'kurye', kuryeId]); }
+      catch(e) { /* telefon zaten varsa yoksay */ }
+    }
     if (process.env.ADMIN_TELEFON) {
       whatsappGonder(process.env.ADMIN_TELEFON, '🛵 Yeni kurye başvurusu: ' + ad + ', ' + ilce + ', ' + arac_tipi);
     }
-
     res.json({ basari: true, mesaj: 'Basvuru alindi.' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
 // Admin kurye listesi
 app.get('/api/admin/kuryeler', async function(req, res) {
-  if (req.query.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
     var result = await pool.query('SELECT * FROM kuryeler ORDER BY kayit_tarihi DESC');
     res.json({ basari: true, veri: result.rows });
@@ -284,7 +291,7 @@ app.get('/api/admin/kuryeler', async function(req, res) {
 
 // Admin kurye onayla
 app.post('/api/admin/kurye-onayla/:id', async function(req, res) {
-  if (req.body.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  if (req.body.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
     await pool.query('UPDATE kuryeler SET onaylandi=true WHERE id=$1', [req.params.id]);
     res.json({ basari: true, mesaj: 'Kurye onaylandi.' });
@@ -293,7 +300,7 @@ app.post('/api/admin/kurye-onayla/:id', async function(req, res) {
 
 // Admin kurye sil
 app.delete('/api/admin/kurye-sil/:id', async function(req, res) {
-  if (req.query.key !== 'yakinda2024') return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
     await pool.query('DELETE FROM kuryeler WHERE id=$1', [req.params.id]);
     res.json({ basari: true, mesaj: 'Kurye silindi.' });
@@ -580,13 +587,39 @@ app.get('/api/ilceler', function(req, res) {
   res.json({ basari: true, veri: liste });
 });
 
-app.post('/api/esnaf-giris', async function(req, res) {
+app.post('/api/kayit', async function(req, res) {
+  try {
+    var { ad, telefon, sifre } = req.body;
+    if (!ad || !telefon || !sifre) return res.status(400).json({ basari: false, mesaj: 'Ad, telefon ve sifre zorunlu' });
+    if (sifre.length < 6) return res.status(400).json({ basari: false, mesaj: 'Sifre en az 6 karakter olmali' });
+    var mevcut = await pool.query('SELECT id FROM kullanicilar WHERE telefon=$1', [telefon]);
+    if (mevcut.rows.length) return res.status(400).json({ basari: false, mesaj: 'Bu telefon zaten kayitli' });
+    var r = await pool.query('INSERT INTO kullanicilar (ad,telefon,sifre,tip) VALUES ($1,$2,$3,$4) RETURNING id', [ad, telefon, sifre, 'musteri']);
+    res.json({ basari: true, mesaj: 'Kayit basarili!', kullanici_id: r.rows[0].id });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+app.post('/api/giris', async function(req, res) {
   try {
     var { telefon, sifre } = req.body;
     if (!telefon || !sifre) return res.status(400).json({ basari: false, mesaj: 'Telefon ve sifre zorunlu' });
-    var result = await pool.query('SELECT id,ad,kategori,ilce,adres,telefon,email,lat,lng,puan,yorum_sayisi,acik,onaylandi FROM esnaflar WHERE telefon=$1 AND sifre=$2', [telefon, sifre]);
-    if (!result.rows.length) return res.status(401).json({ basari: false, mesaj: 'Telefon veya sifre yanlis' });
-    res.json({ basari: true, veri: result.rows[0] });
+    // Admin kontrolü (env'den)
+    if (process.env.ADMIN_TELEFON && process.env.ADMIN_SIFRE &&
+        telefon === process.env.ADMIN_TELEFON && sifre === process.env.ADMIN_SIFRE) {
+      return res.json({ basari: true, veri: { kullanici_id: 0, ad: 'Admin', telefon: telefon, tip: 'admin', esnaf_id: null, kurye_id: null } });
+    }
+    // Kullanicilar tablosu
+    var r = await pool.query('SELECT id,ad,telefon,tip,esnaf_id,kurye_id FROM kullanicilar WHERE telefon=$1 AND sifre=$2', [telefon, sifre]);
+    if (r.rows.length) {
+      var u = r.rows[0];
+      return res.json({ basari: true, veri: { kullanici_id: u.id, ad: u.ad, telefon: u.telefon, tip: u.tip, esnaf_id: u.esnaf_id, kurye_id: u.kurye_id } });
+    }
+    // Geriye dönük uyumluluk: esnaflar tablosundaki sifre
+    var er = await pool.query('SELECT id,ad FROM esnaflar WHERE telefon=$1 AND sifre=$2', [telefon, sifre]);
+    if (er.rows.length) {
+      return res.json({ basari: true, veri: { kullanici_id: null, ad: er.rows[0].ad, telefon: telefon, tip: 'esnaf', esnaf_id: er.rows[0].id, kurye_id: null } });
+    }
+    res.status(401).json({ basari: false, mesaj: 'Telefon veya sifre yanlis' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
