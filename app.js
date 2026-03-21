@@ -11,6 +11,7 @@ var durum = {
   siralama: 'mesafe',
   arama: '',
   mesafeFiltre: 2,
+  panelEsnafId: null,
   teslimat: 'kurye',
   secilenEsnaf: null,
   sepet: [],
@@ -767,6 +768,68 @@ function haritaMarkerlariGuncelle(esnaflar) {
 // ESNAF LİSTESİ
 // =============================================================
 
+// =============================================================
+// ÇALIŞMA SAATLERİ
+// =============================================================
+
+var GUNLER = ['pazar','pazartesi','sali','carsamba','persembe','cuma','cumartesi'];
+var GUN_ETIKET = { pazartesi:'Pzt', sali:'Sal', carsamba:'Car', persembe:'Per', cuma:'Cum', cumartesi:'Cmt', pazar:'Paz' };
+
+function simdiAcikMi(calisma_saatleri) {
+  if (!calisma_saatleri) return { acik: null, sonrakiAcilis: null };
+  var simdi = new Date();
+  var gun = GUNLER[simdi.getDay()];
+  var saat = simdi.getHours() * 60 + simdi.getMinutes();
+
+  function dakikaYap(str) {
+    if (!str) return null;
+    var p = str.split(':');
+    return parseInt(p[0]) * 60 + parseInt(p[1]);
+  }
+
+  var bugun = calisma_saatleri[gun];
+  if (!bugun || bugun.kapali) {
+    // Yarından itibaren ilk açık günü bul
+    for (var i = 1; i <= 7; i++) {
+      var g = GUNLER[(simdi.getDay() + i) % 7];
+      var s = calisma_saatleri[g];
+      if (s && !s.kapali && s.acilis) return { acik: false, sonrakiAcilis: GUN_ETIKET[g] + ' ' + s.acilis };
+    }
+    return { acik: false, sonrakiAcilis: null };
+  }
+
+  var acilis = dakikaYap(bugun.acilis);
+  var kapanis = dakikaYap(bugun.kapanis);
+  if (acilis === null || kapanis === null) return { acik: null, sonrakiAcilis: null };
+
+  if (saat >= acilis && saat < kapanis) return { acik: true, sonrakiAcilis: null };
+
+  // Kapalı — yarın veya bugün açılış saati
+  if (saat < acilis) return { acik: false, sonrakiAcilis: bugun.acilis };
+  for (var j = 1; j <= 7; j++) {
+    var gg = GUNLER[(simdi.getDay() + j) % 7];
+    var ss = calisma_saatleri[gg];
+    if (ss && !ss.kapali && ss.acilis) return { acik: false, sonrakiAcilis: GUN_ETIKET[gg] + ' ' + ss.acilis };
+  }
+  return { acik: false, sonrakiAcilis: null };
+}
+
+function acikDurumHtml(e) {
+  var cs = simdiAcikMi(e.calisma_saatleri);
+  if (cs.acik === null) {
+    return '<span class="tag ' + (e.acik ? 'open' : '') + '">' + (e.acik ? '🟢 Acik' : '🔴 Kapali') + '</span>';
+  }
+  if (cs.acik) return '<span class="tag open">🟢 Acik</span>';
+  return '<span class="tag">' + '🔴 Kapali' + (cs.sonrakiAcilis ? ' · Acilis: ' + cs.sonrakiAcilis : '') + '</span>';
+}
+
+function acikDurumText(e) {
+  var cs = simdiAcikMi(e.calisma_saatleri);
+  if (cs.acik === null) return e.acik ? '🟢 Acik' : '🔴 Kapali';
+  if (cs.acik) return '🟢 Acik';
+  return '🔴 Kapali' + (cs.sonrakiAcilis ? ' · Acilis: ' + cs.sonrakiAcilis : '');
+}
+
 function mesafeFiltrele(liste) {
   if (!durum.lat || !durum.lng || !durum.mesafeFiltre) return liste;
   return liste.filter(function(e) { return (e.mesafe_km || 0) <= durum.mesafeFiltre; });
@@ -843,7 +906,7 @@ function esnafKartlariOlustur(liste) {
             '<span>' + e.ilce + '</span>' +
           '</div>' +
           '<div class="esnaf-tags">' +
-            '<span class="tag ' + (e.acik ? 'open' : '') + '">' + (e.acik ? '🟢 Acik' : '🔴 Kapali') + '</span>' +
+            acikDurumHtml(e) +
             '<span class="tag">' + (e.kategori || '') + '</span>' +
           '</div>' +
         '</div>' +
@@ -947,7 +1010,7 @@ function detayDoldur(e) {
   document.getElementById('detay-puan').textContent = '⭐ ' + (e.puan || 0);
   document.getElementById('detay-mesafe').textContent = e.mesafe_text ? '📍 ' + e.mesafe_text : '📍 ' + e.ilce;
   document.getElementById('detay-yorum-sayi').textContent = '(' + (e.yorum_sayisi || 0) + ' yorum)';
-  document.getElementById('detay-durum').textContent = e.acik ? '🟢 Acik' : '🔴 Kapali';
+  document.getElementById('detay-durum').textContent = acikDurumText(e);
 
   document.getElementById('ulasim-bar').innerHTML =
     '<div class="ulasim-btn active"><div class="u-icon">🚶</div><div class="u-sure">~10dk</div><div class="u-label">Yuruyus</div></div>' +
@@ -1422,6 +1485,65 @@ function panelYukle() {
       }).join('');
     })
     .catch(function() { con.innerHTML = '<div class="hata">Baglanamadi.</div>'; });
+
+  if (durum.panelEsnafId) calismaSaatleriYukle(durum.panelEsnafId);
+}
+
+function panelEsnafIdSec() {
+  var inp = document.getElementById('panel-esnaf-id-giris');
+  var id = parseInt(inp.value);
+  if (!id) { alert('Gecerli bir Esnaf ID girin.'); return; }
+  durum.panelEsnafId = id;
+  calismaSaatleriYukle(id);
+}
+
+function calismaSaatleriYukle(esnafId) {
+  fetch(API_URL + '/api/esnaflar/' + esnafId)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.basari) return;
+      var saatler = data.veri.calisma_saatleri || {};
+      var con = document.getElementById('panel-saatler-form');
+      con.innerHTML = GUNLER.map(function(gun) {
+        var s = saatler[gun] || { acilis: '09:00', kapanis: '18:00', kapali: false };
+        return '<div class="saat-satir">' +
+          '<span class="saat-gun-label">' + GUN_ETIKET[gun] + '</span>' +
+          '<input type="time" id="saat-acilis-' + gun + '" value="' + (s.acilis || '09:00') + '" class="saat-input" ' + (s.kapali ? 'disabled' : '') + '>' +
+          '<span style="font-size:.75rem;color:#aaa">–</span>' +
+          '<input type="time" id="saat-kapanis-' + gun + '" value="' + (s.kapanis || '18:00') + '" class="saat-input" ' + (s.kapali ? 'disabled' : '') + '>' +
+          '<label class="saat-kapali-label"><input type="checkbox" id="saat-kapali-' + gun + '" onchange="saatKapaliToggle(\'' + gun + '\')" ' + (s.kapali ? 'checked' : '') + '> Kapali</label>' +
+          '</div>';
+      }).join('');
+    });
+}
+
+function saatKapaliToggle(gun) {
+  var kapali = document.getElementById('saat-kapali-' + gun).checked;
+  document.getElementById('saat-acilis-' + gun).disabled = kapali;
+  document.getElementById('saat-kapanis-' + gun).disabled = kapali;
+}
+
+function calismaSaatleriKaydet() {
+  var esnafId = durum.panelEsnafId;
+  if (!esnafId) { alert('Once Esnaf ID girin.'); return; }
+  var saatler = {};
+  GUNLER.forEach(function(gun) {
+    saatler[gun] = {
+      acilis:  document.getElementById('saat-acilis-' + gun).value || '09:00',
+      kapanis: document.getElementById('saat-kapanis-' + gun).value || '18:00',
+      kapali:  document.getElementById('saat-kapali-' + gun).checked
+    };
+  });
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/calisma-saatleri', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ calisma_saatleri: saatler })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      alert(data.mesaj || (data.basari ? 'Kaydedildi.' : 'Hata.'));
+    })
+    .catch(function() { alert('Baglanamadi.'); });
 }
 
 function siparisKabul(id) {
