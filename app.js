@@ -12,6 +12,7 @@ var durum = {
   arama: '',
   mesafeFiltre: 2,
   panelEsnafId: null,
+  oturumTip: null,
   teslimat: 'kurye',
   secilenEsnaf: null,
   sepet: [],
@@ -424,20 +425,51 @@ function sayfaGoster(id) {
   }
 }
 
-function navOlustur(containerId, aktif) {
-  var items = [
-    { id: 'ana',          icon: '🏠', label: 'Ana Sayfa'  },
+function navItemleriAl() {
+  var oturum = oturumAl();
+  var tip = oturum ? oturum.tip : null;
+  if (!oturum) return [
+    { id: 'ana',          icon: '🏠', label: 'Ana'        },
     { id: 'favoriler',    icon: '❤️', label: 'Favoriler'  },
     { id: 'siparislerim', icon: '🛵', label: 'Siparisim'  },
-    { id: 'profil',       icon: '👤', label: 'Profilim'   },
-    { id: 'kayit',        icon: '🏪', label: 'Kayit Ol'   },
-    { id: 'panel',        icon: '📦', label: 'Panelim'    }
+    { id: 'kayit',        icon: '🔑', label: 'Giris/Kayit'}
   ];
-  document.getElementById(containerId).innerHTML = items.map(function(item) {
+  if (tip === 'musteri') return [
+    { id: 'ana',          icon: '🏠', label: 'Ana'        },
+    { id: 'favoriler',    icon: '❤️', label: 'Favoriler'  },
+    { id: 'siparislerim', icon: '🛵', label: 'Siparisim'  },
+    { id: 'profil',       icon: '👤', label: 'Profilim'   }
+  ];
+  if (tip === 'esnaf' || tip === 'kurye') return [
+    { id: 'ana',          icon: '🏠', label: 'Ana'        },
+    { id: 'siparislerim', icon: '🛵', label: 'Siparisim'  },
+    { id: 'panel',        icon: '📦', label: 'Panelim'    },
+    { id: 'profil',       icon: '👤', label: 'Profilim'   }
+  ];
+  if (tip === 'admin') return [
+    { id: 'ana',          icon: '🏠', label: 'Ana'        },
+    { id: 'favoriler',    icon: '❤️', label: 'Favoriler'  },
+    { id: 'siparislerim', icon: '🛵', label: 'Siparisim'  },
+    { id: 'panel',        icon: '📦', label: 'Panelim'    },
+    { id: 'profil',       icon: '👤', label: 'Profilim'   }
+  ];
+  return [];
+}
+
+function navOlustur(containerId, aktif) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = navItemleriAl().map(function(item) {
     return '<div class="nav-item' + (item.id === aktif ? ' active' : '') +
       '" onclick="navTikla(\'' + item.id + '\')">' +
       '<span class="nav-icon">' + item.icon + '</span>' + item.label + '</div>';
   }).join('');
+}
+
+function oturumaGoreNavGuncelle(aktif) {
+  ['ana-nav','favoriler-nav','siparislerim-nav','profil-nav','panel-nav'].forEach(function(id) {
+    navOlustur(id, aktif || '');
+  });
 }
 
 function navTikla(id) {
@@ -456,6 +488,7 @@ function navTikla(id) {
     sayfaGoster('panel');
     panelGoruntule();
   }
+  oturumaGoreNavGuncelle(id);
 }
 
 // =============================================================
@@ -1335,6 +1368,7 @@ function kuryeKayitGonder() {
   var telefon = document.getElementById('kur-telefon').value.trim();
   var arac    = document.getElementById('kur-arac').value;
   var ilce    = document.getElementById('kur-ilce').value;
+  var sifre   = document.getElementById('kur-sifre') ? document.getElementById('kur-sifre').value.trim() : '';
   var mesaj   = document.getElementById('kurye-kayit-mesaj');
 
   if (!ad || !telefon || !arac || !ilce) {
@@ -1351,7 +1385,7 @@ function kuryeKayitGonder() {
   fetch(API_URL + '/api/kurye-kayit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ad: ad, telefon: telefon, arac_tipi: arac, ilce: ilce })
+    body: JSON.stringify({ ad: ad, telefon: telefon, arac_tipi: arac, ilce: ilce, sifre: sifre })
   })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -1364,6 +1398,7 @@ function kuryeKayitGonder() {
         document.getElementById('kur-telefon').value = '';
         document.getElementById('kur-arac').value = '';
         document.getElementById('kur-ilce').value = '';
+        if (document.getElementById('kur-sifre')) document.getElementById('kur-sifre').value = '';
       } else {
         mesaj.style.color = '#e53935';
         mesaj.textContent = 'Hata: ' + data.mesaj;
@@ -1372,6 +1407,56 @@ function kuryeKayitGonder() {
     .catch(function() {
       btn.disabled = false;
       btn.textContent = 'Başvur';
+      mesaj.style.color = '#e53935';
+      mesaj.textContent = 'Bağlantı hatası.';
+    });
+}
+
+function musteriKayitGonder() {
+  var ad      = document.getElementById('mus-ad').value.trim();
+  var telefon = document.getElementById('mus-telefon').value.trim();
+  var sifre   = document.getElementById('mus-sifre').value.trim();
+  var mesaj   = document.getElementById('musteri-kayit-mesaj');
+
+  if (!ad || !telefon || !sifre) {
+    mesaj.style.color = '#e53935';
+    mesaj.textContent = 'Lütfen tüm alanları doldurun.';
+    return;
+  }
+  if (sifre.length < 4) {
+    mesaj.style.color = '#e53935';
+    mesaj.textContent = 'Şifre en az 4 karakter olmalı.';
+    return;
+  }
+
+  var btn = document.getElementById('musteri-kayit-gonder');
+  btn.disabled = true;
+  btn.textContent = 'Kaydediliyor...';
+  mesaj.textContent = '';
+
+  fetch(API_URL + '/api/kayit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ad: ad, telefon: telefon, sifre: sifre })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btn.textContent = 'Kayıt Ol';
+      if (data.basari) {
+        oturumKaydet(data.veri);
+        oturumaGoreNavGuncelle();
+        mesaj.style.color = '#2e7d32';
+        mesaj.textContent = '✅ Kayıt başarılı! Hoş geldiniz.';
+        setTimeout(function() { sayfaGoster('ana'); }, 1000);
+      } else {
+        mesaj.style.color = '#e53935';
+        mesaj.textContent = 'Hata: ' + data.mesaj;
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Kayıt Ol';
       mesaj.style.color = '#e53935';
       mesaj.textContent = 'Bağlantı hatası.';
     });
@@ -1469,63 +1554,97 @@ function adminIslem(tip, id, key) {
 }
 
 // =============================================================
-// ESNAF PANELİ — GİRİŞ / ÇIKIŞ
+// OTURUM YÖNETİMİ
 // =============================================================
 
-function panelEsnafAl() {
-  try { return JSON.parse(localStorage.getItem('panel_esnaf') || 'null'); }
+function oturumAl() {
+  try { return JSON.parse(localStorage.getItem('oturum') || 'null'); }
   catch(e) { return null; }
 }
 
-function panelEsnafKaydet(esnaf) {
-  localStorage.setItem('panel_esnaf', JSON.stringify(esnaf));
-  durum.panelEsnafId = esnaf.id;
+function oturumKaydet(kullanici) {
+  localStorage.setItem('oturum', JSON.stringify(kullanici));
+  durum.panelEsnafId = kullanici.esnaf_id || null;
+  durum.oturumTip    = kullanici.tip;
 }
 
-function panelEsnafSil() {
-  localStorage.removeItem('panel_esnaf');
+function oturumSil() {
+  localStorage.removeItem('oturum');
   durum.panelEsnafId = null;
+  durum.oturumTip    = null;
 }
 
-function panelGirisYap() {
-  var telefon = document.getElementById('panel-giris-telefon').value.trim();
-  var sifre   = document.getElementById('panel-giris-sifre').value.trim();
-  if (!telefon || !sifre) { alert('Telefon ve sifre zorunlu.'); return; }
-  var btn = document.getElementById('panel-giris-btn');
-  btn.disabled = true; btn.textContent = 'Giris yapiliyor...';
-  fetch(API_URL + '/api/esnaf-giris', {
+function girisYap(telefon, sifre, btn, callback) {
+  var orijinalMetin = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Giriş yapılıyor...'; }
+  fetch(API_URL + '/api/giris', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ telefon: telefon, sifre: sifre })
   })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      btn.disabled = false; btn.textContent = 'Giriş Yap';
+      if (btn) { btn.disabled = false; btn.textContent = orijinalMetin; }
       if (!data.basari) { alert(data.mesaj); return; }
-      panelEsnafKaydet(data.veri);
-      panelGoruntule();
+      oturumKaydet(data.veri);
+      oturumaGoreNavGuncelle();
+      if (callback) callback(data.veri);
     })
-    .catch(function() { btn.disabled = false; btn.textContent = 'Giriş Yap'; alert('Baglanamadi.'); });
+    .catch(function() {
+      if (btn) { btn.disabled = false; btn.textContent = orijinalMetin; }
+      alert('Bağlantı hatası.');
+    });
+}
+
+function cikisYap() {
+  oturumSil();
+  oturumaGoreNavGuncelle();
+  sayfaGoster('ana');
+}
+
+// =============================================================
+// ESNAF PANELİ — GİRİŞ / ÇIKIŞ
+// =============================================================
+
+function panelEsnafAl() {
+  // Backward compat: önce yeni oturum, sonra eski panel_esnaf
+  var oturum = oturumAl();
+  if (oturum && (oturum.tip === 'esnaf' || oturum.tip === 'admin')) return oturum;
+  try { return JSON.parse(localStorage.getItem('panel_esnaf') || 'null'); }
+  catch(e) { return null; }
+}
+
+function panelGirisYap() {
+  var telefon = document.getElementById('panel-giris-telefon').value.trim();
+  var sifre   = document.getElementById('panel-giris-sifre').value.trim();
+  if (!telefon || !sifre) { alert('Telefon ve şifre zorunlu.'); return; }
+  var btn = document.getElementById('panel-giris-btn');
+  girisYap(telefon, sifre, btn, function(kullanici) {
+    if (kullanici.tip === 'admin') {
+      adminGoster();
+    } else {
+      panelGoruntule();
+    }
+  });
 }
 
 function panelCikisYap() {
-  panelEsnafSil();
-  panelGoruntule();
+  cikisYap();
 }
 
 function panelGoruntule() {
-  var esnaf = panelEsnafAl();
+  var oturum   = oturumAl();
   var girisEl  = document.getElementById('panel-giris-bolum');
   var icerikEl = document.getElementById('panel-icerik');
   var baslikEl = document.getElementById('panel-baslik-ad');
   var cikisEl  = document.getElementById('panel-cikis-btn');
 
-  if (!esnaf) {
+  if (!oturum || (oturum.tip !== 'esnaf' && oturum.tip !== 'kurye' && oturum.tip !== 'admin')) {
     girisEl.style.display  = 'block';
     icerikEl.style.display = 'none';
     cikisEl.style.display  = 'none';
     document.getElementById('panel-stats-row').style.display = 'none';
-    baslikEl.textContent   = 'Giris yapiniz';
+    baslikEl.textContent   = 'Giriş yapınız';
     document.getElementById('panel-giris-telefon').value = '';
     document.getElementById('panel-giris-sifre').value   = '';
     return;
@@ -1533,10 +1652,10 @@ function panelGoruntule() {
 
   girisEl.style.display  = 'none';
   icerikEl.style.display = 'block';
-  baslikEl.textContent   = esnaf.ad;
+  baslikEl.textContent   = oturum.ad || oturum.tip;
   cikisEl.style.display  = 'inline-block';
   document.getElementById('panel-stats-row').style.display = 'flex';
-  durum.panelEsnafId = esnaf.id;
+  durum.panelEsnafId = oturum.esnaf_id || null;
   panelYukle();
 }
 
@@ -1724,12 +1843,15 @@ document.addEventListener('keydown', function(e) {
 document.addEventListener('DOMContentLoaded', function() {
   if (window.L) L.Icon.Default.imagePath = 'images/';
 
-  // Alt navigasyonlar
-  navOlustur('ana-nav',          'ana');
-  navOlustur('favoriler-nav',    'favoriler');
-  navOlustur('siparislerim-nav', 'siparislerim');
-  navOlustur('profil-nav',       'profil');
-  navOlustur('panel-nav',        'panel');
+  // Oturum restore
+  var _oturum = oturumAl();
+  if (_oturum) {
+    durum.panelEsnafId = _oturum.esnaf_id || null;
+    durum.oturumTip    = _oturum.tip;
+  }
+
+  // Alt navigasyonlar (oturuma göre)
+  oturumaGoreNavGuncelle('ana');
 
   // Filtre UI
   kategorilerOlustur();
@@ -1754,6 +1876,17 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('siparislerim-geri').addEventListener('click', function() { sayfaGoster('ana'); });
   document.getElementById('kayit-geri').addEventListener('click', function() { sayfaGoster('kayit-secim'); });
   document.getElementById('kurye-kayit-gonder').addEventListener('click', kuryeKayitGonder);
+  var musKayitBtn = document.getElementById('musteri-kayit-gonder');
+  if (musKayitBtn) musKayitBtn.addEventListener('click', musteriKayitGonder);
+  var secimGirisBtn = document.getElementById('kayit-secim-giris-btn');
+  if (secimGirisBtn) secimGirisBtn.addEventListener('click', function() {
+    var tel  = document.getElementById('kayit-secim-telefon').value.trim();
+    var sif  = document.getElementById('kayit-secim-sifre').value.trim();
+    if (!tel || !sif) { alert('Telefon ve şifre zorunlu.'); return; }
+    girisYap(tel, sif, secimGirisBtn, function(k) {
+      if (k.tip === 'admin') { adminGoster(); } else { sayfaGoster('ana'); }
+    });
+  });
 
   document.getElementById('btn-kurye').addEventListener('click', function() {
     durum.teslimat = 'kurye';

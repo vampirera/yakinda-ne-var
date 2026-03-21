@@ -315,32 +315,70 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
     <div class="header">
       <div class="header-top">
         <button onclick="sayfaGoster('ana')" style="background:#f5f5f5;color:#222;width:34px;height:34px;border-radius:50%;border:none;font-size:1rem;cursor:pointer">←</button>
-        <div style="font-weight:800;font-size:1rem">Kayıt Ol</div>
+        <div style="font-weight:800;font-size:1rem">Giriş / Kayıt</div>
         <div></div>
       </div>
     </div>
     <div style="padding:24px 16px">
-      <div style="background:linear-gradient(135deg,#ff6b35,#f7c948);border-radius:16px;padding:20px;color:#fff;text-align:center;margin-bottom:24px">
-        <div style="font-size:2.5rem;margin-bottom:8px">👋</div>
-        <h3 style="font-size:1.1rem;margin-bottom:4px">Platforma Katıl!</h3>
-        <p style="font-size:.82rem;opacity:.9">Nasıl kayıt olmak istiyorsunuz?</p>
+      <!-- Giriş Yap -->
+      <div style="background:#fff;border:2px solid #1a1a2e;border-radius:16px;padding:20px;margin-bottom:20px">
+        <div style="font-weight:800;font-size:1rem;margin-bottom:14px;color:#1a1a2e">🔑 Giriş Yap</div>
+        <label class="form-label">Telefon</label>
+        <input type="tel" id="kayit-secim-telefon" placeholder="05XX XXX XX XX" class="form-input">
+        <label class="form-label">Şifre</label>
+        <input type="password" id="kayit-secim-sifre" placeholder="••••••" class="form-input">
+        <button id="kayit-secim-giris-btn" style="width:100%;background:#1a1a2e;color:#fff;border:none;border-radius:14px;padding:14px;font-weight:700;font-size:1rem;cursor:pointer;min-height:44px;margin-top:4px">Giriş Yap</button>
       </div>
-      <div style="display:flex;flex-direction:column;gap:14px">
-        <button onclick="sayfaGoster('kayit')" style="background:#fff;border:2px solid #ff6b35;border-radius:16px;padding:20px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:14px">
-          <span style="font-size:2.2rem">🏪</span>
+      <!-- Kayıt Seçenekleri -->
+      <div style="text-align:center;color:#aaa;font-size:.82rem;margin-bottom:14px">— veya yeni hesap oluştur —</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <button onclick="sayfaGoster('musteri-kayit')" style="background:#fff;border:2px solid #ff6b35;border-radius:16px;padding:16px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:14px">
+          <span style="font-size:2rem">👤</span>
           <div>
-            <div style="font-weight:800;font-size:.95rem;color:#222">Esnaf Olarak Kayıt Ol</div>
-            <div style="font-size:.78rem;color:#888;margin-top:3px">İşletmenizi listeyin, siparişleri yönetin</div>
+            <div style="font-weight:800;font-size:.9rem;color:#222">Müşteri Olarak Kayıt Ol</div>
+            <div style="font-size:.75rem;color:#888;margin-top:2px">Sipariş verin, favori tutun</div>
           </div>
         </button>
-        <button onclick="sayfaGoster('kurye-kayit')" style="background:#fff;border:2px solid #1a1a2e;border-radius:16px;padding:20px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:14px">
-          <span style="font-size:2.2rem">🛵</span>
+        <button onclick="sayfaGoster('kayit')" style="background:#fff;border:2px solid #ff6b35;border-radius:16px;padding:16px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:14px">
+          <span style="font-size:2rem">🏪</span>
           <div>
-            <div style="font-weight:800;font-size:.95rem;color:#222">Kurye Olarak Kayıt Ol</div>
-            <div style="font-size:.78rem;color:#888;margin-top:3px">Teslimat yapın, kazanç elde edin</div>
+            <div style="font-weight:800;font-size:.9rem;color:#222">Esnaf Olarak Kayıt Ol</div>
+            <div style="font-size:.75rem;color:#888;margin-top:2px">İşletmenizi listeyin, siparişleri yönetin</div>
+          </div>
+        </button>
+        <button onclick="sayfaGoster('kurye-kayit')" style="background:#fff;border:2px solid #1a1a2e;border-radius:16px;padding:16px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:14px">
+          <span style="font-size:2rem">🛵</span>
+          <div>
+            <div style="font-weight:800;font-size:.9rem;color:#222">Kurye Olarak Kayıt Ol</div>
+            <div style="font-size:.75rem;color:#888;margin-top:2px">Teslimat yapın, kazanç elde edin</div>
           </div>
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- MÜŞTERİ KAYIT -->
+  <div class="sayfa" id="sayfa-musteri-kayit" style="overflow-y:auto">
+    <div class="header">
+      <div class="header-top">
+        <button onclick="sayfaGoster('kayit-secim')" style="background:#f5f5f5;color:#222;width:34px;height:34px;border-radius:50%;border:none;font-size:1rem;cursor:pointer">←</button>
+        <div style="font-weight:800;font-size:1rem">👤 Müşteri Kayıt</div>
+        <div></div>
+      </div>
+    </div>
+    <div style="padding:16px">
+      <div class="kayit-banner" style="background:linear-gradient(135deg,#ff6b35,#f7c948)">
+        <h3 style="font-size:1rem;margin-bottom:4px">Hoş Geldiniz!</h3>
+        <p style="font-size:.8rem;opacity:.9">Birkaç saniyede kayıt olun.</p>
+      </div>
+      <label class="form-label">Ad Soyad *</label>
+      <input type="text" id="mus-ad" placeholder="Ali Yilmaz" class="form-input">
+      <label class="form-label">Telefon *</label>
+      <input type="tel" id="mus-telefon" placeholder="05XX XXX XX XX" class="form-input">
+      <label class="form-label">Şifre *</label>
+      <input type="password" id="mus-sifre" placeholder="En az 4 karakter" class="form-input">
+      <button id="musteri-kayit-gonder" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:14px;padding:14px;font-weight:700;font-size:1rem;cursor:pointer;min-height:44px;margin-top:8px">Kayıt Ol</button>
+      <p id="musteri-kayit-mesaj" style="text-align:center;font-size:.8rem;color:#aaa;margin-top:10px"></p>
     </div>
   </div>
 
@@ -379,6 +417,8 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
         <option value="Milas">Milas</option>
         <option value="Mugla Merkez">Mugla Merkez</option>
       </select>
+      <label class="form-label">Şifre</label>
+      <input type="password" id="kur-sifre" placeholder="En az 4 karakter" class="form-input">
       <button id="kurye-kayit-gonder" style="width:100%;background:#1a1a2e;color:#fff;border:none;border-radius:14px;padding:14px;font-weight:700;font-size:1rem;cursor:pointer;min-height:44px;margin-top:8px">Başvur</button>
       <p id="kurye-kayit-mesaj" style="text-align:center;font-size:.8rem;color:#aaa;margin-top:10px"></p>
     </div>
