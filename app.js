@@ -454,7 +454,7 @@ function navTikla(id) {
     sayfaGoster('kayit-secim');
   } else if (id === 'panel') {
     sayfaGoster('panel');
-    panelYukle();
+    panelGoruntule();
   }
 }
 
@@ -1464,13 +1464,87 @@ function adminIslem(tip, id, key) {
 }
 
 // =============================================================
-// ESNAF PANELİ
+// ESNAF PANELİ — GİRİŞ / ÇIKIŞ
+// =============================================================
+
+function panelEsnafAl() {
+  try { return JSON.parse(localStorage.getItem('panel_esnaf') || 'null'); }
+  catch(e) { return null; }
+}
+
+function panelEsnafKaydet(esnaf) {
+  localStorage.setItem('panel_esnaf', JSON.stringify(esnaf));
+  durum.panelEsnafId = esnaf.id;
+}
+
+function panelEsnafSil() {
+  localStorage.removeItem('panel_esnaf');
+  durum.panelEsnafId = null;
+}
+
+function panelGirisYap() {
+  var telefon = document.getElementById('panel-giris-telefon').value.trim();
+  var sifre   = document.getElementById('panel-giris-sifre').value.trim();
+  if (!telefon || !sifre) { alert('Telefon ve sifre zorunlu.'); return; }
+  var btn = document.getElementById('panel-giris-btn');
+  btn.disabled = true; btn.textContent = 'Giris yapiliyor...';
+  fetch(API_URL + '/api/esnaf-giris', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ telefon: telefon, sifre: sifre })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false; btn.textContent = 'Giriş Yap';
+      if (!data.basari) { alert(data.mesaj); return; }
+      panelEsnafKaydet(data.veri);
+      panelGoruntule();
+    })
+    .catch(function() { btn.disabled = false; btn.textContent = 'Giriş Yap'; alert('Baglanamadi.'); });
+}
+
+function panelCikisYap() {
+  panelEsnafSil();
+  panelGoruntule();
+}
+
+function panelGoruntule() {
+  var esnaf = panelEsnafAl();
+  var girisEl  = document.getElementById('panel-giris-bolum');
+  var icerikEl = document.getElementById('panel-icerik');
+  var baslikEl = document.getElementById('panel-baslik-ad');
+  var cikisEl  = document.getElementById('panel-cikis-btn');
+
+  if (!esnaf) {
+    girisEl.style.display  = 'block';
+    icerikEl.style.display = 'none';
+    cikisEl.style.display  = 'none';
+    document.getElementById('panel-stats-row').style.display = 'none';
+    baslikEl.textContent   = 'Giris yapiniz';
+    document.getElementById('panel-giris-telefon').value = '';
+    document.getElementById('panel-giris-sifre').value   = '';
+    return;
+  }
+
+  girisEl.style.display  = 'none';
+  icerikEl.style.display = 'block';
+  baslikEl.textContent   = esnaf.ad;
+  cikisEl.style.display  = 'inline-block';
+  document.getElementById('panel-stats-row').style.display = 'flex';
+  durum.panelEsnafId = esnaf.id;
+  panelYukle();
+}
+
+// =============================================================
+// ESNAF PANELİ — İÇERİK
 // =============================================================
 
 function panelYukle() {
+  var esnafId = durum.panelEsnafId;
+  if (!esnafId) return;
   var con = document.getElementById('panel-siparisler');
   con.innerHTML = '<div class="yukleniyor">Yukleniyor...</div>';
-  fetch(API_URL + '/api/siparisler')
+  fetch(API_URL + '/api/siparisler?esnaf_id=' + esnafId)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (!data.basari) { con.innerHTML = '<div class="hata">Hata.</div>'; return; }
@@ -1486,11 +1560,11 @@ function panelYukle() {
         var urunText = urunler.map(function(u) { return u.ad + ' x' + u.adet; }).join(', ');
         return '<div class="order-card">' +
           '<div class="order-header">' +
-            '<span class="order-id">#' + s.id + ' - ' + (s.esnaf_adi || '') + '</span>' +
+            '<span class="order-id">#' + s.id + '</span>' +
             '<span class="order-badge ' + (s.durum === 'tamamlandi' ? 'badge-done' : 'badge-new') + '">' + s.durum + '</span>' +
           '</div>' +
           '<div class="order-items">' + urunText +
-            '<br><small>' + (s.teslimat_turu || '') + (s.adres ? ' - ' + s.adres : '') + '</small>' +
+            '<br><small>' + (s.teslimat_turu || '') + (s.adres ? ' — ' + s.adres : '') + '</small>' +
           '</div>' +
           '<div class="order-footer">' +
             '<span class="order-price">₺' + (parseFloat(s.genel_toplam) || 0) + '</span>' +
@@ -1502,16 +1576,8 @@ function panelYukle() {
     })
     .catch(function() { con.innerHTML = '<div class="hata">Baglanamadi.</div>'; });
 
-  if (durum.panelEsnafId) calismaSaatleriYukle(durum.panelEsnafId);
-}
-
-function panelEsnafIdSec() {
-  var inp = document.getElementById('panel-esnaf-id-giris');
-  var id = parseInt(inp.value);
-  if (!id) { alert('Gecerli bir Esnaf ID girin.'); return; }
-  durum.panelEsnafId = id;
-  calismaSaatleriYukle(id);
-  kampanyalariYukle(id);
+  calismaSaatleriYukle(esnafId);
+  kampanyalariYukle(esnafId);
 }
 
 function calismaSaatleriYukle(esnafId) {
