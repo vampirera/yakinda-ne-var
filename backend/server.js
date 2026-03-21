@@ -67,6 +67,7 @@ async function tablolarOlustur() {
   await pool.query(`CREATE TABLE IF NOT EXISTS kuryeler (id SERIAL PRIMARY KEY, ad VARCHAR(255) NOT NULL, telefon VARCHAR(20) NOT NULL, arac_tipi VARCHAR(50), ilce VARCHAR(100), onaylandi BOOLEAN DEFAULT false, kayit_tarihi TIMESTAMP DEFAULT NOW())`);
   await pool.query(`ALTER TABLE siparisler ADD COLUMN IF NOT EXISTS kurye_id INTEGER REFERENCES kuryeler(id)`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS calisma_saatleri JSONB`);
+  await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS sifre VARCHAR(100)`);
   await pool.query(`CREATE TABLE IF NOT EXISTS kampanyalar (id SERIAL PRIMARY KEY, esnaf_id INTEGER REFERENCES esnaflar(id) ON DELETE CASCADE, baslik VARCHAR(255) NOT NULL, aciklama TEXT, indirim_orani INTEGER DEFAULT 0, bitis_tarihi DATE, aktif BOOLEAN DEFAULT true, olusturma_tarihi TIMESTAMP DEFAULT NOW())`);
 
   var sayac = await pool.query('SELECT COUNT(*) FROM esnaflar');
@@ -167,7 +168,7 @@ app.post('/api/esnaf-kayit', upload.fields([{name:'vergi_levhasi',maxCount:1},{n
   try {
     var body = req.body;
     if (!body.ad||!body.kategori||!body.ilce||!body.telefon||!body.vergi_no) return res.status(400).json({ basari: false, mesaj: 'Lutfen tum zorunlu alanlari doldurun' });
-    var result = await pool.query('INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,email,vergi_no,lat,lng,onaylandi) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false) RETURNING id', [body.ad, body.kategori, body.ilce, body.adres||'', body.telefon, body.email||'', body.vergi_no, parseFloat(body.lat)||36.8550, parseFloat(body.lng)||28.2753]);
+    var result = await pool.query('INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,email,vergi_no,lat,lng,onaylandi,sifre) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,$10) RETURNING id', [body.ad, body.kategori, body.ilce, body.adres||'', body.telefon, body.email||'', body.vergi_no, parseFloat(body.lat)||36.8550, parseFloat(body.lng)||28.2753, body.sifre||null]);
     var esnafId = result.rows[0].id;
     if (body.urun_adlari) {
       var adlar = Array.isArray(body.urun_adlari) ? body.urun_adlari : [body.urun_adlari];
@@ -439,7 +440,10 @@ app.get('/api/siparislerim', async function(req, res) {
 
 app.get('/api/siparisler', async function(req, res) {
   try {
-    var result = await pool.query('SELECT * FROM siparisler ORDER BY tarih DESC');
+    var esnafId = req.query.esnaf_id;
+    var result = esnafId
+      ? await pool.query('SELECT * FROM siparisler WHERE esnaf_id=$1 ORDER BY tarih DESC', [esnafId])
+      : await pool.query('SELECT * FROM siparisler ORDER BY tarih DESC');
     res.json({ basari: true, veri: result.rows });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
@@ -576,8 +580,36 @@ app.get('/api/ilceler', function(req, res) {
   res.json({ basari: true, veri: liste });
 });
 
+app.post('/api/esnaf-giris', async function(req, res) {
+  try {
+    var { telefon, sifre } = req.body;
+    if (!telefon || !sifre) return res.status(400).json({ basari: false, mesaj: 'Telefon ve sifre zorunlu' });
+    var result = await pool.query('SELECT id,ad,kategori,ilce,adres,telefon,email,lat,lng,puan,yorum_sayisi,acik,onaylandi FROM esnaflar WHERE telefon=$1 AND sifre=$2', [telefon, sifre]);
+    if (!result.rows.length) return res.status(401).json({ basari: false, mesaj: 'Telefon veya sifre yanlis' });
+    res.json({ basari: true, veri: result.rows[0] });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+app.put('/api/esnaf-panel/:id/profil', async function(req, res) {
+  try {
+    var { ad, adres, telefon, kategori } = req.body;
+    if (!ad || !telefon) return res.status(400).json({ basari: false, mesaj: 'Ad ve telefon zorunlu' });
+    await pool.query('UPDATE esnaflar SET ad=$1, adres=$2, telefon=$3, kategori=$4 WHERE id=$5', [ad, adres||'', telefon, kategori, req.params.id]);
+    cacheSil('esnaf_detay:' + req.params.id);
+    cacheSil('esnaflar:');
+    res.json({ basari: true, mesaj: 'Profil guncellendi.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+async function esnafDogrula(id, res) {
+  var r = await pool.query('SELECT id FROM esnaflar WHERE id=$1', [id]);
+  if (!r.rows.length) { res.status(404).json({ basari: false, mesaj: 'Esnaf bulunamadi' }); return false; }
+  return true;
+}
+
 app.post('/api/esnaf-panel/:id/kampanya', async function(req, res) {
   try {
+    if (!await esnafDogrula(req.params.id, res)) return;
     var { baslik, aciklama, indirim_orani, bitis_tarihi } = req.body;
     if (!baslik) return res.status(400).json({ basari: false, mesaj: 'Baslik zorunlu' });
     var result = await pool.query(
@@ -591,6 +623,7 @@ app.post('/api/esnaf-panel/:id/kampanya', async function(req, res) {
 
 app.delete('/api/esnaf-panel/:id/kampanya/:kampanya_id', async function(req, res) {
   try {
+    if (!await esnafDogrula(req.params.id, res)) return;
     await pool.query('DELETE FROM kampanyalar WHERE id=$1 AND esnaf_id=$2', [req.params.kampanya_id, req.params.id]);
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Kampanya silindi.' });
@@ -599,6 +632,7 @@ app.delete('/api/esnaf-panel/:id/kampanya/:kampanya_id', async function(req, res
 
 app.put('/api/esnaf-panel/:id/calisma-saatleri', async function(req, res) {
   try {
+    if (!await esnafDogrula(req.params.id, res)) return;
     var saatler = req.body.calisma_saatleri;
     if (!saatler || typeof saatler !== 'object') return res.status(400).json({ basari: false, mesaj: 'Gecersiz veri' });
     await pool.query('UPDATE esnaflar SET calisma_saatleri=$1 WHERE id=$2', [JSON.stringify(saatler), req.params.id]);
