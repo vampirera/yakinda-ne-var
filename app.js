@@ -889,9 +889,10 @@ function esnafKartlariOlustur(liste) {
     var minFiyat = fiyatlar.length ? Math.min.apply(null, fiyatlar) : null;
     var urunAdi  = (e.urunler || []).slice(0, 2).map(function(u) { return u.ad; }).join(', ');
     var kalp     = favoriMi(e.id) ? '❤️' : '🤍';
+    var kampanyaVar = (e.kampanyalar || []).length > 0;
     return '<div class="esnaf-card" onclick="esnafDetay(' + e.id + ')">' +
       '<div class="esnaf-card-top">' +
-        '<div class="esnaf-img">' + ikon(e.kategori) + '</div>' +
+        '<div class="esnaf-img">' + ikon(e.kategori) + (kampanyaVar ? '<div class="kart-kampanya-rozet">🏷️</div>' : '') + '</div>' +
         '<div class="esnaf-info">' +
           '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
             '<h4>' + e.ad + (e.onayli ? ' <span class="onay-rozet">✓ Onaylı</span>' : '') + '</h4>' +
@@ -1004,7 +1005,22 @@ function esnafDetay(id) {
     });
 }
 
+function kampanyaBannerOlustur(kampanyalar) {
+  var aktif = (kampanyalar || []).filter(function(k) {
+    if (!k.bitis_tarihi) return true;
+    return new Date(k.bitis_tarihi) >= new Date(new Date().toDateString());
+  });
+  var el = document.getElementById('kampanya-banner');
+  if (!aktif.length) { el.style.display = 'none'; return; }
+  var k = aktif[0];
+  var bugun = k.bitis_tarihi && new Date(k.bitis_tarihi).toDateString() === new Date().toDateString();
+  var sonGun = bugun ? ' · Bugün son gün!' : (k.bitis_tarihi ? ' · ' + new Date(k.bitis_tarihi).toLocaleDateString('tr-TR') + ' son' : '');
+  el.style.display = 'block';
+  el.textContent = '🏷️ ' + (k.indirim_orani ? '%' + k.indirim_orani + ' İndirim — ' : '') + k.baslik + sonGun;
+}
+
 function detayDoldur(e) {
+  kampanyaBannerOlustur(e.kampanyalar);
   document.getElementById('hero-icon').textContent = ikon(e.kategori);
   document.getElementById('detay-adi').textContent = e.ad;
   document.getElementById('detay-puan').textContent = '⭐ ' + (e.puan || 0);
@@ -1495,6 +1511,7 @@ function panelEsnafIdSec() {
   if (!id) { alert('Gecerli bir Esnaf ID girin.'); return; }
   durum.panelEsnafId = id;
   calismaSaatleriYukle(id);
+  kampanyalariYukle(id);
 }
 
 function calismaSaatleriYukle(esnafId) {
@@ -1544,6 +1561,63 @@ function calismaSaatleriKaydet() {
       alert(data.mesaj || (data.basari ? 'Kaydedildi.' : 'Hata.'));
     })
     .catch(function() { alert('Baglanamadi.'); });
+}
+
+function kampanyalariYukle(esnafId) {
+  fetch(API_URL + '/api/esnaflar/' + esnafId)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.basari) return;
+      var liste = data.veri.kampanyalar || [];
+      var con = document.getElementById('panel-kampanyalar-liste');
+      if (!liste.length) { con.innerHTML = '<div style="color:#aaa;font-size:.82rem;padding:6px 0">Aktif kampanya yok.</div>'; return; }
+      con.innerHTML = liste.map(function(k) {
+        var bitis = k.bitis_tarihi ? new Date(k.bitis_tarihi).toLocaleDateString('tr-TR') : '—';
+        return '<div class="kampanya-satir">' +
+          '<div class="kampanya-satir-bilgi">' +
+            '<b>' + k.baslik + '</b>' +
+            (k.indirim_orani ? ' <span class="kampanya-rozet">%' + k.indirim_orani + '</span>' : '') +
+            '<div style="font-size:.72rem;color:#888">' + (k.aciklama || '') + ' · Son: ' + bitis + '</div>' +
+          '</div>' +
+          '<button class="kampanya-sil-btn" onclick="kampanyaSil(' + esnafId + ',' + k.id + ')">🗑</button>' +
+        '</div>';
+      }).join('');
+    });
+}
+
+function kampanyaEkle() {
+  var esnafId = durum.panelEsnafId;
+  if (!esnafId) { alert('Once Esnaf ID yukleyin.'); return; }
+  var baslik = document.getElementById('kamp-baslik').value.trim();
+  var aciklama = document.getElementById('kamp-aciklama').value.trim();
+  var oran = document.getElementById('kamp-oran').value;
+  var bitis = document.getElementById('kamp-bitis').value;
+  if (!baslik) { alert('Baslik zorunlu.'); return; }
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/kampanya', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ baslik: baslik, aciklama: aciklama, indirim_orani: oran, bitis_tarihi: bitis || null })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.basari) { alert(data.mesaj); return; }
+      document.getElementById('kamp-baslik').value = '';
+      document.getElementById('kamp-aciklama').value = '';
+      document.getElementById('kamp-oran').value = '';
+      document.getElementById('kamp-bitis').value = '';
+      kampanyalariYukle(esnafId);
+    })
+    .catch(function() { alert('Baglanamadi.'); });
+}
+
+function kampanyaSil(esnafId, kampanyaId) {
+  if (!confirm('Kampanya silinecek. Emin misiniz?')) return;
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/kampanya/' + kampanyaId, { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.basari) kampanyalariYukle(esnafId);
+      else alert(data.mesaj);
+    });
 }
 
 function siparisKabul(id) {

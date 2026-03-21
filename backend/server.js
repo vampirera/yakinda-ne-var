@@ -67,6 +67,7 @@ async function tablolarOlustur() {
   await pool.query(`CREATE TABLE IF NOT EXISTS kuryeler (id SERIAL PRIMARY KEY, ad VARCHAR(255) NOT NULL, telefon VARCHAR(20) NOT NULL, arac_tipi VARCHAR(50), ilce VARCHAR(100), onaylandi BOOLEAN DEFAULT false, kayit_tarihi TIMESTAMP DEFAULT NOW())`);
   await pool.query(`ALTER TABLE siparisler ADD COLUMN IF NOT EXISTS kurye_id INTEGER REFERENCES kuryeler(id)`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS calisma_saatleri JSONB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS kampanyalar (id SERIAL PRIMARY KEY, esnaf_id INTEGER REFERENCES esnaflar(id) ON DELETE CASCADE, baslik VARCHAR(255) NOT NULL, aciklama TEXT, indirim_orani INTEGER DEFAULT 0, bitis_tarihi DATE, aktif BOOLEAN DEFAULT true, olusturma_tarihi TIMESTAMP DEFAULT NOW())`);
 
   var sayac = await pool.query('SELECT COUNT(*) FROM esnaflar');
   if (parseInt(sayac.rows[0].count) === 0) {
@@ -150,10 +151,10 @@ app.get('/api/esnaflar/:id', async function(req, res) {
     var cached = cacheAl(cacheKey);
     var e = cached ? Object.assign({}, cached) : null;
     if (!e) {
-      var result = await pool.query(`SELECT e.*, json_agg(DISTINCT jsonb_build_object('id',u.id,'ad',u.ad,'fiyat',u.fiyat,'aciklama',u.aciklama,'fotograf_url',u.fotograf_url)) FILTER (WHERE u.id IS NOT NULL) as urunler, json_agg(DISTINCT jsonb_build_object('id',y.id,'kullanici',y.kullanici,'puan',y.puan,'yorum',y.yorum,'tarih',y.tarih)) FILTER (WHERE y.id IS NOT NULL) as yorumlar FROM esnaflar e LEFT JOIN urunler u ON e.id=u.esnaf_id LEFT JOIN yorumlar y ON e.id=y.esnaf_id WHERE e.id=$1 GROUP BY e.id`, [req.params.id]);
+      var result = await pool.query(`SELECT e.*, json_agg(DISTINCT jsonb_build_object('id',u.id,'ad',u.ad,'fiyat',u.fiyat,'aciklama',u.aciklama,'fotograf_url',u.fotograf_url)) FILTER (WHERE u.id IS NOT NULL) as urunler, json_agg(DISTINCT jsonb_build_object('id',y.id,'kullanici',y.kullanici,'puan',y.puan,'yorum',y.yorum,'tarih',y.tarih)) FILTER (WHERE y.id IS NOT NULL) as yorumlar, json_agg(DISTINCT jsonb_build_object('id',k.id,'baslik',k.baslik,'aciklama',k.aciklama,'indirim_orani',k.indirim_orani,'bitis_tarihi',k.bitis_tarihi)) FILTER (WHERE k.id IS NOT NULL AND k.aktif=true AND (k.bitis_tarihi IS NULL OR k.bitis_tarihi >= CURRENT_DATE)) as kampanyalar FROM esnaflar e LEFT JOIN urunler u ON e.id=u.esnaf_id LEFT JOIN yorumlar y ON e.id=y.esnaf_id LEFT JOIN kampanyalar k ON e.id=k.esnaf_id WHERE e.id=$1 GROUP BY e.id`, [req.params.id]);
       if (!result.rows.length) return res.status(404).json({ basari: false, mesaj: 'Esnaf bulunamadi' });
       e = result.rows[0];
-      e.urunler = e.urunler || []; e.yorumlar = e.yorumlar || [];
+      e.urunler = e.urunler || []; e.yorumlar = e.yorumlar || []; e.kampanyalar = e.kampanyalar || [];
       cacheKaydet(cacheKey, e, CACHE_TTL.esnaf_detay);
     }
     var lat = parseFloat(req.query.lat), lng = parseFloat(req.query.lng);
@@ -573,6 +574,27 @@ app.get('/api/ilceler', function(req, res) {
   var liste = ['Marmaris','Bodrum','Fethiye','Datca','Milas','Mugla Merkez'];
   cacheKaydet('ilceler', liste, CACHE_TTL.ilceler);
   res.json({ basari: true, veri: liste });
+});
+
+app.post('/api/esnaf-panel/:id/kampanya', async function(req, res) {
+  try {
+    var { baslik, aciklama, indirim_orani, bitis_tarihi } = req.body;
+    if (!baslik) return res.status(400).json({ basari: false, mesaj: 'Baslik zorunlu' });
+    var result = await pool.query(
+      'INSERT INTO kampanyalar (esnaf_id,baslik,aciklama,indirim_orani,bitis_tarihi,aktif) VALUES ($1,$2,$3,$4,$5,true) RETURNING *',
+      [req.params.id, baslik, aciklama||null, parseInt(indirim_orani)||0, bitis_tarihi||null]
+    );
+    cacheSil('esnaf_detay:' + req.params.id);
+    res.json({ basari: true, veri: result.rows[0] });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+app.delete('/api/esnaf-panel/:id/kampanya/:kampanya_id', async function(req, res) {
+  try {
+    await pool.query('DELETE FROM kampanyalar WHERE id=$1 AND esnaf_id=$2', [req.params.kampanya_id, req.params.id]);
+    cacheSil('esnaf_detay:' + req.params.id);
+    res.json({ basari: true, mesaj: 'Kampanya silindi.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
 app.put('/api/esnaf-panel/:id/calisma-saatleri', async function(req, res) {
