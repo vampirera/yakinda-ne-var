@@ -1271,15 +1271,20 @@ function kayitFormuBaslat() {
       var vergiNo  = document.getElementById('k-vergi').value.trim();
       var lat      = document.getElementById('k-lat').value;
       var lng      = document.getElementById('k-lng').value;
+      var sifre    = document.getElementById('k-sifre').value.trim();
 
       if (!ad || !kategori || !ilce || !telefon || !vergiNo) {
         alert('Lutfen zorunlu alanlari doldurun (*)'); return;
+      }
+      if (sifre && sifre.length < 6) {
+        alert('Sifre en az 6 karakter olmali.'); return;
       }
 
       var fd = new FormData();
       fd.append('ad', ad); fd.append('kategori', kategori); fd.append('ilce', ilce);
       fd.append('adres', adres); fd.append('telefon', telefon); fd.append('email', email);
       fd.append('vergi_no', vergiNo);
+      if (sifre) fd.append('sifre', sifre);
       if (lat) fd.append('lat', lat);
       if (lng) fd.append('lng', lng);
       if (vergiDosya && vergiDosya.files[0]) fd.append('vergi_levhasi', vergiDosya.files[0]);
