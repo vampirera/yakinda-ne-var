@@ -1444,7 +1444,7 @@ function musteriKayitGonder() {
       btn.disabled = false;
       btn.textContent = 'Kayıt Ol';
       if (data.basari) {
-        data.veri.sifre = sifre; oturumKaydet(data.veri);
+        data.veri.sifre = sifre; data.veri.sifre = sifre; oturumKaydet(data.veri);
         oturumaGoreNavGuncelle();
         mesaj.style.color = '#2e7d32';
         mesaj.textContent = '✅ Kayıt başarılı! Hoş geldiniz.';
@@ -1586,7 +1586,7 @@ function girisYap(telefon, sifre, btn, callback) {
     .then(function(data) {
       if (btn) { btn.disabled = false; btn.textContent = orijinalMetin; }
       if (!data.basari) { alert(data.mesaj); return; }
-      data.veri.sifre = sifre; oturumKaydet(data.veri);
+      data.veri.sifre = sifre; data.veri.sifre = sifre; oturumKaydet(data.veri);
       oturumaGoreNavGuncelle();
       if (callback) callback(data.veri);
     })
