@@ -731,6 +731,9 @@ app.post('/api/kayit', async function(req, res) {
     var mevcut = await pool.query('SELECT id FROM kullanicilar WHERE telefon=$1', [telefon]);
     if (mevcut.rows.length) return res.status(400).json({ basari: false, mesaj: 'Bu telefon zaten kayitli' });
     var r = await pool.query('INSERT INTO kullanicilar (ad,telefon,sifre,tip) VALUES ($1,$2,$3,$4) RETURNING id', [ad, telefon, sifre, 'musteri']);
+    if (process.env.ADMIN_TELEFON) {
+      whatsappGonder(process.env.ADMIN_TELEFON, '👤 Yeni müşteri kaydı: ' + ad + ', ' + telefon);
+    }
     res.json({ basari: true, mesaj: 'Kayit basarili!', kullanici_id: r.rows[0].id });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
