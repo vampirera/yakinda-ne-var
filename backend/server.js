@@ -316,6 +316,38 @@ app.get('/api/admin/musteriler', async function(req, res) {
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
+// Admin tüm siparişler
+app.get('/api/admin/siparisler', async function(req, res) {
+  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  try {
+    var where = ''; var params = [];
+    if (req.query.durum) { where = ' WHERE durum=$1'; params = [req.query.durum]; }
+    var result = await pool.query('SELECT * FROM siparisler' + where + ' ORDER BY tarih DESC', params);
+    res.json({ basari: true, veri: result.rows });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Admin esnaf bilgi güncelle
+app.put('/api/admin/esnaf/:id', async function(req, res) {
+  if (req.body.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  try {
+    var { ad, kategori, ilce, adres, telefon } = req.body;
+    await pool.query('UPDATE esnaflar SET ad=$1, kategori=$2, ilce=$3, adres=$4, telefon=$5 WHERE id=$6', [ad, kategori, ilce||'', adres||'', telefon, req.params.id]);
+    cacheSil('esnaf_detay:' + req.params.id);
+    cacheSil('esnaflar:');
+    res.json({ basari: true, mesaj: 'Esnaf guncellendi.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Admin müşteri sil
+app.delete('/api/admin/musteri/:id', async function(req, res) {
+  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  try {
+    await pool.query('DELETE FROM kullanicilar WHERE id=$1 AND tip=$2', [req.params.id, 'musteri']);
+    res.json({ basari: true, mesaj: 'Musteri silindi.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
 app.post('/api/esnaflar/:id/urunler', async function(req, res) {
   try {
     var result = await pool.query('INSERT INTO urunler (esnaf_id,ad,fiyat,aciklama) VALUES ($1,$2,$3,$4) RETURNING *', [req.params.id, req.body.ad, parseFloat(req.body.fiyat), req.body.aciklama||'']);

@@ -432,13 +432,22 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
         <div style="font-weight:800;font-size:1rem">Admin Panel</div>
         <button id="admin-cikis" style="background:#ffebee;color:#c62828;border:none;border-radius:8px;padding:5px 10px;font-size:.75rem;font-weight:700;cursor:pointer">Çıkış</button>
       </div>
-      <div style="display:flex;gap:6px;padding:8px 0 4px">
-        <button class="admin-sekme aktif-sekme" data-sekme="esnaflar" style="flex:1;border:none;border-radius:8px;padding:7px 4px;font-size:.75rem;font-weight:700;cursor:pointer;background:#1a1a2e;color:#fff">🏪 Esnaflar</button>
-        <button class="admin-sekme" data-sekme="kuryeler" style="flex:1;border:none;border-radius:8px;padding:7px 4px;font-size:.75rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444">🛵 Kuryeler</button>
-        <button class="admin-sekme" data-sekme="musteriler" style="flex:1;border:none;border-radius:8px;padding:7px 4px;font-size:.75rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444">👤 Müşteriler</button>
+      <div style="display:flex;gap:5px;padding:8px 0 4px">
+        <button class="admin-sekme aktif-sekme" data-sekme="esnaflar" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.7rem;font-weight:700;cursor:pointer;background:#1a1a2e;color:#fff">🏪 Esnaflar</button>
+        <button class="admin-sekme" data-sekme="kuryeler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.7rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444">🛵 Kuryeler</button>
+        <button class="admin-sekme" data-sekme="musteriler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.7rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444">👤 Müşteriler</button>
+        <button class="admin-sekme" data-sekme="siparisler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.7rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444">📦 Siparişler</button>
       </div>
     </div>
     <div style="padding:16px" id="admin-icerik"><div class="yukleniyor">Yukleniyor...</div></div>
+  </div>
+
+  <!-- ADMİN MODAL -->
+  <div id="admin-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:9999;overflow-y:auto;padding:12px">
+    <div style="background:#fff;max-width:430px;margin:0 auto;border-radius:16px;padding:20px;position:relative;min-height:120px">
+      <button id="admin-modal-kapat" style="position:absolute;top:12px;right:12px;background:#f0f0f0;border:none;border-radius:50%;width:32px;height:32px;font-size:1.1rem;cursor:pointer;line-height:32px">✕</button>
+      <div id="admin-modal-icerik"></div>
+    </div>
   </div>
 
   <!-- ESNAF PANELİ -->
