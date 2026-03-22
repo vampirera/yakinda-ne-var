@@ -4,6 +4,11 @@
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/yakinda-ne-var/sw.js');
+  navigator.serviceWorker.addEventListener('controllerchange', function() {
+    var toast = document.getElementById('guncelleme-toast');
+    if (toast) toast.style.display = 'block';
+    setTimeout(function() { window.location.reload(); }, 1500);
+  });
 }
 
 var API_URL = 'https://yakinda-ne-var-backend-production.up.railway.app';
@@ -136,7 +141,7 @@ function profilSayfasiGoster() {
 }
 
 function adresListesiGoster() {
-  var profil  = profilYukle() || {};
+  var profil   = profilYukle() || {};
   var adresler = profil.adresler || [];
   var el = document.getElementById('adres-listesi');
   if (!adresler.length) {
@@ -145,33 +150,79 @@ function adresListesiGoster() {
   }
   el.innerHTML = adresler.map(function(a, i) {
     var secili = a.secili;
-    return '<div onclick="adresSec(' + i + ')" style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;margin-bottom:6px;cursor:pointer;border:2px solid ' + (secili ? '#ff6b35' : '#eee') + ';background:' + (secili ? '#fff8f5' : '#fafafa') + '">' +
+    return '<div onclick="adresDetayGoster(' + i + ')" style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;margin-bottom:6px;cursor:pointer;border:2px solid ' + (secili ? '#ff6b35' : '#eee') + ';background:' + (secili ? '#fff8f5' : '#fafafa') + '">' +
       '<div style="width:18px;height:18px;border-radius:50%;border:2px solid ' + (secili ? '#ff6b35' : '#ccc') + ';background:' + (secili ? '#ff6b35' : '#fff') + ';flex-shrink:0"></div>' +
       '<div style="flex:1;min-width:0">' +
-        '<div style="font-weight:700;font-size:.82rem;color:#333">' + (a.baslik || 'Adres') + '</div>' +
+        '<div style="font-weight:700;font-size:.82rem;color:#333">' + (a.baslik || 'Adres') + (secili ? ' <span style="color:#ff6b35;font-size:.7rem">● Seçili</span>' : '') + '</div>' +
         '<div style="font-size:.75rem;color:#777;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + a.adres + '</div>' +
       '</div>' +
-      '<button onclick="event.stopPropagation();adresSil(' + i + ')" style="background:none;border:none;color:#ccc;font-size:1rem;cursor:pointer;padding:2px 4px">✕</button>' +
+      '<span style="color:#bbb;font-size:1rem">›</span>' +
     '</div>';
   }).join('');
 }
 
+function adresDetayGoster(index) {
+  var profil   = profilYukle() || {};
+  var adresler = profil.adresler || [];
+  var a = adresler[index];
+  if (!a) return;
+
+  var icerik = document.getElementById('adres-modal-icerik');
+  icerik.innerHTML =
+    '<h3 style="margin:0 30px 14px 0;font-size:1rem">📍 ' + (a.baslik || 'Adres') + '</h3>' +
+    '<div style="background:#f9f9f9;border-radius:10px;padding:12px;margin-bottom:14px;font-size:.85rem;line-height:1.8;color:#444">' +
+      a.adres +
+      (a.lat && a.lng ? '<br><span style="color:#aaa;font-size:.75rem">📌 Konum: ' + parseFloat(a.lat).toFixed(5) + ', ' + parseFloat(a.lng).toFixed(5) + '</span>' : '') +
+    '</div>' +
+    '<div style="display:flex;gap:8px">' +
+      (!a.secili
+        ? '<button onclick="adresSec(' + index + ')" style="flex:1;background:#ff6b35;color:#fff;border:none;border-radius:10px;padding:10px;font-size:.82rem;font-weight:700;cursor:pointer">✓ Bu Adresi Seç</button>'
+        : '<div style="flex:1;background:#fff8f5;color:#ff6b35;border:2px solid #ff6b35;border-radius:10px;padding:10px;font-size:.82rem;font-weight:700;text-align:center">✅ Seçili Adres</div>'
+      ) +
+      '<button onclick="adresSilModaldan(' + index + ')" style="flex:1;background:#ffebee;color:#c62828;border:none;border-radius:10px;padding:10px;font-size:.82rem;font-weight:700;cursor:pointer">🗑 Sil</button>' +
+    '</div>';
+
+  // Haritayı göster (lat/lng varsa)
+  var haritaWrap = document.getElementById('adres-detay-harita');
+  if (a.lat && a.lng) {
+    haritaWrap.style.display = 'block';
+    setTimeout(function() {
+      var mapEl = document.getElementById('adres-detay-harita-ic');
+      if (!durum.adresDetayHarita) {
+        durum.adresDetayHarita = L.map('adres-detay-harita-ic', { zoomControl: false, attributionControl: false });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(durum.adresDetayHarita);
+      }
+      durum.adresDetayHarita.setView([a.lat, a.lng], 16);
+      durum.adresDetayHarita.invalidateSize();
+      if (durum.adresDetayMarker) durum.adresDetayMarker.remove();
+      durum.adresDetayMarker = L.marker([a.lat, a.lng]).addTo(durum.adresDetayHarita).bindPopup(a.baslik || 'Adres').openPopup();
+    }, 150);
+  } else {
+    haritaWrap.style.display = 'none';
+  }
+
+  document.getElementById('adres-modal').style.display = 'block';
+}
+
 function adresSec(index) {
-  var profil = profilYukle() || {};
+  var profil   = profilYukle() || {};
   var adresler = profil.adresler || [];
   adresler.forEach(function(a, i) { a.secili = (i === index); });
   profil.adresler = adresler;
   profilKaydet(profil);
+  document.getElementById('adres-modal').style.display = 'none';
   adresListesiGoster();
 }
 
-function adresSil(index) {
-  var profil = profilYukle() || {};
+function adresSilModaldan(index) {
+  if (!confirm('Bu adres silinecek. Emin misiniz?')) return;
+  var profil   = profilYukle() || {};
   var adresler = profil.adresler || [];
   adresler.splice(index, 1);
   if (adresler.length && !adresler.some(function(a) { return a.secili; })) adresler[0].secili = true;
   profil.adresler = adresler;
   profilKaydet(profil);
+  document.getElementById('adres-modal').style.display = 'none';
   adresListesiGoster();
 }
 
@@ -2333,6 +2384,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Kayıt formu
   kayitFormuBaslat();
+
+  // Adres modal kapat
+  var adresModalKapatBtn = document.getElementById('adres-modal-kapat');
+  if (adresModalKapatBtn) adresModalKapatBtn.addEventListener('click', function() {
+    document.getElementById('adres-modal').style.display = 'none';
+  });
+  var adresModal = document.getElementById('adres-modal');
+  if (adresModal) adresModal.addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+  });
 
   // Admin gizli erişim: konum div'e 5 kez tıkla
   var tikSayisi = 0;
