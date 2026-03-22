@@ -1,4 +1,4 @@
-var CACHE_ADI = 'yakinda-ne-var-v2';
+var CACHE_ADI = 'yakinda-ne-var-v3';
 var CACHE_DOSYALARI = [
   '/yakinda-ne-var/',
   '/yakinda-ne-var/index.html',

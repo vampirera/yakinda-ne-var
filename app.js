@@ -109,6 +109,21 @@ function profilKaydet(profil) {
   localStorage.setItem('musteri_profil', JSON.stringify(profil));
 }
 
+function profilBackendSync(profil) {
+  var oturum = oturumAl();
+  if (!oturum || oturum.tip !== 'musteri' || !oturum.kullanici_id) return;
+  fetch(API_URL + '/api/musteri/profil', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: oturum.kullanici_id,
+      telefon: oturum.telefon,
+      email: profil.email || '',
+      adresler: profil.adresler || []
+    })
+  }).catch(function() {});  // sessizce başarısız ol, localStorage'daki veri yeterli
+}
+
 function profilSayfasiGoster() {
   var profil  = profilYukle() || {};
   var oturum  = oturumAl();
@@ -210,6 +225,7 @@ function adresSec(index) {
   adresler.forEach(function(a, i) { a.secili = (i === index); });
   profil.adresler = adresler;
   profilKaydet(profil);
+  profilBackendSync(profil);
   document.getElementById('adres-modal').style.display = 'none';
   adresListesiGoster();
 }
@@ -222,6 +238,7 @@ function adresSilModaldan(index) {
   if (adresler.length && !adresler.some(function(a) { return a.secili; })) adresler[0].secili = true;
   profil.adresler = adresler;
   profilKaydet(profil);
+  profilBackendSync(profil);
   document.getElementById('adres-modal').style.display = 'none';
   adresListesiGoster();
 }
@@ -251,14 +268,16 @@ function profilFormuBaslat() {
       mevcutProfil.adresler = adresler;
     }
 
-    profilKaydet(Object.assign(mevcutProfil, {
+    var kaydedilecek = Object.assign(mevcutProfil, {
       isim:       isim,
       telefon:    document.getElementById('profil-telefon').value.trim(),
       email:      document.getElementById('profil-email').value.trim(),
       kart_ad:    document.getElementById('profil-kart-ad').value.trim().toUpperCase(),
       kart_son4:  document.getElementById('profil-kart-son4').value.trim(),
       kart_tarih: document.getElementById('profil-kart-tarih').value.trim()
-    }));
+    });
+    profilKaydet(kaydedilecek);
+    profilBackendSync(kaydedilecek);
     document.getElementById('profil-hosgeldin').textContent = 'Merhaba, ' + isim + '!';
     alert('Profil kaydedildi!');
     sayfaGoster('ana');
@@ -275,6 +294,7 @@ function profilFormuBaslat() {
     adresler.push({ baslik: baslik, adres: adres, lat: lat || null, lng: lng || null, secili: adresler.length === 0 });
     profil.adresler = adresler;
     profilKaydet(profil);
+    profilBackendSync(profil);
     document.getElementById('yeni-adres-input').value  = '';
     document.getElementById('yeni-adres-baslik').value = '';
     document.getElementById('profil-lat').value        = '';
@@ -2140,9 +2160,18 @@ function girisYap(telefon, sifre, btn, callback) {
     .then(function(data) {
       if (btn) { btn.disabled = false; btn.textContent = orijinalMetin; }
       if (!data.basari) { alert(data.mesaj); return; }
-      data.veri.sifre = sifre; data.veri.sifre = sifre; oturumKaydet(data.veri);
+      data.veri.sifre = sifre; oturumKaydet(data.veri);
       oturumaGoreNavGuncelle();
       bildirimIzniAl();
+      // Müşteri ise backend'deki profil verisini localStorage'a merge et
+      if (data.veri.tip === 'musteri' && data.veri.kullanici_id) {
+        var mevcutProfil = profilYukle() || {};
+        if (data.veri.email)   mevcutProfil.email   = data.veri.email;
+        if (data.veri.adresler && data.veri.adresler.length) mevcutProfil.adresler = data.veri.adresler;
+        mevcutProfil.isim    = mevcutProfil.isim    || data.veri.ad    || '';
+        mevcutProfil.telefon = mevcutProfil.telefon || data.veri.telefon || '';
+        profilKaydet(mevcutProfil);
+      }
       if (callback) callback(data.veri);
     })
     .catch(function() {

@@ -71,6 +71,8 @@ async function tablolarOlustur() {
   await pool.query(`CREATE TABLE IF NOT EXISTS kullanicilar (id SERIAL PRIMARY KEY, ad VARCHAR(100), telefon VARCHAR(20) UNIQUE NOT NULL, sifre VARCHAR(100) NOT NULL, tip VARCHAR(20) DEFAULT 'musteri', esnaf_id INTEGER REFERENCES esnaflar(id), kurye_id INTEGER REFERENCES kuryeler(id), olusturma TIMESTAMP DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS kampanyalar (id SERIAL PRIMARY KEY, esnaf_id INTEGER REFERENCES esnaflar(id) ON DELETE CASCADE, baslik VARCHAR(255) NOT NULL, aciklama TEXT, indirim_orani INTEGER DEFAULT 0, bitis_tarihi DATE, aktif BOOLEAN DEFAULT true, olusturma_tarihi TIMESTAMP DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS bildirim_tokenler (id SERIAL PRIMARY KEY, token TEXT UNIQUE NOT NULL, kullanici_telefon VARCHAR(20), olusturma TIMESTAMP DEFAULT NOW())`);
+  await pool.query(`ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS email TEXT`);
+  await pool.query(`ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS adresler JSONB DEFAULT '[]'`);
 
   var sayac = await pool.query('SELECT COUNT(*) FROM esnaflar');
   if (parseInt(sayac.rows[0].count) === 0) {
@@ -682,10 +684,10 @@ app.post('/api/giris', async function(req, res) {
       return res.json({ basari: true, veri: { kullanici_id: 0, ad: 'Admin', telefon: telefon, tip: 'admin', esnaf_id: null, kurye_id: null } });
     }
     // Kullanicilar tablosu
-    var r = await pool.query('SELECT id,ad,telefon,tip,esnaf_id,kurye_id FROM kullanicilar WHERE telefon=$1 AND sifre=$2', [telefon, sifre]);
+    var r = await pool.query('SELECT id,ad,telefon,tip,esnaf_id,kurye_id,email,adresler FROM kullanicilar WHERE telefon=$1 AND sifre=$2', [telefon, sifre]);
     if (r.rows.length) {
       var u = r.rows[0];
-      return res.json({ basari: true, veri: { kullanici_id: u.id, ad: u.ad, telefon: u.telefon, tip: u.tip, esnaf_id: u.esnaf_id, kurye_id: u.kurye_id } });
+      return res.json({ basari: true, veri: { kullanici_id: u.id, ad: u.ad, telefon: u.telefon, tip: u.tip, esnaf_id: u.esnaf_id, kurye_id: u.kurye_id, email: u.email || '', adresler: u.adresler || [] } });
     }
     // Geriye dönük uyumluluk: esnaflar tablosundaki sifre
     var er = await pool.query('SELECT id,ad FROM esnaflar WHERE telefon=$1 AND sifre=$2', [telefon, sifre]);
@@ -693,6 +695,17 @@ app.post('/api/giris', async function(req, res) {
       return res.json({ basari: true, veri: { kullanici_id: null, ad: er.rows[0].ad, telefon: telefon, tip: 'esnaf', esnaf_id: er.rows[0].id, kurye_id: null } });
     }
     res.status(401).json({ basari: false, mesaj: 'Telefon veya sifre yanlis' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+app.put('/api/musteri/profil', async function(req, res) {
+  try {
+    var { id, telefon, email, adresler } = req.body;
+    if (!id || !telefon) return res.status(400).json({ basari: false, mesaj: 'id ve telefon zorunlu' });
+    var kontrol = await pool.query('SELECT id FROM kullanicilar WHERE id=$1 AND telefon=$2', [id, telefon]);
+    if (!kontrol.rows.length) return res.status(403).json({ basari: false, mesaj: 'Yetkisiz' });
+    await pool.query('UPDATE kullanicilar SET email=$1, adresler=$2 WHERE id=$3', [email || null, JSON.stringify(adresler || []), id]);
+    res.json({ basari: true });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
