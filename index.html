@@ -549,39 +549,49 @@ firebase.initializeApp({
       <!-- Kişisel Bilgiler -->
       <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)">
         <div style="font-weight:800;font-size:.82rem;color:#ff6b35;margin-bottom:12px;letter-spacing:.5px">KİŞİSEL BİLGİLER</div>
-        <label class="form-label">Ad *</label>
-        <input type="text" id="profil-isim" placeholder="Ali" class="form-input">
-        <label class="form-label">Soyad</label>
-        <input type="text" id="profil-soyad" placeholder="Yılmaz" class="form-input">
+        <label class="form-label">Ad Soyad *</label>
+        <input type="text" id="profil-isim" placeholder="Ali Yılmaz" class="form-input">
         <label class="form-label">Telefon</label>
         <input type="tel" id="profil-telefon" placeholder="05XX XXX XX XX" class="form-input" readonly style="background:#f5f5f5;color:#888">
         <label class="form-label">E-posta</label>
         <input type="email" id="profil-email" placeholder="ali@ornek.com" class="form-input">
       </div>
 
-      <!-- Teslimat Adresi -->
+      <!-- Kayıtlı Adresler -->
       <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)">
-        <div style="font-weight:800;font-size:.82rem;color:#ff6b35;margin-bottom:12px;letter-spacing:.5px">TESLİMAT ADRESİ</div>
-        <label class="form-label">Adres</label>
-        <input type="text" id="profil-adres1" placeholder="Atatürk Cad. No:12 D:3" class="form-input">
-        <button id="profil-konum-al" style="width:100%;background:#1a1a2e;color:#fff;border:none;border-radius:12px;padding:11px;font-weight:700;font-size:.9rem;cursor:pointer;margin-bottom:8px">📍 Konumumu Kullan</button>
-        <div id="profil-harita-wrap" style="display:none;border-radius:12px;overflow:hidden;margin-bottom:4px;border:2px solid #eee">
-          <div id="profil-harita" style="height:180px"></div>
-          <div id="profil-konum-bilgi" style="padding:6px 10px;font-size:.72rem;color:#888;background:#f9f9f9"></div>
+        <div style="font-weight:800;font-size:.82rem;color:#ff6b35;margin-bottom:12px;letter-spacing:.5px">KAYITLI ADRESLER</div>
+        <div id="adres-listesi" style="margin-bottom:10px"></div>
+        <div style="border-top:1px solid #f0f0f0;padding-top:12px">
+          <label class="form-label">Yeni Adres</label>
+          <input type="text" id="yeni-adres-input" placeholder="Atatürk Cad. No:12 D:3" class="form-input">
+          <input type="text" id="yeni-adres-baslik" placeholder="Etiket: Ev, İş, Diğer..." class="form-input">
+          <div style="display:flex;gap:8px">
+            <button id="profil-konum-al" style="flex:1;background:#1a1a2e;color:#fff;border:none;border-radius:10px;padding:10px;font-weight:700;font-size:.82rem;cursor:pointer">📍 Konum Al</button>
+            <button id="adres-ekle-btn" style="flex:1;background:#ff6b35;color:#fff;border:none;border-radius:10px;padding:10px;font-weight:700;font-size:.82rem;cursor:pointer">+ Ekle</button>
+          </div>
+          <div id="profil-harita-wrap" style="display:none;border-radius:12px;overflow:hidden;margin-top:8px;border:2px solid #eee">
+            <div id="profil-harita" style="height:160px"></div>
+            <div id="profil-konum-bilgi" style="padding:6px 10px;font-size:.72rem;color:#888;background:#f9f9f9"></div>
+          </div>
+          <input type="hidden" id="profil-lat">
+          <input type="hidden" id="profil-lng">
         </div>
-        <input type="hidden" id="profil-lat">
-        <input type="hidden" id="profil-lng">
       </div>
 
-      <!-- Ödeme Bilgileri -->
-      <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)">
-        <div style="font-weight:800;font-size:.82rem;color:#ff6b35;margin-bottom:12px;letter-spacing:.5px">ÖDEME BİLGİLERİ</div>
-        <label class="form-label">Kart Üzerindeki İsim</label>
-        <input type="text" id="profil-kart-ad" placeholder="ALİ YILMAZ" class="form-input" style="text-transform:uppercase">
-        <label class="form-label">Kart Numarası (son 4 hane)</label>
-        <input type="text" id="profil-kart-son4" placeholder="**** **** **** 1234" maxlength="4" class="form-input" inputmode="numeric">
-        <label class="form-label">Son Kullanma Tarihi</label>
-        <input type="text" id="profil-kart-tarih" placeholder="AA/YY" maxlength="5" class="form-input">
+      <!-- Ödeme Bilgileri (accordion) -->
+      <div style="background:#fff;border-radius:14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow:hidden">
+        <div id="odeme-baslik" onclick="odemeToggle()" style="cursor:pointer;padding:14px;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:800;font-size:.82rem;color:#ff6b35;letter-spacing:.5px">ÖDEME BİLGİLERİ</div>
+          <span id="odeme-ok" style="color:#aaa;font-size:.8rem;transition:transform .2s">▼</span>
+        </div>
+        <div id="odeme-icerik" style="display:none;padding:0 14px 14px">
+          <label class="form-label">Kart Üzerindeki İsim</label>
+          <input type="text" id="profil-kart-ad" placeholder="ALİ YILMAZ" class="form-input" style="text-transform:uppercase">
+          <label class="form-label">Kart Son 4 Hane</label>
+          <input type="text" id="profil-kart-son4" placeholder="1234" maxlength="4" class="form-input" inputmode="numeric">
+          <label class="form-label">Son Kullanma Tarihi</label>
+          <input type="text" id="profil-kart-tarih" placeholder="AA/YY" maxlength="5" class="form-input">
+        </div>
       </div>
 
       <button id="profil-kaydet" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:14px;padding:14px;font-weight:700;font-size:1rem;cursor:pointer;margin-bottom:10px">💾 Kaydet</button>
