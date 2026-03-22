@@ -188,6 +188,18 @@ function profilFormuBaslat() {
     var isim = document.getElementById('profil-isim').value.trim();
     if (!isim) { alert('Ad Soyad zorunludur.'); return; }
     var mevcutProfil = profilYukle() || {};
+
+    // Eğer adres alanında yazı varsa ve "+ Ekle" butonuna basılmamışsa otomatik ekle
+    var yeniAdres = document.getElementById('yeni-adres-input').value.trim();
+    if (yeniAdres) {
+      var baslik = document.getElementById('yeni-adres-baslik').value.trim() || 'Adres';
+      var lat = document.getElementById('profil-lat').value;
+      var lng = document.getElementById('profil-lng').value;
+      var adresler = mevcutProfil.adresler || [];
+      adresler.push({ baslik: baslik, adres: yeniAdres, lat: lat || null, lng: lng || null, secili: adresler.length === 0 });
+      mevcutProfil.adresler = adresler;
+    }
+
     profilKaydet(Object.assign(mevcutProfil, {
       isim:       isim,
       telefon:    document.getElementById('profil-telefon').value.trim(),
