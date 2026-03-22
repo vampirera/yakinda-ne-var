@@ -307,6 +307,15 @@ app.delete('/api/admin/kurye-sil/:id', async function(req, res) {
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
+// Admin müşteriler listesi
+app.get('/api/admin/musteriler', async function(req, res) {
+  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  try {
+    var result = await pool.query("SELECT id, ad, telefon, olusturma FROM kullanicilar WHERE tip='musteri' ORDER BY olusturma DESC");
+    res.json({ basari: true, veri: result.rows });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
 app.post('/api/esnaflar/:id/urunler', async function(req, res) {
   try {
     var result = await pool.query('INSERT INTO urunler (esnaf_id,ad,fiyat,aciklama) VALUES ($1,$2,$3,$4) RETURNING *', [req.params.id, req.body.ad, parseFloat(req.body.fiyat), req.body.aciklama||'']);

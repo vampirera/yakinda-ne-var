@@ -1462,62 +1462,111 @@ function musteriKayitGonder() {
     });
 }
 
-function adminGoster() {
+var adminAktifSekme = 'esnaflar';
+
+function adminGoster(sekme) {
   var oturum = oturumAl(); var key = (oturum && oturum.sifre) ? oturum.sifre : prompt('Admin sifresi:');
   if (!key) return;
   sayfaGoster('admin');
+  if (sekme) adminAktifSekme = sekme;
+  adminSekmeGuncelle(adminAktifSekme);
+  adminVerileriYukle(key, adminAktifSekme);
+}
+
+function adminSekmeGuncelle(aktif) {
+  document.querySelectorAll('.admin-sekme').forEach(function(btn) {
+    var isAktif = btn.dataset.sekme === aktif;
+    btn.style.background = isAktif ? '#1a1a2e' : '#f0f0f0';
+    btn.style.color = isAktif ? '#fff' : '#444';
+  });
+}
+
+function adminVerileriYukle(key, sekme) {
   var icerik = document.getElementById('admin-icerik');
   icerik.innerHTML = '<div class="yukleniyor">Yukleniyor...</div>';
 
-  Promise.all([
-    fetch(API_URL + '/api/admin/bekleyenler?key=' + key).then(function(r) { return r.json(); }),
-    fetch(API_URL + '/api/admin/aktifler?key='    + key).then(function(r) { return r.json(); }),
-    fetch(API_URL + '/api/admin/kuryeler?key='    + key).then(function(r) { return r.json(); })
-  ]).then(function(results) {
-    if (!results[0].basari) { icerik.innerHTML = '<div class="hata">Yetkisiz erisim.</div>'; return; }
-    adminPanelGoster(results[0].veri, results[1].veri || [], results[2].veri || [], key);
-  }).catch(function() { icerik.innerHTML = '<div class="hata">Baglanamadi.</div>'; });
+  if (sekme === 'esnaflar') {
+    Promise.all([
+      fetch(API_URL + '/api/admin/bekleyenler?key=' + key).then(function(r) { return r.json(); }),
+      fetch(API_URL + '/api/admin/aktifler?key='    + key).then(function(r) { return r.json(); })
+    ]).then(function(results) {
+      if (!results[0].basari) { icerik.innerHTML = '<div class="hata">Yetkisiz erisim.</div>'; return; }
+      adminEsnaflarGoster(results[0].veri, results[1].veri || [], key);
+    }).catch(function() { icerik.innerHTML = '<div class="hata">Baglanamadi.</div>'; });
+
+  } else if (sekme === 'kuryeler') {
+    fetch(API_URL + '/api/admin/kuryeler?key=' + key).then(function(r) { return r.json(); })
+    .then(function(result) {
+      if (!result.basari) { icerik.innerHTML = '<div class="hata">Yetkisiz erisim.</div>'; return; }
+      adminKuryelerGoster(result.veri || [], key);
+    }).catch(function() { icerik.innerHTML = '<div class="hata">Baglanamadi.</div>'; });
+
+  } else if (sekme === 'musteriler') {
+    fetch(API_URL + '/api/admin/musteriler?key=' + key).then(function(r) { return r.json(); })
+    .then(function(result) {
+      if (!result.basari) { icerik.innerHTML = '<div class="hata">Yetkisiz erisim.</div>'; return; }
+      adminMusterilerGoster(result.veri || []);
+    }).catch(function() { icerik.innerHTML = '<div class="hata">Baglanamadi.</div>'; });
+  }
 }
 
-function adminPanelGoster(bekleyenler, aktifler, kuryeler, key) {
+function adminEsnaflarGoster(bekleyenler, aktifler, key) {
   var html = '<div class="s-title">Bekleyen Onaylar (' + bekleyenler.length + ')</div>';
-  html += bekleyenler.map(function(e) {
-    return '<div class="admin-card">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-        '<div><b>' + e.ad + '</b><br><small>' + e.kategori + ' - ' + e.ilce + '</small></div>' +
-        '<div style="display:flex;gap:5px">' +
-          '<button onclick="adminIslem(\'onayla\',' + e.id + ',\'' + key + '\')" style="background:#e8f5e9;color:#2e7d32;border:none;border-radius:7px;padding:5px 10px;font-size:.73rem;font-weight:700;cursor:pointer">Onayla</button>' +
-          '<button onclick="adminIslem(\'reddet\',' + e.id + ',\'' + key + '\')" style="background:#ffebee;color:#c62828;border:none;border-radius:7px;padding:5px 10px;font-size:.73rem;font-weight:700;cursor:pointer">Reddet</button>' +
-        '</div>' +
-      '</div></div>';
-  }).join('');
+  if (!bekleyenler.length) {
+    html += '<div style="color:#aaa;font-size:.82rem;padding:8px 0">Bekleyen başvuru yok.</div>';
+  } else {
+    html += bekleyenler.map(function(e) {
+      return '<div class="admin-card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+          '<div><b>' + e.ad + '</b><br><small>' + e.kategori + ' - ' + e.ilce + '</small></div>' +
+          '<div style="display:flex;gap:5px">' +
+            '<button onclick="adminIslem(\'onayla\',' + e.id + ',\'' + key + '\')" style="background:#e8f5e9;color:#2e7d32;border:none;border-radius:7px;padding:5px 10px;font-size:.73rem;font-weight:700;cursor:pointer">Onayla</button>' +
+            '<button onclick="adminIslem(\'reddet\',' + e.id + ',\'' + key + '\')" style="background:#ffebee;color:#c62828;border:none;border-radius:7px;padding:5px 10px;font-size:.73rem;font-weight:700;cursor:pointer">Reddet</button>' +
+          '</div>' +
+        '</div></div>';
+    }).join('');
+  }
 
-  html += '<div class="s-title" style="margin-top:16px">Tum Esnaflar (' + aktifler.length + ')</div>';
-  html += aktifler.map(function(e) {
-    return '<div class="admin-card">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center">' +
-        '<div><b>' + e.ad + '</b><br><small>' + e.kategori + ' - ' + e.ilce + ' - ' +
-          (e.onaylandi ? '✅ Yayinda' : '⏳ Bekliyor') + '</small></div>' +
-        '<div style="display:flex;gap:5px;flex-wrap:wrap">' +
-          (e.onaylandi
-            ? '<button onclick="adminIslem(\'pasif\',' + e.id + ',\'' + key + '\')" style="background:#fff3e0;color:#e65100;border:none;border-radius:7px;padding:4px 8px;font-size:.7rem;font-weight:700;cursor:pointer">Yayindan Al</button>'
-            : '<button onclick="adminIslem(\'aktif\',' + e.id + ',\'' + key + '\')" style="background:#e8f5e9;color:#2e7d32;border:none;border-radius:7px;padding:4px 8px;font-size:.7rem;font-weight:700;cursor:pointer">Yayina Al</button>'
-          ) +
-          '<button onclick="adminIslem(\'sil\',' + e.id + ',\'' + key + '\')" style="background:#ffebee;color:#c62828;border:none;border-radius:7px;padding:4px 8px;font-size:.7rem;font-weight:700;cursor:pointer">Sil</button>' +
-        '</div>' +
-      '</div></div>';
-  }).join('');
+  html += '<div class="s-title" style="margin-top:16px">Tüm Esnaflar (' + aktifler.length + ')</div>';
+  if (!aktifler.length) {
+    html += '<div style="color:#aaa;font-size:.82rem;padding:8px 0">Kayıtlı esnaf yok.</div>';
+  } else {
+    html += aktifler.map(function(e) {
+      return '<div class="admin-card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<div><b>' + e.ad + '</b><br><small>' + e.kategori + ' · ' + e.ilce + ' · ' +
+            (e.onaylandi ? '✅ Yayında' : '⏳ Bekliyor') + '</small>' +
+            (e.telefon ? '<br><small style="color:#888">' + e.telefon + '</small>' : '') +
+          '</div>' +
+          '<div style="display:flex;gap:5px;flex-wrap:wrap">' +
+            (e.onaylandi
+              ? '<button onclick="adminIslem(\'pasif\',' + e.id + ',\'' + key + '\')" style="background:#fff3e0;color:#e65100;border:none;border-radius:7px;padding:4px 8px;font-size:.7rem;font-weight:700;cursor:pointer">Yayından Al</button>'
+              : '<button onclick="adminIslem(\'aktif\',' + e.id + ',\'' + key + '\')" style="background:#e8f5e9;color:#2e7d32;border:none;border-radius:7px;padding:4px 8px;font-size:.7rem;font-weight:700;cursor:pointer">Yayına Al</button>'
+            ) +
+            '<button onclick="adminIslem(\'sil\',' + e.id + ',\'' + key + '\')" style="background:#ffebee;color:#c62828;border:none;border-radius:7px;padding:4px 8px;font-size:.7rem;font-weight:700;cursor:pointer">Sil</button>' +
+          '</div>' +
+        '</div></div>';
+    }).join('');
+  }
 
-  // Kurye başvuruları
-  html += '<div class="s-title" style="margin-top:16px">🛵 Kurye Başvuruları (' + kuryeler.length + ')</div>';
+  document.getElementById('admin-icerik').innerHTML = html;
+}
+
+function adminKuryelerGoster(kuryeler, key) {
+  var html = '<div class="s-title">Tüm Kuryeler (' + kuryeler.length + ')</div>';
   if (!kuryeler.length) {
-    html += '<div style="color:#aaa;font-size:.82rem;padding:8px 0">Bekleyen kurye başvurusu yok.</div>';
+    html += '<div style="color:#aaa;font-size:.82rem;padding:8px 0">Kayıtlı kurye yok.</div>';
   } else {
     html += kuryeler.map(function(k) {
       return '<div class="admin-card">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
-          '<div><b>' + k.ad + '</b><br><small>' + k.telefon + ' · ' + k.arac_tipi + ' · ' + k.ilce + ' · ' +
-            (k.onaylandi ? '✅ Onaylı' : '⏳ Bekliyor') + '</small></div>' +
+          '<div>' +
+            '<b>' + k.ad + '</b><br>' +
+            '<small>' + k.telefon + ' · ' + k.arac_tipi + ' · ' + k.ilce + '</small><br>' +
+            '<small style="color:' + (k.onaylandi ? '#2e7d32' : '#e65100') + '">' +
+              (k.onaylandi ? '✅ Onaylı' : '⏳ Bekliyor') +
+            '</small>' +
+          '</div>' +
           '<div style="display:flex;gap:5px;flex-wrap:wrap">' +
             (!k.onaylandi
               ? '<button onclick="kuryeIslem(\'onayla\',' + k.id + ',\'' + key + '\')" style="background:#e8f5e9;color:#2e7d32;border:none;border-radius:7px;padding:5px 10px;font-size:.73rem;font-weight:700;cursor:pointer">Onayla</button>'
@@ -1527,7 +1576,27 @@ function adminPanelGoster(bekleyenler, aktifler, kuryeler, key) {
         '</div></div>';
     }).join('');
   }
+  document.getElementById('admin-icerik').innerHTML = html;
+}
 
+function adminMusterilerGoster(musteriler) {
+  var html = '<div class="s-title">Kayıtlı Müşteriler (' + musteriler.length + ')</div>';
+  if (!musteriler.length) {
+    html += '<div style="color:#aaa;font-size:.82rem;padding:8px 0">Kayıtlı müşteri yok.</div>';
+  } else {
+    html += musteriler.map(function(m) {
+      var tarih = m.olusturma ? new Date(m.olusturma).toLocaleDateString('tr-TR') : '-';
+      return '<div class="admin-card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<div>' +
+            '<b>' + (m.ad || 'İsimsiz') + '</b><br>' +
+            '<small>' + m.telefon + '</small><br>' +
+            '<small style="color:#999">Kayıt: ' + tarih + '</small>' +
+          '</div>' +
+          '<div style="background:#e3f2fd;color:#1565c0;border-radius:8px;padding:4px 10px;font-size:.72rem;font-weight:700">👤 Müşteri</div>' +
+        '</div></div>';
+    }).join('');
+  }
   document.getElementById('admin-icerik').innerHTML = html;
 }
 
@@ -1536,7 +1605,7 @@ function kuryeIslem(tip, id, key) {
   var istek;
   if (tip === 'onayla') istek = fetch(API_URL + '/api/admin/kurye-onayla/' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) });
   else if (tip === 'sil') istek = fetch(API_URL + '/api/admin/kurye-sil/' + id + '?key=' + key, { method: 'DELETE' });
-  istek.then(function() { adminGoster(); });
+  istek.then(function() { adminGoster('kuryeler'); });
 }
 
 function adminIslem(tip, id, key) {
@@ -1550,7 +1619,7 @@ function adminIslem(tip, id, key) {
   else if (tip === 'reddet') istek = fetch(API_URL + '/api/admin/reddet/' + id + '?key=' + key, { method: 'DELETE' });
   else if (tip === 'sil')    istek = fetch(API_URL + '/api/admin/sil/'    + id + '?key=' + key, { method: 'DELETE' });
 
-  istek.then(function() { adminGoster(); });
+  istek.then(function() { adminGoster('esnaflar'); });
 }
 
 // =============================================================
@@ -1873,6 +1942,21 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('yorum-gonder-btn').addEventListener('click', yorumGonder);
   document.getElementById('back-btn').addEventListener('click', function() { sayfaGoster('ana'); });
   document.getElementById('admin-geri').addEventListener('click', function() { sayfaGoster('ana'); });
+  document.getElementById('admin-cikis').addEventListener('click', function() {
+    localStorage.removeItem('oturum');
+    adminAktifSekme = 'esnaflar';
+    sayfaGoster('ana');
+  });
+  document.querySelectorAll('.admin-sekme').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var oturum = oturumAl();
+      var key = oturum && oturum.sifre;
+      if (!key) return;
+      adminAktifSekme = btn.dataset.sekme;
+      adminSekmeGuncelle(adminAktifSekme);
+      adminVerileriYukle(key, adminAktifSekme);
+    });
+  });
   document.getElementById('siparislerim-geri').addEventListener('click', function() { sayfaGoster('ana'); });
   document.getElementById('kayit-geri').addEventListener('click', function() { sayfaGoster('kayit-secim'); });
   document.getElementById('kurye-kayit-gonder').addEventListener('click', kuryeKayitGonder);
