@@ -314,9 +314,8 @@ app.delete('/api/admin/sil/:id', async function(req, res) {
 // Kurye kayıt
 app.post('/api/kurye-kayit', async function(req, res) {
   try {
-    var { ad, telefon, arac_tipi, ilce, sifre, otp } = req.body;
+    var { ad, telefon, arac_tipi, ilce, sifre } = req.body;
     if (!ad || !telefon || !arac_tipi || !ilce) return res.status(400).json({ basari: false, mesaj: 'Tum alanlar zorunlu' });
-    if (!otp || !otpDogrula(telefon, otp)) return res.status(400).json({ basari: false, mesaj: 'Dogrulama kodu hatali veya suresi dolmus' });
     var kr = await pool.query('INSERT INTO kuryeler (ad,telefon,arac_tipi,ilce) VALUES ($1,$2,$3,$4) RETURNING id', [ad, telefon, arac_tipi, ilce]);
     var kuryeId = kr.rows[0].id;
     if (sifre) {
@@ -726,10 +725,9 @@ app.post('/api/otp-gonder', async function(req, res) {
 
 app.post('/api/kayit', async function(req, res) {
   try {
-    var { ad, telefon, sifre, otp } = req.body;
+    var { ad, telefon, sifre } = req.body;
     if (!ad || !telefon || !sifre) return res.status(400).json({ basari: false, mesaj: 'Ad, telefon ve sifre zorunlu' });
     if (sifre.length < 4) return res.status(400).json({ basari: false, mesaj: 'Sifre en az 4 karakter olmali' });
-    if (!otp || !otpDogrula(telefon, otp)) return res.status(400).json({ basari: false, mesaj: 'Dogrulama kodu hatali veya suresi dolmus' });
     var mevcut = await pool.query('SELECT id FROM kullanicilar WHERE telefon=$1', [telefon]);
     if (mevcut.rows.length) return res.status(400).json({ basari: false, mesaj: 'Bu telefon zaten kayitli' });
     var r = await pool.query('INSERT INTO kullanicilar (ad,telefon,sifre,tip) VALUES ($1,$2,$3,$4) RETURNING id', [ad, telefon, sifre, 'musteri']);
