@@ -472,9 +472,27 @@ app.post('/api/kurye-kabul', async function(req, res) {
 
 app.get('/api/siparis-detay/:id', async function(req, res) {
   try {
-    var result = await pool.query('SELECT * FROM siparisler WHERE id=$1', [req.params.id]);
+    var result = await pool.query(
+      'SELECT s.*, k.ad AS kurye_ad, k.telefon AS kurye_telefon, k.arac_tipi AS kurye_arac ' +
+      'FROM siparisler s LEFT JOIN kuryeler k ON k.id=s.kurye_id WHERE s.id=$1',
+      [req.params.id]
+    );
     if (!result.rows.length) return res.status(404).json({ basari: false, mesaj: 'Siparis bulunamadi' });
     res.json({ basari: true, veri: result.rows[0] });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+app.put('/api/siparis-iptal/:id', async function(req, res) {
+  try {
+    var telefon = req.body.musteri_telefon;
+    if (!telefon) return res.status(400).json({ basari: false, mesaj: 'musteri_telefon gerekli' });
+    var siparis = await pool.query('SELECT * FROM siparisler WHERE id=$1', [req.params.id]);
+    if (!siparis.rows.length) return res.status(404).json({ basari: false, mesaj: 'Siparis bulunamadi' });
+    var s = siparis.rows[0];
+    if (s.musteri_telefon !== telefon) return res.status(403).json({ basari: false, mesaj: 'Yetkisiz' });
+    if (s.durum !== 'bekliyor') return res.status(400).json({ basari: false, mesaj: 'Sadece bekliyor durumundaki siparisler iptal edilebilir' });
+    await pool.query("UPDATE siparisler SET durum='iptal' WHERE id=$1", [req.params.id]);
+    res.json({ basari: true, mesaj: 'Siparis iptal edildi' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
