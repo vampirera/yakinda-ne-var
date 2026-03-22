@@ -160,6 +160,19 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
 .mesafe-btn{background:#f5f5f5;border:2px solid #eee;border-radius:20px;padding:4px 11px;font-size:.72rem;font-weight:600;color:#666;cursor:pointer;white-space:nowrap;flex-shrink:0;min-height:32px}
 .mesafe-btn.active{background:#ff6b35;border-color:#ff6b35;color:#fff}
 </style>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyA9-mMM4Cb9G2zNJh7xhG2HFjEAOOf1E4Q",
+  authDomain: "yakinda-ne-var-7c5db.firebaseapp.com",
+  projectId: "yakinda-ne-var-7c5db",
+  storageBucket: "yakinda-ne-var-7c5db.firebasestorage.app",
+  messagingSenderId: "738430294415",
+  appId: "1:738430294415:web:3fdf6bfb279210afd653fa"
+});
+</script>
 </head>
 <body>
 <div class="lightbox-overlay" id="lightbox" onclick="lightboxKapat()">
