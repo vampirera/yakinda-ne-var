@@ -33,6 +33,28 @@ function cacheSil(prefix) {
 }
 
 // =============================================================
+// OTP STORE
+// =============================================================
+
+var _otpStore = {};
+
+function otpOlustur(telefon) {
+  var kod = Math.floor(100000 + Math.random() * 900000).toString();
+  _otpStore[telefon] = { kod: kod, exp: Date.now() + 10 * 60 * 1000 };
+  console.log('[OTP] ' + telefon + ': ' + kod);
+  return kod;
+}
+
+function otpDogrula(telefon, kod) {
+  var kayit = _otpStore[telefon];
+  if (!kayit) return false;
+  if (Date.now() > kayit.exp) { delete _otpStore[telefon]; return false; }
+  if (kayit.kod !== kod) return false;
+  delete _otpStore[telefon];
+  return true;
+}
+
+// =============================================================
 
 function whatsappGonder(telefon, mesaj) {
   if (!telefon || !process.env.TWILIO_WHATSAPP_FROM) return;
@@ -283,8 +305,9 @@ app.delete('/api/admin/sil/:id', async function(req, res) {
 // Kurye kayıt
 app.post('/api/kurye-kayit', async function(req, res) {
   try {
-    var { ad, telefon, arac_tipi, ilce, sifre } = req.body;
+    var { ad, telefon, arac_tipi, ilce, sifre, otp } = req.body;
     if (!ad || !telefon || !arac_tipi || !ilce) return res.status(400).json({ basari: false, mesaj: 'Tum alanlar zorunlu' });
+    if (!otp || !otpDogrula(telefon, otp)) return res.status(400).json({ basari: false, mesaj: 'Dogrulama kodu hatali veya suresi dolmus' });
     var kr = await pool.query('INSERT INTO kuryeler (ad,telefon,arac_tipi,ilce) VALUES ($1,$2,$3,$4) RETURNING id', [ad, telefon, arac_tipi, ilce]);
     var kuryeId = kr.rows[0].id;
     if (sifre) {
@@ -677,11 +700,20 @@ app.get('/api/ilceler', function(req, res) {
   res.json({ basari: true, veri: liste });
 });
 
+app.post('/api/otp-gonder', function(req, res) {
+  var telefon = req.body.telefon;
+  if (!telefon) return res.status(400).json({ basari: false, mesaj: 'Telefon zorunlu' });
+  var kod = otpOlustur(telefon);
+  whatsappGonder(telefon, 'Yakinda Ne Var dogrulama kodunuz: *' + kod + '*\n(10 dakika gecerli)');
+  res.json({ basari: true, mesaj: 'Dogrulama kodu WhatsApp a gonderildi.' });
+});
+
 app.post('/api/kayit', async function(req, res) {
   try {
-    var { ad, telefon, sifre } = req.body;
+    var { ad, telefon, sifre, otp } = req.body;
     if (!ad || !telefon || !sifre) return res.status(400).json({ basari: false, mesaj: 'Ad, telefon ve sifre zorunlu' });
-    if (sifre.length < 6) return res.status(400).json({ basari: false, mesaj: 'Sifre en az 6 karakter olmali' });
+    if (sifre.length < 4) return res.status(400).json({ basari: false, mesaj: 'Sifre en az 4 karakter olmali' });
+    if (!otp || !otpDogrula(telefon, otp)) return res.status(400).json({ basari: false, mesaj: 'Dogrulama kodu hatali veya suresi dolmus' });
     var mevcut = await pool.query('SELECT id FROM kullanicilar WHERE telefon=$1', [telefon]);
     if (mevcut.rows.length) return res.status(400).json({ basari: false, mesaj: 'Bu telefon zaten kayitli' });
     var r = await pool.query('INSERT INTO kullanicilar (ad,telefon,sifre,tip) VALUES ($1,$2,$3,$4) RETURNING id', [ad, telefon, sifre, 'musteri']);
@@ -702,7 +734,12 @@ app.post('/api/giris', async function(req, res) {
     var r = await pool.query('SELECT id,ad,telefon,tip,esnaf_id,kurye_id,email,adresler FROM kullanicilar WHERE telefon=$1 AND sifre=$2', [telefon, sifre]);
     if (r.rows.length) {
       var u = r.rows[0];
-      return res.json({ basari: true, veri: { kullanici_id: u.id, ad: u.ad, telefon: u.telefon, tip: u.tip, esnaf_id: u.esnaf_id, kurye_id: u.kurye_id, email: u.email || '', adresler: u.adresler || [] } });
+      var veri = { kullanici_id: u.id, ad: u.ad, telefon: u.telefon, tip: u.tip, esnaf_id: u.esnaf_id, kurye_id: u.kurye_id, email: u.email || '', adresler: u.adresler || [] };
+      if (u.tip === 'kurye' && u.kurye_id) {
+        var kr = await pool.query('SELECT ilce, arac_tipi, onaylandi FROM kuryeler WHERE id=$1', [u.kurye_id]);
+        if (kr.rows.length) { veri.ilce = kr.rows[0].ilce; veri.arac_tipi = kr.rows[0].arac_tipi; veri.onaylandi = kr.rows[0].onaylandi; }
+      }
+      return res.json({ basari: true, veri: veri });
     }
     // Geriye dönük uyumluluk: esnaflar tablosundaki sifre
     var er = await pool.query('SELECT id,ad FROM esnaflar WHERE telefon=$1 AND sifre=$2', [telefon, sifre]);

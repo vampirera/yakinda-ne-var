@@ -141,25 +141,47 @@ function profilSayfasiGoster() {
   var tip     = oturum ? oturum.tip : '';
   var tipEtiket = { musteri: '👤 Müşteri', esnaf: '🏪 Esnaf', kurye: '🛵 Kurye', admin: '⚙️ Admin' };
 
-  document.getElementById('profil-hosgeldin').textContent  = 'Merhaba, ' + (ad || 'Misafir') + '!';
-  document.getElementById('profil-tip-rozet').textContent  = tipEtiket[tip] || '';
-  document.getElementById('profil-isim').value             = ad;
-  document.getElementById('profil-telefon').value          = telefon;
-  document.getElementById('profil-email').value            = profil.email || '';
-  document.getElementById('profil-kart-ad').value          = profil.kart_ad    || '';
-  document.getElementById('profil-kart-son4').value        = profil.kart_son4  || '';
-  document.getElementById('profil-kart-tarih').value       = profil.kart_tarih || '';
-  document.getElementById('profil-lat').value              = '';
-  document.getElementById('profil-lng').value              = '';
-  document.getElementById('profil-harita-wrap').style.display = 'none';
-  document.getElementById('yeni-adres-input').value        = '';
-  document.getElementById('yeni-adres-baslik').value       = '';
+  document.getElementById('profil-hosgeldin').textContent = 'Merhaba, ' + (ad || 'Misafir') + '!';
+  document.getElementById('profil-tip-rozet').textContent = tipEtiket[tip] || '';
 
-  // Ödeme accordion kapalı başlasın
-  document.getElementById('odeme-icerik').style.display = 'none';
-  document.getElementById('odeme-ok').textContent = '▼';
+  var musteriEl = document.getElementById('profil-musteri-icerik');
+  var kuryeEl   = document.getElementById('profil-kurye-icerik');
 
-  adresListesiGoster();
+  if (tip === 'kurye') {
+    musteriEl.style.display = 'none';
+    kuryeEl.style.display   = 'block';
+    document.getElementById('kurye-profil-ad').value      = ad;
+    document.getElementById('kurye-profil-telefon').value = telefon;
+    document.getElementById('kurye-profil-ilce').value    = (oturum && oturum.ilce) ? oturum.ilce : '';
+    document.getElementById('kurye-profil-arac').value    = (oturum && oturum.arac_tipi) ? oturum.arac_tipi : '';
+    var onayEl = document.getElementById('kurye-onay-durumu');
+    if (oturum && oturum.onaylandi) {
+      onayEl.style.background = '#e8f5e9';
+      onayEl.style.color      = '#2e7d32';
+      onayEl.textContent      = '✅ Hesabınız onaylı — aktif olarak teslimat yapabilirsiniz.';
+    } else {
+      onayEl.style.background = '#fff8e1';
+      onayEl.style.color      = '#f57f17';
+      onayEl.textContent      = '⏳ Başvurunuz inceleniyor. Onaylandığında bildirim alacaksınız.';
+    }
+  } else {
+    musteriEl.style.display = 'block';
+    kuryeEl.style.display   = 'none';
+    document.getElementById('profil-isim').value             = ad;
+    document.getElementById('profil-telefon').value          = telefon;
+    document.getElementById('profil-email').value            = profil.email || '';
+    document.getElementById('profil-kart-ad').value          = profil.kart_ad    || '';
+    document.getElementById('profil-kart-son4').value        = profil.kart_son4  || '';
+    document.getElementById('profil-kart-tarih').value       = profil.kart_tarih || '';
+    document.getElementById('profil-lat').value              = '';
+    document.getElementById('profil-lng').value              = '';
+    document.getElementById('profil-harita-wrap').style.display = 'none';
+    document.getElementById('yeni-adres-input').value        = '';
+    document.getElementById('yeni-adres-baslik').value       = '';
+    document.getElementById('odeme-icerik').style.display    = 'none';
+    document.getElementById('odeme-ok').textContent          = '▼';
+    adresListesiGoster();
+  }
 }
 
 function adresListesiGoster() {
@@ -313,6 +335,7 @@ function profilFormuBaslat() {
   function cikisYapProfil() { cikisYap(); }
   document.getElementById('profil-cikis-btn').addEventListener('click', cikisYapProfil);
   document.getElementById('profil-cikis-alt').addEventListener('click', cikisYapProfil);
+  document.getElementById('profil-kurye-cikis').addEventListener('click', cikisYapProfil);
 
   document.getElementById('profil-konum-al').addEventListener('click', function() {
     var btn = document.getElementById('profil-konum-al');
@@ -719,11 +742,16 @@ function navItemleriAl() {
     { id: 'siparislerim', icon: '🛵', label: 'Siparisim'  },
     { id: 'profil',       icon: '👤', label: 'Profilim'   }
   ];
-  if (tip === 'esnaf' || tip === 'kurye') return [
+  if (tip === 'esnaf') return [
     { id: 'ana',          icon: '🏠', label: 'Ana'        },
     { id: 'siparislerim', icon: '🛵', label: 'Siparisim'  },
     { id: 'panel',        icon: '📦', label: 'Panelim'    },
     { id: 'profil',       icon: '👤', label: 'Profilim'   }
+  ];
+  if (tip === 'kurye') return [
+    { id: 'ana',          icon: '🏠', label: 'Ana'        },
+    { id: 'siparislerim', icon: '🛵', label: 'Siparisim'  },
+    { id: 'profil',       icon: '🛵', label: 'Profilim'   }
   ];
   if (tip === 'admin') return [
     { id: 'ana',   icon: '🏠', label: 'Ana'   },
@@ -756,7 +784,7 @@ function navTikla(id) {
     siparislerListele();
   } else if (id === 'profil') {
     var _oturum = oturumAl();
-    if (_oturum && (_oturum.tip === 'esnaf' || _oturum.tip === 'kurye')) {
+    if (_oturum && _oturum.tip === 'esnaf') {
       sayfaGoster('panel');
       panelGoruntule();
       return;
@@ -1672,6 +1700,8 @@ function kayitFormuBaslat() {
 // KURYE KAYIT
 // =============================================================
 
+var _kurOtpGonderildi = false;
+
 function kuryeKayitGonder() {
   var ad      = document.getElementById('kur-ad').value.trim();
   var telefon = document.getElementById('kur-telefon').value.trim();
@@ -1679,6 +1709,7 @@ function kuryeKayitGonder() {
   var ilce    = document.getElementById('kur-ilce').value;
   var sifre   = document.getElementById('kur-sifre') ? document.getElementById('kur-sifre').value.trim() : '';
   var mesaj   = document.getElementById('kurye-kayit-mesaj');
+  var btn     = document.getElementById('kurye-kayit-gonder');
 
   if (!ad || !telefon || !arac || !ilce) {
     mesaj.style.color = '#e53935';
@@ -1686,7 +1717,48 @@ function kuryeKayitGonder() {
     return;
   }
 
-  var btn = document.getElementById('kurye-kayit-gonder');
+  // Adım 1: OTP gönder
+  if (!_kurOtpGonderildi) {
+    btn.disabled = true;
+    btn.textContent = 'Gönderiliyor...';
+    mesaj.textContent = '';
+    fetch(API_URL + '/api/otp-gonder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telefon: telefon })
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        btn.disabled = false;
+        if (data.basari) {
+          _kurOtpGonderildi = true;
+          document.getElementById('kur-otp-bolum').style.display = 'block';
+          btn.textContent = 'Doğrula ve Başvur';
+          mesaj.style.color = '#2e7d32';
+          mesaj.textContent = '✅ Doğrulama kodu WhatsApp\'a gönderildi.';
+        } else {
+          btn.textContent = 'Başvur';
+          mesaj.style.color = '#e53935';
+          mesaj.textContent = 'Hata: ' + data.mesaj;
+        }
+      })
+      .catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Başvur';
+        mesaj.style.color = '#e53935';
+        mesaj.textContent = 'Bağlantı hatası.';
+      });
+    return;
+  }
+
+  // Adım 2: OTP doğrula ve başvuru tamamla
+  var otp = document.getElementById('kur-otp').value.trim();
+  if (!otp) {
+    mesaj.style.color = '#e53935';
+    mesaj.textContent = 'Doğrulama kodunu girin.';
+    return;
+  }
+
   btn.disabled = true;
   btn.textContent = 'Gönderiliyor...';
   mesaj.textContent = '';
@@ -1694,13 +1766,15 @@ function kuryeKayitGonder() {
   fetch(API_URL + '/api/kurye-kayit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ad: ad, telefon: telefon, arac_tipi: arac, ilce: ilce, sifre: sifre })
+    body: JSON.stringify({ ad: ad, telefon: telefon, arac_tipi: arac, ilce: ilce, sifre: sifre, otp: otp })
   })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       btn.disabled = false;
-      btn.textContent = 'Başvur';
+      btn.textContent = 'Doğrula ve Başvur';
       if (data.basari) {
+        _kurOtpGonderildi = false;
+        document.getElementById('kur-otp-bolum').style.display = 'none';
         mesaj.style.color = '#2e7d32';
         mesaj.textContent = '✅ Başvurunuz alındı! Onaylandığında size ulaşacağız.';
         document.getElementById('kur-ad').value = '';
@@ -1708,24 +1782,33 @@ function kuryeKayitGonder() {
         document.getElementById('kur-arac').value = '';
         document.getElementById('kur-ilce').value = '';
         if (document.getElementById('kur-sifre')) document.getElementById('kur-sifre').value = '';
+        document.getElementById('kur-otp').value = '';
       } else {
         mesaj.style.color = '#e53935';
         mesaj.textContent = 'Hata: ' + data.mesaj;
+        if (data.mesaj && data.mesaj.includes('kod')) {
+          _kurOtpGonderildi = false;
+          document.getElementById('kur-otp-bolum').style.display = 'none';
+          btn.textContent = 'Başvur';
+        }
       }
     })
     .catch(function() {
       btn.disabled = false;
-      btn.textContent = 'Başvur';
+      btn.textContent = 'Doğrula ve Başvur';
       mesaj.style.color = '#e53935';
       mesaj.textContent = 'Bağlantı hatası.';
     });
 }
+
+var _musOtpGonderildi = false;
 
 function musteriKayitGonder() {
   var ad      = document.getElementById('mus-ad').value.trim();
   var telefon = document.getElementById('mus-telefon').value.trim();
   var sifre   = document.getElementById('mus-sifre').value.trim();
   var mesaj   = document.getElementById('musteri-kayit-mesaj');
+  var btn     = document.getElementById('musteri-kayit-gonder');
 
   if (!ad || !telefon || !sifre) {
     mesaj.style.color = '#e53935';
@@ -1738,7 +1821,48 @@ function musteriKayitGonder() {
     return;
   }
 
-  var btn = document.getElementById('musteri-kayit-gonder');
+  // Adım 1: OTP gönder
+  if (!_musOtpGonderildi) {
+    btn.disabled = true;
+    btn.textContent = 'Gönderiliyor...';
+    mesaj.textContent = '';
+    fetch(API_URL + '/api/otp-gonder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telefon: telefon })
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        btn.disabled = false;
+        if (data.basari) {
+          _musOtpGonderildi = true;
+          document.getElementById('mus-otp-bolum').style.display = 'block';
+          btn.textContent = 'Doğrula ve Kayıt Ol';
+          mesaj.style.color = '#2e7d32';
+          mesaj.textContent = '✅ Doğrulama kodu WhatsApp\'a gönderildi.';
+        } else {
+          btn.textContent = 'Kayıt Ol';
+          mesaj.style.color = '#e53935';
+          mesaj.textContent = 'Hata: ' + data.mesaj;
+        }
+      })
+      .catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Kayıt Ol';
+        mesaj.style.color = '#e53935';
+        mesaj.textContent = 'Bağlantı hatası.';
+      });
+    return;
+  }
+
+  // Adım 2: OTP doğrula ve kayıt tamamla
+  var otp = document.getElementById('mus-otp').value.trim();
+  if (!otp) {
+    mesaj.style.color = '#e53935';
+    mesaj.textContent = 'Doğrulama kodunu girin.';
+    return;
+  }
+
   btn.disabled = true;
   btn.textContent = 'Kaydediliyor...';
   mesaj.textContent = '';
@@ -1746,14 +1870,18 @@ function musteriKayitGonder() {
   fetch(API_URL + '/api/kayit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ad: ad, telefon: telefon, sifre: sifre })
+    body: JSON.stringify({ ad: ad, telefon: telefon, sifre: sifre, otp: otp })
   })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       btn.disabled = false;
-      btn.textContent = 'Kayıt Ol';
+      btn.textContent = 'Doğrula ve Kayıt Ol';
       if (data.basari) {
-        data.veri.sifre = sifre; data.veri.sifre = sifre; oturumKaydet(data.veri);
+        _musOtpGonderildi = false;
+        document.getElementById('mus-otp-bolum').style.display = 'none';
+        var oturumVeri = { kullanici_id: data.kullanici_id, ad: ad, telefon: telefon, tip: 'musteri' };
+        oturumVeri.sifre = sifre;
+        oturumKaydet(oturumVeri);
         oturumaGoreNavGuncelle();
         mesaj.style.color = '#2e7d32';
         mesaj.textContent = '✅ Kayıt başarılı! Hoş geldiniz.';
@@ -1761,11 +1889,16 @@ function musteriKayitGonder() {
       } else {
         mesaj.style.color = '#e53935';
         mesaj.textContent = 'Hata: ' + data.mesaj;
+        if (data.mesaj && data.mesaj.includes('kod')) {
+          _musOtpGonderildi = false;
+          document.getElementById('mus-otp-bolum').style.display = 'none';
+          btn.textContent = 'Kayıt Ol';
+        }
       }
     })
     .catch(function(err) {
       btn.disabled = false;
-      btn.textContent = 'Kayıt Ol';
+      btn.textContent = 'Doğrula ve Kayıt Ol';
       mesaj.style.color = '#e53935';
       mesaj.textContent = 'Bağlantı hatası: ' + err.message;
     });
