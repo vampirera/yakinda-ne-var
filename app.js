@@ -1617,7 +1617,10 @@ function kayitFormuBaslat() {
     });
   }
 
-  // Kayıt gönder
+  // Kayıt gönder — Firebase SMS OTP
+  var _esnafConfirmation = null;
+  var _esnafRecaptcha = null;
+
   var kayitGonderBtn = document.getElementById('kayit-gonder');
   if (kayitGonderBtn) {
     kayitGonderBtn.addEventListener('click', function() {
@@ -1631,62 +1634,86 @@ function kayitFormuBaslat() {
       var lat      = document.getElementById('k-lat').value;
       var lng      = document.getElementById('k-lng').value;
       var sifre    = document.getElementById('k-sifre').value.trim();
+      var mesajEl  = document.getElementById('esnaf-kayit-mesaj');
 
       if (!ad || !kategori || !ilce || !telefon || !vergiNo) {
-        alert('Lutfen zorunlu alanlari doldurun (*)'); return;
+        mesajEl.style.color = '#e53935'; mesajEl.textContent = 'Lütfen zorunlu alanları doldurun (*).'; return;
       }
       if (sifre && sifre.length < 6) {
-        alert('Sifre en az 6 karakter olmali.'); return;
+        mesajEl.style.color = '#e53935'; mesajEl.textContent = 'Şifre en az 6 karakter olmalı.'; return;
       }
 
-      var fd = new FormData();
-      fd.append('ad', ad); fd.append('kategori', kategori); fd.append('ilce', ilce);
-      fd.append('adres', adres); fd.append('telefon', telefon); fd.append('email', email);
-      fd.append('vergi_no', vergiNo);
-      if (sifre) fd.append('sifre', sifre);
-      if (lat) fd.append('lat', lat);
-      if (lng) fd.append('lng', lng);
-      if (vergiDosya && vergiDosya.files[0]) fd.append('vergi_levhasi', vergiDosya.files[0]);
+      // Adım 1: SMS gönder
+      if (!_esnafConfirmation) {
+        kayitGonderBtn.disabled = true; kayitGonderBtn.textContent = 'Gönderiliyor...'; mesajEl.textContent = '';
+        if (!_esnafRecaptcha) {
+          _esnafRecaptcha = new firebase.auth.RecaptchaVerifier('recaptcha-esnaf', { size: 'invisible' });
+        }
+        firebase.auth().signInWithPhoneNumber(telefonIntlFormat(telefon), _esnafRecaptcha)
+          .then(function(result) {
+            _esnafConfirmation = result;
+            kayitGonderBtn.disabled = false; kayitGonderBtn.textContent = 'Doğrula ve Kayıt Ol';
+            document.getElementById('esnaf-otp-bolum').style.display = 'block';
+            mesajEl.style.color = '#2e7d32'; mesajEl.textContent = '✅ SMS ile doğrulama kodu gönderildi.';
+          })
+          .catch(function(e) {
+            kayitGonderBtn.disabled = false; kayitGonderBtn.textContent = 'Kayıt Ol';
+            mesajEl.style.color = '#e53935'; mesajEl.textContent = 'SMS gönderilemedi: ' + e.message;
+            if (_esnafRecaptcha) { _esnafRecaptcha.clear(); _esnafRecaptcha = null; }
+          });
+        return;
+      }
 
-      document.querySelectorAll('[name="urun_adlari"]').forEach(function(inp) {
-        if (inp.value.trim()) fd.append('urun_adlari', inp.value.trim());
-      });
-      document.querySelectorAll('[name="urun_fiyatlari"]').forEach(function(inp) {
-        fd.append('urun_fiyatlari', inp.value || '0');
-      });
-      document.querySelectorAll('[name="urun_fotograflari"]').forEach(function(inp) {
-        if (inp.files[0]) fd.append('urun_fotograflari', inp.files[0]);
-      });
+      // Adım 2: OTP doğrula ve formu gönder
+      var otp = document.getElementById('esnaf-otp').value.trim();
+      if (!otp) { mesajEl.style.color = '#e53935'; mesajEl.textContent = 'Doğrulama kodunu girin.'; return; }
 
-      kayitGonderBtn.disabled = true;
-      kayitGonderBtn.textContent = 'Gonderiliyor...';
+      kayitGonderBtn.disabled = true; kayitGonderBtn.textContent = 'Gönderiliyor...'; mesajEl.textContent = '';
 
-      fetch(API_URL + '/api/esnaf-kayit', { method: 'POST', body: fd })
+      _esnafConfirmation.confirm(otp)
+        .then(function() {
+          var fd = new FormData();
+          fd.append('ad', ad); fd.append('kategori', kategori); fd.append('ilce', ilce);
+          fd.append('adres', adres); fd.append('telefon', telefon); fd.append('email', email);
+          fd.append('vergi_no', vergiNo);
+          if (sifre) fd.append('sifre', sifre);
+          if (lat) fd.append('lat', lat);
+          if (lng) fd.append('lng', lng);
+          if (vergiDosya && vergiDosya.files[0]) fd.append('vergi_levhasi', vergiDosya.files[0]);
+          document.querySelectorAll('[name="urun_adlari"]').forEach(function(inp) {
+            if (inp.value.trim()) fd.append('urun_adlari', inp.value.trim());
+          });
+          document.querySelectorAll('[name="urun_fiyatlari"]').forEach(function(inp) {
+            fd.append('urun_fiyatlari', inp.value || '0');
+          });
+          document.querySelectorAll('[name="urun_fotograflari"]').forEach(function(inp) {
+            if (inp.files[0]) fd.append('urun_fotograflari', inp.files[0]);
+          });
+          return fetch(API_URL + '/api/esnaf-kayit', { method: 'POST', body: fd });
+        })
         .then(function(r) { return r.json(); })
         .then(function(data) {
-          kayitGonderBtn.disabled = false;
-          kayitGonderBtn.textContent = 'Kayit Ol ve WhatsApp ile Onayla';
+          kayitGonderBtn.disabled = false; kayitGonderBtn.textContent = 'Doğrula ve Kayıt Ol';
+          _esnafConfirmation = null; _esnafRecaptcha = null;
+          document.getElementById('esnaf-otp-bolum').style.display = 'none';
           if (data.basari) {
-            var formu = document.querySelector('#sayfa-kayit .content') || document.getElementById('kayit-form-wrap');
             var onayHtml = '<div style="text-align:center;padding:20px 10px">' +
               '<div style="font-size:3rem;margin-bottom:12px">✅</div>' +
               '<h3 style="font-weight:800;font-size:1.1rem;margin-bottom:8px;color:#2e7d32">Başvurunuz Alındı!</h3>' +
               '<p style="font-size:.85rem;color:#555;margin-bottom:6px">Kayıt No: <b>#' + data.kayit_id + '</b></p>' +
-              '<p style="font-size:.82rem;color:#888;margin-bottom:20px">İşletmeniz incelendikten sonra listelenmesi için onay vermeniz gerekiyor. Aşağıdaki butona basarak WhatsApp üzerinden onay isteyin.</p>' +
-              (data.whatsapp_url
-                ? '<a href="' + data.whatsapp_url + '" target="_blank" rel="noopener" style="display:block;background:#25d366;color:#fff;text-decoration:none;border-radius:14px;padding:14px;font-weight:800;font-size:.95rem;margin-bottom:12px">💬 WhatsApp ile Onay İste</a>'
-                : '') +
+              '<p style="font-size:.82rem;color:#888;margin-bottom:20px">İşletmeniz incelendikten sonra onaylanacak.</p>' +
               '<button onclick="sayfaGoster(\'kayit-secim\')" style="width:100%;background:#1a1a2e;color:#fff;border:none;border-radius:14px;padding:13px;font-weight:700;font-size:.9rem;cursor:pointer">Giriş Yap</button>' +
             '</div>';
             var icerikEl = document.getElementById('kayit-form-wrap');
             if (icerikEl) icerikEl.innerHTML = onayHtml;
             else sayfaGoster('ana');
-          } else { alert('Hata: ' + data.mesaj); }
+          } else {
+            mesajEl.style.color = '#e53935'; mesajEl.textContent = 'Hata: ' + data.mesaj;
+          }
         })
-        .catch(function() {
-          kayitGonderBtn.disabled = false;
-          kayitGonderBtn.textContent = 'Kayit Ol ve WhatsApp ile Onayla';
-          alert('Kayit gonderilemedi.');
+        .catch(function(e) {
+          kayitGonderBtn.disabled = false; kayitGonderBtn.textContent = 'Doğrula ve Kayıt Ol';
+          mesajEl.style.color = '#e53935'; mesajEl.textContent = 'Kod hatalı veya süresi dolmuş.';
         });
     });
   }
