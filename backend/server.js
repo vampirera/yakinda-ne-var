@@ -70,6 +70,7 @@ async function tablolarOlustur() {
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS sifre VARCHAR(100)`);
   await pool.query(`CREATE TABLE IF NOT EXISTS kullanicilar (id SERIAL PRIMARY KEY, ad VARCHAR(100), telefon VARCHAR(20) UNIQUE NOT NULL, sifre VARCHAR(100) NOT NULL, tip VARCHAR(20) DEFAULT 'musteri', esnaf_id INTEGER REFERENCES esnaflar(id), kurye_id INTEGER REFERENCES kuryeler(id), olusturma TIMESTAMP DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS kampanyalar (id SERIAL PRIMARY KEY, esnaf_id INTEGER REFERENCES esnaflar(id) ON DELETE CASCADE, baslik VARCHAR(255) NOT NULL, aciklama TEXT, indirim_orani INTEGER DEFAULT 0, bitis_tarihi DATE, aktif BOOLEAN DEFAULT true, olusturma_tarihi TIMESTAMP DEFAULT NOW())`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS bildirim_tokenler (id SERIAL PRIMARY KEY, token TEXT UNIQUE NOT NULL, kullanici_telefon VARCHAR(20), olusturma TIMESTAMP DEFAULT NOW())`);
 
   var sayac = await pool.query('SELECT COUNT(*) FROM esnaflar');
   if (parseInt(sayac.rows[0].count) === 0) {
@@ -617,6 +618,19 @@ app.post('/api/gorsel-ara', upload.single('fotograf'), async function(req, res) 
       mesaj: urunAdi ? ('"' + urunAdi + '" icin sonuclar') : (kategori ? kategori + ' kategorisinde esnaflar' : 'Tum esnaflar'),
       veri: esnaflar
     });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Push bildirim token kaydet
+app.post('/api/bildirim-token', async function(req, res) {
+  var { token, kullanici_telefon } = req.body;
+  if (!token) return res.status(400).json({ basari: false, mesaj: 'Token zorunlu' });
+  try {
+    await pool.query(
+      'INSERT INTO bildirim_tokenler (token, kullanici_telefon) VALUES ($1,$2) ON CONFLICT (token) DO UPDATE SET kullanici_telefon=$2, olusturma=NOW()',
+      [token, kullanici_telefon || null]
+    );
+    res.json({ basari: true });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 

@@ -8,6 +8,38 @@ if ('serviceWorker' in navigator) {
 
 var API_URL = 'https://yakinda-ne-var-backend-production.up.railway.app';
 
+var VAPID_KEY = 'BMShtgCFEigjmfHuq6ijOmO2vVBhTkACupg9FXi8k7W88ute3JuwbGnAuuJ4-WzZaBVYK2IIFu_9B5TYDAlFNWI';
+
+function bildirimIzniAl() {
+  if (!('Notification' in window) || !window.firebase) return;
+  if (Notification.permission === 'denied') return;
+
+  var messaging = firebase.messaging();
+  Notification.requestPermission().then(function(izin) {
+    if (izin !== 'granted') return;
+    return messaging.getToken({ vapidKey: VAPID_KEY });
+  }).then(function(token) {
+    if (!token) return;
+    var oturum = oturumAl();
+    fetch(API_URL + '/api/bildirim-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: token,
+        kullanici_telefon: oturum ? oturum.telefon : null
+      })
+    });
+    messaging.onMessage(function(payload) {
+      if (payload.notification) {
+        new Notification(payload.notification.title, {
+          body: payload.notification.body,
+          icon: '/yakinda-ne-var/icon-192.png'
+        });
+      }
+    });
+  }).catch(function() {});
+}
+
 var durum = {
   lat: null,
   lng: null,
@@ -2173,6 +2205,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Konum al → esnafları yükle
   konumAl();
+
+  // Push bildirim izni
+  bildirimIzniAl();
 
   // Buton event'leri
   document.getElementById('sepet-btn').addEventListener('click', siparisVer);
