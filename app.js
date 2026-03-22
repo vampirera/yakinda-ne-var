@@ -447,11 +447,8 @@ function navItemleriAl() {
     { id: 'profil',       icon: '👤', label: 'Profilim'   }
   ];
   if (tip === 'admin') return [
-    { id: 'ana',          icon: '🏠', label: 'Ana'        },
-    { id: 'favoriler',    icon: '❤️', label: 'Favoriler'  },
-    { id: 'siparislerim', icon: '🛵', label: 'Siparisim'  },
-    { id: 'panel',        icon: '⚙️', label: 'Admin'      },
-    { id: 'profil',       icon: '👤', label: 'Profilim'   }
+    { id: 'ana',   icon: '🏠', label: 'Ana'   },
+    { id: 'panel', icon: '⚙️', label: 'Admin' }
   ];
   return [];
 }
@@ -1510,7 +1507,14 @@ function adminVerileriYukle(key, sekme) {
     fetch(API_URL + '/api/admin/musteriler?key=' + key).then(function(r) { return r.json(); })
     .then(function(result) {
       if (!result.basari) { icerik.innerHTML = '<div class="hata">Yetkisiz erisim.</div>'; return; }
-      adminMusterilerGoster(result.veri || []);
+      adminMusterilerGoster(result.veri || [], key);
+    }).catch(function() { icerik.innerHTML = '<div class="hata">Baglanamadi.</div>'; });
+
+  } else if (sekme === 'siparisler') {
+    fetch(API_URL + '/api/admin/siparisler?key=' + key).then(function(r) { return r.json(); })
+    .then(function(result) {
+      if (!result.basari) { icerik.innerHTML = '<div class="hata">Yetkisiz erisim.</div>'; return; }
+      adminSiparislerGoster(result.veri || [], key, 'tumu');
     }).catch(function() { icerik.innerHTML = '<div class="hata">Baglanamadi.</div>'; });
   }
 }
@@ -1521,13 +1525,10 @@ function adminEsnaflarGoster(bekleyenler, aktifler, key) {
     html += '<div style="color:#aaa;font-size:.82rem;padding:8px 0">Bekleyen başvuru yok.</div>';
   } else {
     html += bekleyenler.map(function(e) {
-      return '<div class="admin-card">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-          '<div><b>' + e.ad + '</b><br><small>' + e.kategori + ' - ' + e.ilce + '</small></div>' +
-          '<div style="display:flex;gap:5px">' +
-            '<button onclick="adminIslem(\'onayla\',' + e.id + ',\'' + key + '\')" style="background:#e8f5e9;color:#2e7d32;border:none;border-radius:7px;padding:5px 10px;font-size:.73rem;font-weight:700;cursor:pointer">Onayla</button>' +
-            '<button onclick="adminIslem(\'reddet\',' + e.id + ',\'' + key + '\')" style="background:#ffebee;color:#c62828;border:none;border-radius:7px;padding:5px 10px;font-size:.73rem;font-weight:700;cursor:pointer">Reddet</button>' +
-          '</div>' +
+      return '<div class="admin-card" onclick="adminEsnafDetay(' + e.id + ',\'' + key + '\')" style="cursor:pointer">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<div><b>' + e.ad + '</b><br><small>' + e.kategori + ' · ' + e.ilce + '</small><br><small style="color:#e65100">⏳ Onay Bekliyor</small></div>' +
+          '<div style="color:#aaa;font-size:1.2rem">›</div>' +
         '</div></div>';
     }).join('');
   }
@@ -1537,19 +1538,13 @@ function adminEsnaflarGoster(bekleyenler, aktifler, key) {
     html += '<div style="color:#aaa;font-size:.82rem;padding:8px 0">Kayıtlı esnaf yok.</div>';
   } else {
     html += aktifler.map(function(e) {
-      return '<div class="admin-card">' +
+      return '<div class="admin-card" onclick="adminEsnafDetay(' + e.id + ',\'' + key + '\')" style="cursor:pointer">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
-          '<div><b>' + e.ad + '</b><br><small>' + e.kategori + ' · ' + e.ilce + ' · ' +
-            (e.onaylandi ? '✅ Yayında' : '⏳ Bekliyor') + '</small>' +
-            (e.telefon ? '<br><small style="color:#888">' + e.telefon + '</small>' : '') +
+          '<div><b>' + e.ad + '</b><br>' +
+            '<small>' + e.kategori + ' · ' + e.ilce + '</small><br>' +
+            '<small style="color:' + (e.onaylandi ? '#2e7d32' : '#e65100') + '">' + (e.onaylandi ? '✅ Yayında' : '⏳ Bekliyor') + '</small>' +
           '</div>' +
-          '<div style="display:flex;gap:5px;flex-wrap:wrap">' +
-            (e.onaylandi
-              ? '<button onclick="adminIslem(\'pasif\',' + e.id + ',\'' + key + '\')" style="background:#fff3e0;color:#e65100;border:none;border-radius:7px;padding:4px 8px;font-size:.7rem;font-weight:700;cursor:pointer">Yayından Al</button>'
-              : '<button onclick="adminIslem(\'aktif\',' + e.id + ',\'' + key + '\')" style="background:#e8f5e9;color:#2e7d32;border:none;border-radius:7px;padding:4px 8px;font-size:.7rem;font-weight:700;cursor:pointer">Yayına Al</button>'
-            ) +
-            '<button onclick="adminIslem(\'sil\',' + e.id + ',\'' + key + '\')" style="background:#ffebee;color:#c62828;border:none;border-radius:7px;padding:4px 8px;font-size:.7rem;font-weight:700;cursor:pointer">Sil</button>' +
-          '</div>' +
+          '<div style="color:#aaa;font-size:1.2rem">›</div>' +
         '</div></div>';
     }).join('');
   }
@@ -1563,46 +1558,279 @@ function adminKuryelerGoster(kuryeler, key) {
     html += '<div style="color:#aaa;font-size:.82rem;padding:8px 0">Kayıtlı kurye yok.</div>';
   } else {
     html += kuryeler.map(function(k) {
-      return '<div class="admin-card">' +
+      return '<div class="admin-card" onclick="adminKuryeDetay(' + k.id + ',\'' + key + '\')" style="cursor:pointer">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
-          '<div>' +
-            '<b>' + k.ad + '</b><br>' +
+          '<div><b>' + k.ad + '</b><br>' +
             '<small>' + k.telefon + ' · ' + k.arac_tipi + ' · ' + k.ilce + '</small><br>' +
-            '<small style="color:' + (k.onaylandi ? '#2e7d32' : '#e65100') + '">' +
-              (k.onaylandi ? '✅ Onaylı' : '⏳ Bekliyor') +
-            '</small>' +
+            '<small style="color:' + (k.onaylandi ? '#2e7d32' : '#e65100') + '">' + (k.onaylandi ? '✅ Onaylı' : '⏳ Bekliyor') + '</small>' +
           '</div>' +
-          '<div style="display:flex;gap:5px;flex-wrap:wrap">' +
-            (!k.onaylandi
-              ? '<button onclick="kuryeIslem(\'onayla\',' + k.id + ',\'' + key + '\')" style="background:#e8f5e9;color:#2e7d32;border:none;border-radius:7px;padding:5px 10px;font-size:.73rem;font-weight:700;cursor:pointer">Onayla</button>'
-              : '') +
-            '<button onclick="kuryeIslem(\'sil\',' + k.id + ',\'' + key + '\')" style="background:#ffebee;color:#c62828;border:none;border-radius:7px;padding:5px 10px;font-size:.73rem;font-weight:700;cursor:pointer">Sil</button>' +
-          '</div>' +
+          '<div style="color:#aaa;font-size:1.2rem">›</div>' +
         '</div></div>';
     }).join('');
   }
   document.getElementById('admin-icerik').innerHTML = html;
 }
 
-function adminMusterilerGoster(musteriler) {
+function adminMusterilerGoster(musteriler, key) {
   var html = '<div class="s-title">Kayıtlı Müşteriler (' + musteriler.length + ')</div>';
   if (!musteriler.length) {
     html += '<div style="color:#aaa;font-size:.82rem;padding:8px 0">Kayıtlı müşteri yok.</div>';
   } else {
     html += musteriler.map(function(m) {
       var tarih = m.olusturma ? new Date(m.olusturma).toLocaleDateString('tr-TR') : '-';
-      return '<div class="admin-card">' +
+      return '<div class="admin-card" onclick="adminMusteriDetay(' + m.id + ',\'' + m.ad + '\',\'' + m.telefon + '\',\'' + tarih + '\',\'' + key + '\')" style="cursor:pointer">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
-          '<div>' +
-            '<b>' + (m.ad || 'İsimsiz') + '</b><br>' +
-            '<small>' + m.telefon + '</small><br>' +
-            '<small style="color:#999">Kayıt: ' + tarih + '</small>' +
-          '</div>' +
-          '<div style="background:#e3f2fd;color:#1565c0;border-radius:8px;padding:4px 10px;font-size:.72rem;font-weight:700">👤 Müşteri</div>' +
+          '<div><b>' + (m.ad || 'İsimsiz') + '</b><br><small>' + m.telefon + '</small><br><small style="color:#999">Kayıt: ' + tarih + '</small></div>' +
+          '<div style="color:#aaa;font-size:1.2rem">›</div>' +
         '</div></div>';
     }).join('');
   }
   document.getElementById('admin-icerik').innerHTML = html;
+}
+
+// ---- SİPARİŞLER ----
+
+var _adminSiparisVerisi = [];
+
+function adminSiparislerGoster(siparisler, key, filtre) {
+  _adminSiparisVerisi = siparisler;
+  var durumlar = [
+    { v: 'tumu',          l: 'Tümü' },
+    { v: 'bekliyor',      l: '⏳ Bekliyor' },
+    { v: 'hazirlaniyor',  l: '👨‍🍳 Hazırlanıyor' },
+    { v: 'kurye_atandi',  l: '🛵 Kurye Atandı' },
+    { v: 'yolda',         l: '🚀 Yolda' },
+    { v: 'teslim_edildi', l: '✅ Teslim' },
+    { v: 'iptal',         l: '❌ İptal' }
+  ];
+  var filtreHTML = '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">' +
+    durumlar.map(function(d) {
+      var aktif = filtre === d.v;
+      return '<button onclick="adminSiparisFiltrele(\'' + d.v + '\',\'' + key + '\')" style="border:none;border-radius:8px;padding:5px 8px;font-size:.68rem;font-weight:700;cursor:pointer;background:' + (aktif ? '#1a1a2e' : '#f0f0f0') + ';color:' + (aktif ? '#fff' : '#444') + '">' + d.l + '</button>';
+    }).join('') + '</div>';
+
+  var liste = filtre === 'tumu' ? siparisler : siparisler.filter(function(s) { return s.durum === filtre; });
+  var html = '<div class="s-title">Siparişler (' + liste.length + ')</div>' + filtreHTML;
+
+  if (!liste.length) {
+    html += '<div style="color:#aaa;font-size:.82rem;padding:8px 0">Bu filtrede sipariş yok.</div>';
+  } else {
+    html += liste.map(function(s) {
+      var tarih = s.tarih ? new Date(s.tarih).toLocaleString('tr-TR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '-';
+      var durumRenk = { bekliyor:'#e65100', hazirlaniyor:'#1565c0', kurye_atandi:'#6a1b9a', yolda:'#0277bd', teslim_edildi:'#2e7d32', iptal:'#c62828' };
+      var renk = durumRenk[s.durum] || '#666';
+      return '<div class="admin-card" onclick="adminSiparisDetay(' + s.id + ',\'' + key + '\')" style="cursor:pointer">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+          '<div style="flex:1">' +
+            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">' +
+              '<b>#' + s.id + '</b>' +
+              '<span style="background:' + renk + ';color:#fff;border-radius:6px;padding:2px 7px;font-size:.65rem;font-weight:700">' + (s.durum || 'bekliyor') + '</span>' +
+            '</div>' +
+            '<small>' + (s.esnaf_adi || '-') + '</small><br>' +
+            '<small style="color:#888">' + (s.musteri_telefon || '-') + ' · ' + tarih + '</small>' +
+          '</div>' +
+          '<div style="text-align:right"><b style="color:#1a1a2e">₺' + (s.genel_toplam || 0) + '</b><div style="color:#aaa;font-size:1rem">›</div></div>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  document.getElementById('admin-icerik').innerHTML = html;
+}
+
+function adminSiparisFiltrele(filtre, key) {
+  adminSiparislerGoster(_adminSiparisVerisi, key, filtre);
+}
+
+// ---- MODAL ----
+
+function adminModalAc(html) {
+  document.getElementById('admin-modal-icerik').innerHTML = html;
+  document.getElementById('admin-modal').style.display = 'block';
+}
+
+function adminModalKapat() {
+  document.getElementById('admin-modal').style.display = 'none';
+}
+
+// ---- DETAY MODALLARI ----
+
+function adminEsnafDetay(id, key) {
+  adminModalAc('<div class="yukleniyor">Yükleniyor...</div>');
+  fetch(API_URL + '/api/esnaflar/' + id).then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (!res.basari) { adminModalAc('<div class="hata">Yüklenemedi.</div>'); return; }
+    var e = res.veri;
+    var urunlerHTML = (e.urunler && e.urunler.length)
+      ? e.urunler.map(function(u) { return '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0f0f0"><span>' + u.ad + '</span><b>₺' + u.fiyat + '</b></div>'; }).join('')
+      : '<div style="color:#aaa;font-size:.8rem">Ürün yok</div>';
+
+    var html = '<h3 style="margin:0 30px 12px 0;font-size:1rem">🏪 Esnaf Detayı</h3>' +
+      '<div style="display:flex;gap:8px;margin-bottom:12px">' +
+        (e.onaylandi
+          ? '<button onclick="adminIslem(\'pasif\',' + e.id + ',\'' + key + '\')" style="flex:1;background:#fff3e0;color:#e65100;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">Yayından Al</button>'
+          : '<button onclick="adminIslem(\'onayla\',' + e.id + ',\'' + key + '\')" style="flex:1;background:#e8f5e9;color:#2e7d32;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">Onayla</button>'
+        ) +
+        '<button onclick="adminIslem(\'reddet\',' + e.id + ',\'' + key + '\')" style="flex:1;background:#ffebee;color:#c62828;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">Reddet/Sil</button>' +
+      '</div>' +
+      '<div style="background:#f9f9f9;border-radius:10px;padding:12px;margin-bottom:12px">' +
+        '<div style="font-size:.75rem;color:#888;margin-bottom:8px">BİLGİLER — tıklayarak düzenle</div>' +
+        '<input id="esnaf-edit-ad" value="' + (e.ad||'') + '" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:7px 10px;margin-bottom:6px;font-size:.85rem;box-sizing:border-box">' +
+        '<input id="esnaf-edit-kategori" value="' + (e.kategori||'') + '" placeholder="Kategori" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:7px 10px;margin-bottom:6px;font-size:.85rem;box-sizing:border-box">' +
+        '<input id="esnaf-edit-ilce" value="' + (e.ilce||'') + '" placeholder="İlçe" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:7px 10px;margin-bottom:6px;font-size:.85rem;box-sizing:border-box">' +
+        '<input id="esnaf-edit-telefon" value="' + (e.telefon||'') + '" placeholder="Telefon" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:7px 10px;margin-bottom:6px;font-size:.85rem;box-sizing:border-box">' +
+        '<input id="esnaf-edit-adres" value="' + (e.adres||'') + '" placeholder="Adres" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:7px 10px;margin-bottom:6px;font-size:.85rem;box-sizing:border-box">' +
+        '<button onclick="adminEsnafKaydet(' + e.id + ',\'' + key + '\')" style="width:100%;background:#1a1a2e;color:#fff;border:none;border-radius:8px;padding:9px;font-size:.8rem;font-weight:700;cursor:pointer">Kaydet</button>' +
+      '</div>' +
+      '<div style="font-weight:700;font-size:.82rem;margin-bottom:6px">Ürünler (' + (e.urunler ? e.urunler.length : 0) + ')</div>' +
+      urunlerHTML;
+
+    adminModalAc(html);
+  }).catch(function() { adminModalAc('<div class="hata">Bağlantı hatası.</div>'); });
+}
+
+function adminEsnafKaydet(id, key) {
+  var body = {
+    key: key,
+    ad:       document.getElementById('esnaf-edit-ad').value.trim(),
+    kategori: document.getElementById('esnaf-edit-kategori').value.trim(),
+    ilce:     document.getElementById('esnaf-edit-ilce').value.trim(),
+    telefon:  document.getElementById('esnaf-edit-telefon').value.trim(),
+    adres:    document.getElementById('esnaf-edit-adres').value.trim()
+  };
+  if (!body.ad || !body.telefon) { alert('Ad ve telefon zorunlu.'); return; }
+  fetch(API_URL + '/api/admin/esnaf/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.basari) { adminModalKapat(); adminGoster('esnaflar'); }
+    else alert(res.mesaj);
+  });
+}
+
+function adminKuryeDetay(id, key) {
+  var oturum = oturumAl();
+  if (!oturum) return;
+  fetch(API_URL + '/api/admin/kuryeler?key=' + key).then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (!res.basari) return;
+    var k = (res.veri || []).find(function(x) { return x.id === id; });
+    if (!k) { adminModalAc('<div class="hata">Kurye bulunamadı.</div>'); return; }
+    var tarih = k.kayit_tarihi ? new Date(k.kayit_tarihi).toLocaleDateString('tr-TR') : '-';
+    var html = '<h3 style="margin:0 30px 12px 0;font-size:1rem">🛵 Kurye Detayı</h3>' +
+      '<div style="background:#f9f9f9;border-radius:10px;padding:12px;margin-bottom:14px">' +
+        '<div style="margin-bottom:5px"><b>' + k.ad + '</b></div>' +
+        '<div style="font-size:.83rem;color:#555;line-height:1.8">' +
+          '📞 ' + k.telefon + '<br>' +
+          '🚗 ' + k.arac_tipi + '<br>' +
+          '📍 ' + k.ilce + '<br>' +
+          '📅 Kayıt: ' + tarih + '<br>' +
+          '<span style="color:' + (k.onaylandi ? '#2e7d32' : '#e65100') + '">' + (k.onaylandi ? '✅ Onaylı' : '⏳ Onay Bekliyor') + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px">' +
+        (!k.onaylandi
+          ? '<button onclick="kuryeIslem(\'onayla\',' + k.id + ',\'' + key + '\')" style="flex:1;background:#e8f5e9;color:#2e7d32;border:none;border-radius:8px;padding:9px;font-size:.8rem;font-weight:700;cursor:pointer">Onayla</button>'
+          : '') +
+        '<button onclick="kuryeIslem(\'sil\',' + k.id + ',\'' + key + '\')" style="flex:1;background:#ffebee;color:#c62828;border:none;border-radius:8px;padding:9px;font-size:.8rem;font-weight:700;cursor:pointer">Sil</button>' +
+      '</div>';
+    adminModalAc(html);
+  });
+}
+
+function adminMusteriDetay(id, ad, telefon, tarih, key) {
+  var html = '<h3 style="margin:0 30px 12px 0;font-size:1rem">👤 Müşteri Detayı</h3>' +
+    '<div style="background:#f9f9f9;border-radius:10px;padding:12px;margin-bottom:14px">' +
+      '<div style="margin-bottom:5px"><b>' + (ad || 'İsimsiz') + '</b></div>' +
+      '<div style="font-size:.83rem;color:#555;line-height:1.8">' +
+        '📞 ' + telefon + '<br>' +
+        '📅 Kayıt: ' + tarih +
+      '</div>' +
+    '</div>' +
+    '<div style="font-weight:700;font-size:.82rem;margin-bottom:8px">Siparişleri</div>' +
+    '<div id="musteri-siparis-listesi"><div class="yukleniyor" style="font-size:.8rem">Yükleniyor...</div></div>' +
+    '<div style="margin-top:14px">' +
+      '<button onclick="adminMusteriSil(' + id + ',\'' + key + '\')" style="width:100%;background:#ffebee;color:#c62828;border:none;border-radius:8px;padding:9px;font-size:.8rem;font-weight:700;cursor:pointer">Müşteriyi Sil</button>' +
+    '</div>';
+  adminModalAc(html);
+
+  fetch(API_URL + '/api/admin/siparisler?key=' + key).then(function(r) { return r.json(); })
+  .then(function(res) {
+    var el = document.getElementById('musteri-siparis-listesi');
+    if (!el) return;
+    var liste = (res.veri || []).filter(function(s) { return s.musteri_telefon === telefon; });
+    if (!liste.length) { el.innerHTML = '<div style="color:#aaa;font-size:.78rem">Sipariş bulunamadı.</div>'; return; }
+    el.innerHTML = liste.slice(0, 10).map(function(s) {
+      var t = s.tarih ? new Date(s.tarih).toLocaleDateString('tr-TR') : '-';
+      return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:.78rem">' +
+        '<span><b>#' + s.id + '</b> ' + (s.esnaf_adi||'-') + ' · ' + t + '</span>' +
+        '<b>₺' + (s.genel_toplam||0) + '</b></div>';
+    }).join('');
+  });
+}
+
+function adminMusteriSil(id, key) {
+  if (!confirm('Müşteri silinecek. Emin misiniz?')) return;
+  fetch(API_URL + '/api/admin/musteri/' + id + '?key=' + key, { method: 'DELETE' })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.basari) { adminModalKapat(); adminGoster('musteriler'); }
+    else alert(res.mesaj);
+  });
+}
+
+function adminSiparisDetay(id, key) {
+  fetch(API_URL + '/api/siparis-detay/' + id).then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (!res.basari) { adminModalAc('<div class="hata">Sipariş yüklenemedi.</div>'); return; }
+    var s = res.veri;
+    var tarih = s.tarih ? new Date(s.tarih).toLocaleString('tr-TR') : '-';
+    var urunlerHTML = '';
+    try {
+      var urunler = typeof s.urunler === 'string' ? JSON.parse(s.urunler) : s.urunler;
+      urunlerHTML = (urunler || []).map(function(u) {
+        return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f5f5f5;font-size:.8rem">' +
+          '<span>' + u.ad + ' × ' + u.adet + '</span><b>₺' + (u.fiyat * u.adet) + '</b></div>';
+      }).join('');
+    } catch(e) { urunlerHTML = '<div style="font-size:.8rem;color:#aaa">Ürün verisi okunamadı</div>'; }
+
+    var durumSecenekleri = ['bekliyor','hazirlaniyor','kurye_atandi','yolda','teslim_edildi','iptal'];
+    var durumSelect = '<select id="siparis-durum-select" style="width:100%;border:1px solid #ddd;border-radius:8px;padding:8px;font-size:.82rem;margin-bottom:8px">' +
+      durumSecenekleri.map(function(d) { return '<option value="' + d + '"' + (s.durum === d ? ' selected' : '') + '>' + d + '</option>'; }).join('') +
+      '</select>';
+
+    var html = '<h3 style="margin:0 30px 12px 0;font-size:1rem">📦 Sipariş #' + s.id + '</h3>' +
+      '<div style="background:#f9f9f9;border-radius:10px;padding:12px;margin-bottom:12px;font-size:.82rem;line-height:1.9">' +
+        '🏪 <b>' + (s.esnaf_adi||'-') + '</b><br>' +
+        '👤 ' + (s.musteri_telefon||'-') + '<br>' +
+        '📍 ' + (s.teslimat_turu||'-') + (s.adres ? ' · ' + s.adres : '') + '<br>' +
+        '📅 ' + tarih +
+      '</div>' +
+      '<div style="font-weight:700;font-size:.82rem;margin-bottom:6px">Ürünler</div>' +
+      '<div style="margin-bottom:12px">' + urunlerHTML + '</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:6px 0;border-top:1px solid #eee">' +
+        '<span>Ara toplam</span><span>₺' + (s.ara_toplam||0) + '</span></div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:6px 0;border-bottom:1px solid #eee">' +
+        '<span>Kurye + Komisyon</span><span>₺' + ((s.kurye_ucreti||0) + (s.komisyon||0)) + '</span></div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:.9rem;font-weight:800;padding:8px 0;margin-bottom:12px">' +
+        '<span>Toplam</span><span>₺' + (s.genel_toplam||0) + '</span></div>' +
+      '<div style="font-weight:700;font-size:.82rem;margin-bottom:6px">Durum Güncelle</div>' +
+      durumSelect +
+      '<button onclick="adminSiparisGuncelle(' + s.id + ',\'' + key + '\')" style="width:100%;background:#1a1a2e;color:#fff;border:none;border-radius:8px;padding:9px;font-size:.82rem;font-weight:700;cursor:pointer">Kaydet</button>';
+
+    adminModalAc(html);
+  });
+}
+
+function adminSiparisGuncelle(id, key) {
+  var durum = document.getElementById('siparis-durum-select').value;
+  fetch(API_URL + '/api/siparisler/' + id + '/durum', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ durum: durum })
+  }).then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.basari) { adminModalKapat(); adminGoster('siparisler'); }
+    else alert(res.mesaj);
+  });
 }
 
 function kuryeIslem(tip, id, key) {
@@ -1610,7 +1838,7 @@ function kuryeIslem(tip, id, key) {
   var istek;
   if (tip === 'onayla') istek = fetch(API_URL + '/api/admin/kurye-onayla/' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) });
   else if (tip === 'sil') istek = fetch(API_URL + '/api/admin/kurye-sil/' + id + '?key=' + key, { method: 'DELETE' });
-  istek.then(function() { adminGoster('kuryeler'); });
+  istek.then(function() { adminModalKapat(); adminGoster('kuryeler'); });
 }
 
 function adminIslem(tip, id, key) {
@@ -1624,7 +1852,7 @@ function adminIslem(tip, id, key) {
   else if (tip === 'reddet') istek = fetch(API_URL + '/api/admin/reddet/' + id + '?key=' + key, { method: 'DELETE' });
   else if (tip === 'sil')    istek = fetch(API_URL + '/api/admin/sil/'    + id + '?key=' + key, { method: 'DELETE' });
 
-  istek.then(function() { adminGoster('esnaflar'); });
+  istek.then(function() { adminModalKapat(); adminGoster('esnaflar'); });
 }
 
 // =============================================================
@@ -1947,6 +2175,10 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('yorum-gonder-btn').addEventListener('click', yorumGonder);
   document.getElementById('back-btn').addEventListener('click', function() { sayfaGoster('ana'); });
   document.getElementById('admin-geri').addEventListener('click', function() { sayfaGoster('ana'); });
+  document.getElementById('admin-modal-kapat').addEventListener('click', adminModalKapat);
+  document.getElementById('admin-modal').addEventListener('click', function(e) {
+    if (e.target === this) adminModalKapat();
+  });
   document.getElementById('admin-cikis').addEventListener('click', function() {
     adminAktifSekme = 'esnaflar';
     cikisYap();
