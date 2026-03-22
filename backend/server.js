@@ -56,9 +56,18 @@ function otpDogrula(telefon, kod) {
 
 // =============================================================
 
+function telefonNormalize(telefon) {
+  var t = telefon.replace(/\D/g, ''); // sadece rakam
+  if (t.startsWith('90') && t.length === 12) return '+' + t;
+  if (t.startsWith('0') && t.length === 11) return '+90' + t.slice(1);
+  if (t.length === 10) return '+90' + t;
+  return '+' + t;
+}
+
 function whatsappGonder(telefon, mesaj) {
   if (!telefon || !process.env.TWILIO_WHATSAPP_FROM) return;
-  var to = telefon.startsWith('whatsapp:') ? telefon : 'whatsapp:' + telefon;
+  var normalized = telefonNormalize(telefon);
+  var to = normalized.startsWith('whatsapp:') ? normalized : 'whatsapp:' + normalized;
   twilioClient.messages.create({ from: process.env.TWILIO_WHATSAPP_FROM, to: to, body: mesaj })
     .then(function(m) { console.log('[WhatsApp] Gönderildi:', m.sid); })
     .catch(function(e) { console.log('[WhatsApp] Hata:', e.message); });
