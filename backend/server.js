@@ -65,12 +65,12 @@ function telefonNormalize(telefon) {
 }
 
 function whatsappGonder(telefon, mesaj) {
-  if (!telefon || !process.env.TWILIO_WHATSAPP_FROM) return;
+  if (!telefon || !process.env.TWILIO_WHATSAPP_FROM) return Promise.resolve();
   var normalized = telefonNormalize(telefon);
   var to = normalized.startsWith('whatsapp:') ? normalized : 'whatsapp:' + normalized;
-  twilioClient.messages.create({ from: process.env.TWILIO_WHATSAPP_FROM, to: to, body: mesaj })
+  return twilioClient.messages.create({ from: process.env.TWILIO_WHATSAPP_FROM, to: to, body: mesaj })
     .then(function(m) { console.log('[WhatsApp] Gönderildi:', m.sid); })
-    .catch(function(e) { console.log('[WhatsApp] Hata:', e.message); });
+    .catch(function(e) { console.log('[WhatsApp] Hata:', e.message); throw e; });
 }
 
 cloudinary.config({
@@ -709,12 +709,19 @@ app.get('/api/ilceler', function(req, res) {
   res.json({ basari: true, veri: liste });
 });
 
-app.post('/api/otp-gonder', function(req, res) {
+app.post('/api/otp-gonder', async function(req, res) {
   var telefon = req.body.telefon;
   if (!telefon) return res.status(400).json({ basari: false, mesaj: 'Telefon zorunlu' });
+  if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_WHATSAPP_FROM) {
+    return res.status(500).json({ basari: false, mesaj: 'WhatsApp servisi yapılandırılmamış (Twilio env vars eksik)' });
+  }
   var kod = otpOlustur(telefon);
-  whatsappGonder(telefon, 'Yakinda Ne Var dogrulama kodunuz: *' + kod + '*\n(10 dakika gecerli)');
-  res.json({ basari: true, mesaj: 'Dogrulama kodu WhatsApp a gonderildi.' });
+  try {
+    await whatsappGonder(telefon, 'Yakinda Ne Var dogrulama kodunuz: *' + kod + '*\n(10 dakika gecerli)');
+    res.json({ basari: true, mesaj: 'Dogrulama kodu WhatsApp a gonderildi.' });
+  } catch(e) {
+    res.status(500).json({ basari: false, mesaj: 'WhatsApp gönderilemedi: ' + e.message });
+  }
 });
 
 app.post('/api/kayit', async function(req, res) {
