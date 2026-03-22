@@ -450,7 +450,7 @@ function navItemleriAl() {
     { id: 'ana',          icon: '🏠', label: 'Ana'        },
     { id: 'favoriler',    icon: '❤️', label: 'Favoriler'  },
     { id: 'siparislerim', icon: '🛵', label: 'Siparisim'  },
-    { id: 'panel',        icon: '📦', label: 'Panelim'    },
+    { id: 'panel',        icon: '⚙️', label: 'Admin'      },
     { id: 'profil',       icon: '👤', label: 'Profilim'   }
   ];
   return [];
@@ -485,8 +485,13 @@ function navTikla(id) {
   } else if (id === 'kayit') {
     sayfaGoster('kayit-secim');
   } else if (id === 'panel') {
-    sayfaGoster('panel');
-    panelGoruntule();
+    var oturum = oturumAl();
+    if (oturum && oturum.tip === 'admin') {
+      adminGoster();
+    } else {
+      sayfaGoster('panel');
+      panelGoruntule();
+    }
   }
   oturumaGoreNavGuncelle(id);
 }
@@ -1943,9 +1948,8 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('back-btn').addEventListener('click', function() { sayfaGoster('ana'); });
   document.getElementById('admin-geri').addEventListener('click', function() { sayfaGoster('ana'); });
   document.getElementById('admin-cikis').addEventListener('click', function() {
-    localStorage.removeItem('oturum');
     adminAktifSekme = 'esnaflar';
-    sayfaGoster('ana');
+    cikisYap();
   });
   document.querySelectorAll('.admin-sekme').forEach(function(btn) {
     btn.addEventListener('click', function() {
