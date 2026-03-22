@@ -255,12 +255,19 @@ app.post('/api/admin/aktif/:id', async function(req, res) {
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
+async function esnafSil(id) {
+  await pool.query('DELETE FROM kampanyalar WHERE esnaf_id=$1', [id]);
+  await pool.query('DELETE FROM urunler WHERE esnaf_id=$1', [id]);
+  await pool.query('DELETE FROM yorumlar WHERE esnaf_id=$1', [id]);
+  await pool.query('UPDATE kullanicilar SET esnaf_id=NULL WHERE esnaf_id=$1', [id]);
+  await pool.query('DELETE FROM esnaflar WHERE id=$1', [id]);
+  cacheSil('esnaflar:'); cacheSil('esnaf_detay:' + id);
+}
+
 app.delete('/api/admin/reddet/:id', async function(req, res) {
   if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
-    await pool.query('DELETE FROM urunler WHERE esnaf_id=$1', [req.params.id]);
-    await pool.query('DELETE FROM esnaflar WHERE id=$1', [req.params.id]);
-    cacheSil('esnaflar:'); cacheSil('esnaf_detay:' + req.params.id);
+    await esnafSil(req.params.id);
     res.json({ basari: true, mesaj: 'Esnaf reddedildi.' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
@@ -268,10 +275,7 @@ app.delete('/api/admin/reddet/:id', async function(req, res) {
 app.delete('/api/admin/sil/:id', async function(req, res) {
   if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
-    await pool.query('DELETE FROM urunler WHERE esnaf_id=$1', [req.params.id]);
-    await pool.query('DELETE FROM yorumlar WHERE esnaf_id=$1', [req.params.id]);
-    await pool.query('DELETE FROM esnaflar WHERE id=$1', [req.params.id]);
-    cacheSil('esnaflar:'); cacheSil('esnaf_detay:' + req.params.id);
+    await esnafSil(req.params.id);
     res.json({ basari: true, mesaj: 'Esnaf silindi.' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });

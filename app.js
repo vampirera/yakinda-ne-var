@@ -2145,7 +2145,11 @@ function kuryeIslem(tip, id, key) {
   var istek;
   if (tip === 'onayla') istek = fetch(API_URL + '/api/admin/kurye-onayla/' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) });
   else if (tip === 'sil') istek = fetch(API_URL + '/api/admin/kurye-sil/' + id + '?key=' + key, { method: 'DELETE' });
-  istek.then(function() { adminModalKapat(); adminGoster('kuryeler'); });
+  istek.then(function(r) { return r.json(); }).then(function(data) {
+    if (!data.basari) { alert('Hata: ' + data.mesaj); return; }
+    adminModalKapat();
+    adminGoster('kuryeler');
+  }).catch(function() { alert('Bağlantı hatası.'); });
 }
 
 function adminIslem(tip, id, key) {
@@ -2159,7 +2163,12 @@ function adminIslem(tip, id, key) {
   else if (tip === 'reddet') istek = fetch(API_URL + '/api/admin/reddet/' + id + '?key=' + key, { method: 'DELETE' });
   else if (tip === 'sil')    istek = fetch(API_URL + '/api/admin/sil/'    + id + '?key=' + key, { method: 'DELETE' });
 
-  istek.then(function() { adminModalKapat(); adminGoster('esnaflar'); });
+  istek.then(function(r) { return r.json(); }).then(function(data) {
+    if (!data.basari) { alert('Hata: ' + data.mesaj); return; }
+    adminModalKapat();
+    fcSil('esnaflar'); // frontend önbelleği temizle
+    adminGoster('esnaflar');
+  }).catch(function() { alert('Bağlantı hatası.'); });
 }
 
 // =============================================================
