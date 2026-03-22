@@ -162,6 +162,7 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
 </style>
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js"></script>
 <script>
 firebase.initializeApp({
@@ -401,10 +402,11 @@ firebase.initializeApp({
       <label class="form-label">Şifre *</label>
       <input type="password" id="mus-sifre" placeholder="En az 4 karakter" class="form-input">
       <div id="mus-otp-bolum" style="display:none;margin-top:4px">
-        <label class="form-label">WhatsApp Doğrulama Kodu *</label>
+        <label class="form-label">SMS Doğrulama Kodu *</label>
         <input type="text" id="mus-otp" placeholder="6 haneli kodu girin" class="form-input" maxlength="6" inputmode="numeric">
-        <p style="font-size:.72rem;color:#888;margin:2px 0 8px">WhatsApp'ınıza gönderilen 6 haneli kodu girin.</p>
+        <p style="font-size:.72rem;color:#888;margin:2px 0 8px">Telefonunuza SMS ile gönderilen 6 haneli kodu girin.</p>
       </div>
+      <div id="recaptcha-mus"></div>
       <button id="musteri-kayit-gonder" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:14px;padding:14px;font-weight:700;font-size:1rem;cursor:pointer;min-height:44px;margin-top:8px">Kayıt Ol</button>
       <p id="musteri-kayit-mesaj" style="text-align:center;font-size:.8rem;color:#aaa;margin-top:10px"></p>
     </div>
@@ -448,10 +450,11 @@ firebase.initializeApp({
       <label class="form-label">Şifre</label>
       <input type="password" id="kur-sifre" placeholder="En az 4 karakter" class="form-input">
       <div id="kur-otp-bolum" style="display:none;margin-top:4px">
-        <label class="form-label">WhatsApp Doğrulama Kodu *</label>
+        <label class="form-label">SMS Doğrulama Kodu *</label>
         <input type="text" id="kur-otp" placeholder="6 haneli kodu girin" class="form-input" maxlength="6" inputmode="numeric">
-        <p style="font-size:.72rem;color:#888;margin:2px 0 8px">WhatsApp'ınıza gönderilen 6 haneli kodu girin.</p>
+        <p style="font-size:.72rem;color:#888;margin:2px 0 8px">Telefonunuza SMS ile gönderilen 6 haneli kodu girin.</p>
       </div>
+      <div id="recaptcha-kur"></div>
       <button id="kurye-kayit-gonder" style="width:100%;background:#1a1a2e;color:#fff;border:none;border-radius:14px;padding:14px;font-weight:700;font-size:1rem;cursor:pointer;min-height:44px;margin-top:8px">Başvur</button>
       <p id="kurye-kayit-mesaj" style="text-align:center;font-size:.8rem;color:#aaa;margin-top:10px"></p>
     </div>

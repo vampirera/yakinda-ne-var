@@ -1700,7 +1700,8 @@ function kayitFormuBaslat() {
 // KURYE KAYIT
 // =============================================================
 
-var _kurOtpGonderildi = false;
+var _kurConfirmation = null;
+var _kurRecaptcha = null;
 
 function kuryeKayitGonder() {
   var ad      = document.getElementById('kur-ad').value.trim();
@@ -1712,96 +1713,73 @@ function kuryeKayitGonder() {
   var btn     = document.getElementById('kurye-kayit-gonder');
 
   if (!ad || !telefon || !arac || !ilce) {
-    mesaj.style.color = '#e53935';
-    mesaj.textContent = 'Lütfen tüm alanları doldurun.';
-    return;
+    mesaj.style.color = '#e53935'; mesaj.textContent = 'Lütfen tüm alanları doldurun.'; return;
   }
 
-  // Adım 1: OTP gönder
-  if (!_kurOtpGonderildi) {
-    btn.disabled = true;
-    btn.textContent = 'Gönderiliyor...';
-    mesaj.textContent = '';
-    fetch(API_URL + '/api/otp-gonder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telefon: telefon })
-    })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        btn.disabled = false;
-        if (data.basari) {
-          _kurOtpGonderildi = true;
-          document.getElementById('kur-otp-bolum').style.display = 'block';
-          btn.textContent = 'Doğrula ve Başvur';
-          mesaj.style.color = '#2e7d32';
-          mesaj.textContent = '✅ Doğrulama kodu WhatsApp\'a gönderildi.';
-        } else {
-          btn.textContent = 'Başvur';
-          mesaj.style.color = '#e53935';
-          mesaj.textContent = 'Hata: ' + data.mesaj;
-        }
+  // Adım 1: SMS gönder
+  if (!_kurConfirmation) {
+    btn.disabled = true; btn.textContent = 'Gönderiliyor...'; mesaj.textContent = '';
+    if (!_kurRecaptcha) {
+      _kurRecaptcha = new firebase.auth.RecaptchaVerifier('recaptcha-kur', { size: 'invisible' });
+    }
+    firebase.auth().signInWithPhoneNumber(telefonIntlFormat(telefon), _kurRecaptcha)
+      .then(function(result) {
+        _kurConfirmation = result;
+        btn.disabled = false; btn.textContent = 'Doğrula ve Başvur';
+        document.getElementById('kur-otp-bolum').style.display = 'block';
+        mesaj.style.color = '#2e7d32'; mesaj.textContent = '✅ SMS ile doğrulama kodu gönderildi.';
       })
-      .catch(function() {
-        btn.disabled = false;
-        btn.textContent = 'Başvur';
-        mesaj.style.color = '#e53935';
-        mesaj.textContent = 'Bağlantı hatası.';
+      .catch(function(e) {
+        btn.disabled = false; btn.textContent = 'Başvur';
+        mesaj.style.color = '#e53935'; mesaj.textContent = 'SMS gönderilemedi: ' + e.message;
+        if (_kurRecaptcha) { _kurRecaptcha.clear(); _kurRecaptcha = null; }
       });
     return;
   }
 
-  // Adım 2: OTP doğrula ve başvuru tamamla
+  // Adım 2: Kodu doğrula ve başvuru tamamla
   var otp = document.getElementById('kur-otp').value.trim();
-  if (!otp) {
-    mesaj.style.color = '#e53935';
-    mesaj.textContent = 'Doğrulama kodunu girin.';
-    return;
-  }
+  if (!otp) { mesaj.style.color = '#e53935'; mesaj.textContent = 'Doğrulama kodunu girin.'; return; }
 
-  btn.disabled = true;
-  btn.textContent = 'Gönderiliyor...';
-  mesaj.textContent = '';
+  btn.disabled = true; btn.textContent = 'Gönderiliyor...'; mesaj.textContent = '';
 
-  fetch(API_URL + '/api/kurye-kayit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ad: ad, telefon: telefon, arac_tipi: arac, ilce: ilce, sifre: sifre, otp: otp })
-  })
+  _kurConfirmation.confirm(otp)
+    .then(function() {
+      return fetch(API_URL + '/api/kurye-kayit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ad: ad, telefon: telefon, arac_tipi: arac, ilce: ilce, sifre: sifre })
+      });
+    })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      btn.disabled = false;
-      btn.textContent = 'Doğrula ve Başvur';
+      btn.disabled = false; btn.textContent = 'Doğrula ve Başvur';
+      _kurConfirmation = null; _kurRecaptcha = null;
+      document.getElementById('kur-otp-bolum').style.display = 'none';
       if (data.basari) {
-        _kurOtpGonderildi = false;
-        document.getElementById('kur-otp-bolum').style.display = 'none';
-        mesaj.style.color = '#2e7d32';
-        mesaj.textContent = '✅ Başvurunuz alındı! Onaylandığında size ulaşacağız.';
-        document.getElementById('kur-ad').value = '';
-        document.getElementById('kur-telefon').value = '';
-        document.getElementById('kur-arac').value = '';
-        document.getElementById('kur-ilce').value = '';
-        if (document.getElementById('kur-sifre')) document.getElementById('kur-sifre').value = '';
-        document.getElementById('kur-otp').value = '';
+        mesaj.style.color = '#2e7d32'; mesaj.textContent = '✅ Başvurunuz alındı! Onaylandığında size ulaşacağız.';
+        ['kur-ad','kur-telefon','kur-arac','kur-ilce','kur-sifre','kur-otp'].forEach(function(id) {
+          var el = document.getElementById(id); if (el) el.value = '';
+        });
       } else {
-        mesaj.style.color = '#e53935';
-        mesaj.textContent = 'Hata: ' + data.mesaj;
-        if (data.mesaj && data.mesaj.includes('kod')) {
-          _kurOtpGonderildi = false;
-          document.getElementById('kur-otp-bolum').style.display = 'none';
-          btn.textContent = 'Başvur';
-        }
+        mesaj.style.color = '#e53935'; mesaj.textContent = 'Hata: ' + data.mesaj;
       }
     })
-    .catch(function() {
-      btn.disabled = false;
-      btn.textContent = 'Doğrula ve Başvur';
-      mesaj.style.color = '#e53935';
-      mesaj.textContent = 'Bağlantı hatası.';
+    .catch(function(e) {
+      btn.disabled = false; btn.textContent = 'Doğrula ve Başvur';
+      mesaj.style.color = '#e53935'; mesaj.textContent = 'Kod hatalı veya süresi dolmuş.';
     });
 }
 
-var _musOtpGonderildi = false;
+var _musConfirmation = null;
+var _musRecaptcha = null;
+
+function telefonIntlFormat(t) {
+  var d = t.replace(/\D/g, '');
+  if (d.startsWith('90') && d.length === 12) return '+' + d;
+  if (d.startsWith('0')  && d.length === 11) return '+90' + d.slice(1);
+  if (d.length === 10) return '+90' + d;
+  return '+' + d;
+}
 
 function musteriKayitGonder() {
   var ad      = document.getElementById('mus-ad').value.trim();
@@ -1811,96 +1789,63 @@ function musteriKayitGonder() {
   var btn     = document.getElementById('musteri-kayit-gonder');
 
   if (!ad || !telefon || !sifre) {
-    mesaj.style.color = '#e53935';
-    mesaj.textContent = 'Lütfen tüm alanları doldurun.';
-    return;
+    mesaj.style.color = '#e53935'; mesaj.textContent = 'Lütfen tüm alanları doldurun.'; return;
   }
   if (sifre.length < 4) {
-    mesaj.style.color = '#e53935';
-    mesaj.textContent = 'Şifre en az 4 karakter olmalı.';
-    return;
+    mesaj.style.color = '#e53935'; mesaj.textContent = 'Şifre en az 4 karakter olmalı.'; return;
   }
 
-  // Adım 1: OTP gönder
-  if (!_musOtpGonderildi) {
-    btn.disabled = true;
-    btn.textContent = 'Gönderiliyor...';
-    mesaj.textContent = '';
-    fetch(API_URL + '/api/otp-gonder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telefon: telefon })
-    })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        btn.disabled = false;
-        if (data.basari) {
-          _musOtpGonderildi = true;
-          document.getElementById('mus-otp-bolum').style.display = 'block';
-          btn.textContent = 'Doğrula ve Kayıt Ol';
-          mesaj.style.color = '#2e7d32';
-          mesaj.textContent = '✅ Doğrulama kodu WhatsApp\'a gönderildi.';
-        } else {
-          btn.textContent = 'Kayıt Ol';
-          mesaj.style.color = '#e53935';
-          mesaj.textContent = 'Hata: ' + data.mesaj;
-        }
+  // Adım 1: SMS gönder
+  if (!_musConfirmation) {
+    btn.disabled = true; btn.textContent = 'Gönderiliyor...'; mesaj.textContent = '';
+    if (!_musRecaptcha) {
+      _musRecaptcha = new firebase.auth.RecaptchaVerifier('recaptcha-mus', { size: 'invisible' });
+    }
+    firebase.auth().signInWithPhoneNumber(telefonIntlFormat(telefon), _musRecaptcha)
+      .then(function(result) {
+        _musConfirmation = result;
+        btn.disabled = false; btn.textContent = 'Doğrula ve Kayıt Ol';
+        document.getElementById('mus-otp-bolum').style.display = 'block';
+        mesaj.style.color = '#2e7d32'; mesaj.textContent = '✅ SMS ile doğrulama kodu gönderildi.';
       })
-      .catch(function() {
-        btn.disabled = false;
-        btn.textContent = 'Kayıt Ol';
-        mesaj.style.color = '#e53935';
-        mesaj.textContent = 'Bağlantı hatası.';
+      .catch(function(e) {
+        btn.disabled = false; btn.textContent = 'Kayıt Ol';
+        mesaj.style.color = '#e53935'; mesaj.textContent = 'SMS gönderilemedi: ' + e.message;
+        if (_musRecaptcha) { _musRecaptcha.clear(); _musRecaptcha = null; }
       });
     return;
   }
 
-  // Adım 2: OTP doğrula ve kayıt tamamla
+  // Adım 2: Kodu doğrula ve kayıt tamamla
   var otp = document.getElementById('mus-otp').value.trim();
-  if (!otp) {
-    mesaj.style.color = '#e53935';
-    mesaj.textContent = 'Doğrulama kodunu girin.';
-    return;
-  }
+  if (!otp) { mesaj.style.color = '#e53935'; mesaj.textContent = 'Doğrulama kodunu girin.'; return; }
 
-  btn.disabled = true;
-  btn.textContent = 'Kaydediliyor...';
-  mesaj.textContent = '';
+  btn.disabled = true; btn.textContent = 'Kaydediliyor...'; mesaj.textContent = '';
 
-  fetch(API_URL + '/api/kayit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ad: ad, telefon: telefon, sifre: sifre, otp: otp })
-  })
+  _musConfirmation.confirm(otp)
+    .then(function() {
+      return fetch(API_URL + '/api/kayit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ad: ad, telefon: telefon, sifre: sifre })
+      });
+    })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      btn.disabled = false;
-      btn.textContent = 'Doğrula ve Kayıt Ol';
+      btn.disabled = false; btn.textContent = 'Doğrula ve Kayıt Ol';
+      _musConfirmation = null; _musRecaptcha = null;
+      document.getElementById('mus-otp-bolum').style.display = 'none';
       if (data.basari) {
-        _musOtpGonderildi = false;
-        document.getElementById('mus-otp-bolum').style.display = 'none';
-        var oturumVeri = { kullanici_id: data.kullanici_id, ad: ad, telefon: telefon, tip: 'musteri' };
-        oturumVeri.sifre = sifre;
-        oturumKaydet(oturumVeri);
-        oturumaGoreNavGuncelle();
-        mesaj.style.color = '#2e7d32';
-        mesaj.textContent = '✅ Kayıt başarılı! Hoş geldiniz.';
+        var v = { kullanici_id: data.kullanici_id, ad: ad, telefon: telefon, tip: 'musteri', sifre: sifre };
+        oturumKaydet(v); oturumaGoreNavGuncelle();
+        mesaj.style.color = '#2e7d32'; mesaj.textContent = '✅ Kayıt başarılı! Hoş geldiniz.';
         setTimeout(function() { sayfaGoster('ana'); }, 1000);
       } else {
-        mesaj.style.color = '#e53935';
-        mesaj.textContent = 'Hata: ' + data.mesaj;
-        if (data.mesaj && data.mesaj.includes('kod')) {
-          _musOtpGonderildi = false;
-          document.getElementById('mus-otp-bolum').style.display = 'none';
-          btn.textContent = 'Kayıt Ol';
-        }
+        mesaj.style.color = '#e53935'; mesaj.textContent = 'Hata: ' + data.mesaj;
       }
     })
-    .catch(function(err) {
-      btn.disabled = false;
-      btn.textContent = 'Doğrula ve Kayıt Ol';
-      mesaj.style.color = '#e53935';
-      mesaj.textContent = 'Bağlantı hatası: ' + err.message;
+    .catch(function(e) {
+      btn.disabled = false; btn.textContent = 'Doğrula ve Kayıt Ol';
+      mesaj.style.color = '#e53935'; mesaj.textContent = 'Kod hatalı veya süresi dolmuş.';
     });
 }
 
