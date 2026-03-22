@@ -9,6 +9,13 @@ if ('serviceWorker' in navigator) {
     if (toast) toast.style.display = 'block';
     setTimeout(function() { window.location.reload(); }, 1500);
   });
+  navigator.serviceWorker.addEventListener('message', function(event) {
+    if (event.data && event.data.tip === 'GUNCELLEME_VAR') {
+      var toast = document.getElementById('guncelleme-toast');
+      if (toast) toast.style.display = 'block';
+      setTimeout(function() { window.location.reload(); }, 1500);
+    }
+  });
 }
 
 var API_URL = 'https://yakinda-ne-var-backend-production.up.railway.app';
@@ -1643,7 +1650,7 @@ function kayitFormuBaslat() {
                 : '') +
               '<button onclick="sayfaGoster(\'kayit-secim\')" style="width:100%;background:#1a1a2e;color:#fff;border:none;border-radius:14px;padding:13px;font-weight:700;font-size:.9rem;cursor:pointer">Giriş Yap</button>' +
             '</div>';
-            var icerikEl = document.querySelector('#sayfa-kayit .content');
+            var icerikEl = document.getElementById('kayit-form-wrap');
             if (icerikEl) icerikEl.innerHTML = onayHtml;
             else sayfaGoster('ana');
           } else { alert('Hata: ' + data.mesaj); }
