@@ -107,6 +107,11 @@ function mesafeHesapla(lat1, lng1, lat2, lng2) {
 
 app.get('/', function(req, res) { res.json({ mesaj: 'Yakinda Ne Var API calisiyor!', versiyon: '5.0' }); });
 app.get('/api/ping', function(req, res) { res.sendStatus(200); });
+app.get('/api/config', function(req, res) {
+  var tel = (process.env.ADMIN_TELEFON || '').replace(/\D/g, '');
+  if (tel.startsWith('0')) tel = '90' + tel.slice(1);
+  res.json({ admin_wa: tel ? 'https://wa.me/' + tel : null });
+});
 
 app.get('/api/esnaflar', async function(req, res) {
   try {
@@ -199,8 +204,11 @@ app.post('/api/esnaf-kayit', upload.fields([{name:'vergi_levhasi',maxCount:1},{n
         }
       }
     }
-    var waMesaj = 'Merhaba! Yakinda Ne Var uygulamasina kayit olmak istiyorum.%0A%0AIsletme: '+body.ad+'%0AKategori: '+body.kategori+'%0AIlce: '+body.ilce+'%0ATelefon: '+body.telefon+'%0AVergi No: '+body.vergi_no+'%0AKayit ID: '+esnafId;
-    res.json({ basari: true, mesaj: 'Kaydiniz alindi!', kayit_id: esnafId, whatsapp_url: 'https://wa.me/905XXXXXXXXX?text='+waMesaj });
+    var adminTel = (process.env.ADMIN_TELEFON || '').replace(/\D/g, '');
+    if (adminTel.startsWith('0')) adminTel = '90' + adminTel.slice(1);
+    var waMesaj = encodeURIComponent('Merhaba! Yakinda Ne Var uygulamasina kayit olmak istiyorum.\n\nIsletme: '+body.ad+'\nKategori: '+body.kategori+'\nIlce: '+body.ilce+'\nTelefon: '+body.telefon+'\nVergi No: '+body.vergi_no+'\nKayit ID: '+esnafId);
+    var whatsapp_url = adminTel ? 'https://wa.me/' + adminTel + '?text=' + waMesaj : null;
+    res.json({ basari: true, mesaj: 'Kaydiniz alindi! Onay icin WhatsApp mesaji gonderin.', kayit_id: esnafId, whatsapp_url: whatsapp_url });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 

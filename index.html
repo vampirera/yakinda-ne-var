@@ -518,6 +518,13 @@ firebase.initializeApp({
     <!-- PANEL İÇERİĞİ -->
     <div id="panel-icerik" class="content" style="display:none">
 
+      <!-- Onay Bekleniyor Banneri -->
+      <div id="panel-onay-banner" style="display:none;background:#fff3cd;border:1.5px solid #ffc107;border-radius:12px;padding:14px 16px;margin-bottom:16px">
+        <div style="font-weight:800;font-size:.88rem;color:#856404;margin-bottom:4px">⏳ Onay Bekleniyor</div>
+        <div style="font-size:.78rem;color:#856404;margin-bottom:10px">İşletmeniz henüz admin tarafından onaylanmadı. Onaylanana kadar esnaf listesinde görünmezsiniz.</div>
+        <a id="panel-onay-wa-btn" href="#" target="_blank" rel="noopener" style="display:inline-block;background:#25d366;color:#fff;text-decoration:none;border-radius:10px;padding:8px 14px;font-size:.78rem;font-weight:700">💬 WhatsApp ile Onay İste</a>
+      </div>
+
       <!-- İstatistik Kartları -->
       <div class="s-title"><span>📊 İstatistikler</span><button class="add-btn-small" onclick="panelIstatistikYukle()">Yenile</button></div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
