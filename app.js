@@ -105,14 +105,30 @@ function profilKaydet(profil) {
 }
 
 function profilSayfasiGoster() {
-  var profil = profilYukle();
+  var profil  = profilYukle() || {};
+  var oturum  = oturumAl();
   sayfaGoster('profil');
-  document.getElementById('profil-isim').value    = profil ? profil.isim    : '';
-  document.getElementById('profil-telefon').value = profil ? profil.telefon : '';
-  document.getElementById('profil-adres1').value  = profil ? (profil.adres1 || '') : '';
-  document.getElementById('profil-lat').value     = profil ? (profil.lat || '') : '';
-  document.getElementById('profil-lng').value     = profil ? (profil.lng || '') : '';
-  if (profil && profil.lat && profil.lng) {
+
+  // Oturumdan gelen bilgiler
+  var ad      = (oturum && oturum.ad) ? oturum.ad : (profil.isim || '');
+  var telefon = (oturum && oturum.telefon) ? oturum.telefon : (profil.telefon || '');
+  var tip     = oturum ? oturum.tip : '';
+  var tipEtiket = { musteri: '👤 Müşteri', esnaf: '🏪 Esnaf', kurye: '🛵 Kurye', admin: '⚙️ Admin' };
+
+  document.getElementById('profil-hosgeldin').textContent = 'Merhaba, ' + (ad || 'Misafir') + '!';
+  document.getElementById('profil-tip-rozet').textContent = tipEtiket[tip] || '';
+  document.getElementById('profil-isim').value      = ad;
+  document.getElementById('profil-soyad').value     = profil.soyad    || '';
+  document.getElementById('profil-telefon').value   = telefon;
+  document.getElementById('profil-email').value     = profil.email    || '';
+  document.getElementById('profil-adres1').value    = profil.adres1   || '';
+  document.getElementById('profil-lat').value       = profil.lat      || '';
+  document.getElementById('profil-lng').value       = profil.lng      || '';
+  document.getElementById('profil-kart-ad').value   = profil.kart_ad  || '';
+  document.getElementById('profil-kart-son4').value = profil.kart_son4 || '';
+  document.getElementById('profil-kart-tarih').value= profil.kart_tarih || '';
+
+  if (profil.lat && profil.lng) {
     document.getElementById('profil-harita-wrap').style.display = 'block';
     setTimeout(function() {
       if (!durum.profilHarita) {
@@ -130,32 +146,35 @@ function profilSayfasiGoster() {
   } else {
     document.getElementById('profil-harita-wrap').style.display = 'none';
   }
-  document.getElementById('profil-hosgeldin').textContent =
-    profil ? 'Merhaba, ' + profil.isim + '!' : 'Hosgeldiniz!';
 }
 
 function profilFormuBaslat() {
   document.getElementById('profil-kaydet').addEventListener('click', function() {
-    var isim    = document.getElementById('profil-isim').value.trim();
-    var telefon = document.getElementById('profil-telefon').value.trim();
-    var adres1  = document.getElementById('profil-adres1').value.trim();
-    if (!isim || !telefon) { alert('Lutfen isim ve telefon girin.'); return; }
+    var isim  = document.getElementById('profil-isim').value.trim();
+    if (!isim) { alert('Ad zorunludur.'); return; }
     var mevcutProfil = profilYukle() || {};
-    profilKaydet({ isim: isim, telefon: telefon, adres1: adres1, lat: mevcutProfil.lat || null, lng: mevcutProfil.lng || null });
+    profilKaydet({
+      isim:        isim,
+      soyad:       document.getElementById('profil-soyad').value.trim(),
+      telefon:     document.getElementById('profil-telefon').value.trim(),
+      email:       document.getElementById('profil-email').value.trim(),
+      adres1:      document.getElementById('profil-adres1').value.trim(),
+      lat:         mevcutProfil.lat  || null,
+      lng:         mevcutProfil.lng  || null,
+      kart_ad:     document.getElementById('profil-kart-ad').value.trim().toUpperCase(),
+      kart_son4:   document.getElementById('profil-kart-son4').value.trim(),
+      kart_tarih:  document.getElementById('profil-kart-tarih').value.trim()
+    });
     document.getElementById('profil-hosgeldin').textContent = 'Merhaba, ' + isim + '!';
     alert('Profil kaydedildi!');
     sayfaGoster('ana');
   });
 
-  document.getElementById('profil-sifirla').addEventListener('click', function() {
-    if (!confirm('Profil bilgileriniz silinecek. Emin misiniz?')) return;
-    localStorage.removeItem('musteri_profil');
-    document.getElementById('profil-isim').value    = '';
-    document.getElementById('profil-telefon').value = '';
-    document.getElementById('profil-adres1').value  = '';
-    document.getElementById('profil-hosgeldin').textContent = 'Hosgeldiniz!';
-    alert('Profil sifirlandi.');
-  });
+  function cikisYapProfil() {
+    cikisYap();
+  }
+  document.getElementById('profil-cikis-btn').addEventListener('click', cikisYapProfil);
+  document.getElementById('profil-cikis-alt').addEventListener('click', cikisYapProfil);
 
   document.getElementById('profil-konum-al').addEventListener('click', function() {
     var btn = document.getElementById('profil-konum-al');
