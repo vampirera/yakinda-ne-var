@@ -73,6 +73,9 @@ async function tablolarOlustur() {
   await pool.query(`CREATE TABLE IF NOT EXISTS bildirim_tokenler (id SERIAL PRIMARY KEY, token TEXT UNIQUE NOT NULL, kullanici_telefon VARCHAR(20), olusturma TIMESTAMP DEFAULT NOW())`);
   await pool.query(`ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS email TEXT`);
   await pool.query(`ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS adresler JSONB DEFAULT '[]'`);
+  await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS goruntuleme_sayisi INTEGER DEFAULT 0`);
+  await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS instagram_url TEXT`);
+  await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS google_maps_url TEXT`);
 
   var sayac = await pool.query('SELECT COUNT(*) FROM esnaflar');
   if (parseInt(sayac.rows[0].count) === 0) {
@@ -711,12 +714,67 @@ app.put('/api/musteri/profil', async function(req, res) {
 
 app.put('/api/esnaf-panel/:id/profil', async function(req, res) {
   try {
-    var { ad, adres, telefon, kategori } = req.body;
+    var { ad, adres, telefon, kategori, instagram_url, google_maps_url } = req.body;
     if (!ad || !telefon) return res.status(400).json({ basari: false, mesaj: 'Ad ve telefon zorunlu' });
-    await pool.query('UPDATE esnaflar SET ad=$1, adres=$2, telefon=$3, kategori=$4 WHERE id=$5', [ad, adres||'', telefon, kategori, req.params.id]);
+    await pool.query(
+      'UPDATE esnaflar SET ad=$1, adres=$2, telefon=$3, kategori=$4, instagram_url=$5, google_maps_url=$6 WHERE id=$7',
+      [ad, adres||'', telefon, kategori, instagram_url||null, google_maps_url||null, req.params.id]
+    );
     cacheSil('esnaf_detay:' + req.params.id);
     cacheSil('esnaflar:');
     res.json({ basari: true, mesaj: 'Profil guncellendi.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+app.put('/api/esnaflar/:id/goruntuleme', async function(req, res) {
+  try {
+    await pool.query('UPDATE esnaflar SET goruntuleme_sayisi = COALESCE(goruntuleme_sayisi,0) + 1 WHERE id=$1', [req.params.id]);
+    res.json({ basari: true });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+app.get('/api/esnaf-panel/:id/istatistik', async function(req, res) {
+  try {
+    var id = req.params.id;
+
+    var haftaRes = await pool.query(
+      "SELECT COUNT(*) AS sayi, COALESCE(SUM(genel_toplam),0) AS tutar FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal' AND tarih >= date_trunc('week', NOW())",
+      [id]
+    );
+    var ayRes = await pool.query(
+      "SELECT COUNT(*) AS sayi, COALESCE(SUM(genel_toplam),0) AS tutar FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal' AND tarih >= date_trunc('month', NOW())",
+      [id]
+    );
+    var toplamRes = await pool.query(
+      "SELECT COUNT(*) AS sayi, COALESCE(SUM(genel_toplam),0) AS tutar FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal'",
+      [id]
+    );
+    var goruntulemeRes = await pool.query('SELECT COALESCE(goruntuleme_sayisi,0) AS goruntuleme FROM esnaflar WHERE id=$1', [id]);
+
+    var tumSiparisler = await pool.query("SELECT urunler FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal'", [id]);
+    var urunSayilari = {};
+    tumSiparisler.rows.forEach(function(s) {
+      var urunler = Array.isArray(s.urunler) ? s.urunler : (typeof s.urunler === 'string' ? JSON.parse(s.urunler || '[]') : []);
+      urunler.forEach(function(u) {
+        if (!u.ad) return;
+        urunSayilari[u.ad] = (urunSayilari[u.ad] || 0) + (parseInt(u.adet) || 1);
+      });
+    });
+    var enCokSatanlar = Object.keys(urunSayilari)
+      .map(function(ad) { return { ad: ad, adet: urunSayilari[ad] }; })
+      .sort(function(a, b) { return b.adet - a.adet; })
+      .slice(0, 3);
+
+    res.json({
+      basari: true,
+      veri: {
+        hafta:  { sayi: parseInt(haftaRes.rows[0].sayi), tutar: parseFloat(haftaRes.rows[0].tutar) },
+        ay:     { sayi: parseInt(ayRes.rows[0].sayi),    tutar: parseFloat(ayRes.rows[0].tutar) },
+        toplam: { sayi: parseInt(toplamRes.rows[0].sayi), tutar: parseFloat(toplamRes.rows[0].tutar) },
+        goruntuleme: parseInt(goruntulemeRes.rows[0]?.goruntuleme || 0),
+        en_cok_satanlar: enCokSatanlar
+      }
+    });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 

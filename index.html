@@ -233,6 +233,7 @@ firebase.initializeApp({
         <button class="btn-p secili" id="btn-kurye">🛵 Siparis Ver</button>
         <button class="btn-s" id="btn-gelal">🚶 Gel-Al</button>
       </div>
+      <div id="detay-sosyal" style="display:flex;gap:8px;margin-top:10px"></div>
     </div>
     <div id="detay-harita"></div>
     <div class="ulasim-bar" id="ulasim-bar"></div>
@@ -472,6 +473,22 @@ firebase.initializeApp({
     </div>
   </div>
 
+  <!-- ADRES DETAY MODAL -->
+  <div id="adres-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:9999;padding:12px;overflow-y:auto">
+    <div style="background:#fff;max-width:430px;margin:0 auto;border-radius:16px;padding:20px;position:relative">
+      <button id="adres-modal-kapat" style="position:absolute;top:12px;right:12px;background:#f0f0f0;border:none;border-radius:50%;width:32px;height:32px;font-size:1.1rem;cursor:pointer;line-height:32px">✕</button>
+      <div id="adres-modal-icerik"></div>
+      <div id="adres-detay-harita" style="display:none;border-radius:12px;overflow:hidden;margin-top:12px;border:2px solid #eee">
+        <div id="adres-detay-harita-ic" style="height:180px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GÜNCELLEME BİLDİRİMİ -->
+  <div id="guncelleme-toast" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;border-radius:12px;padding:12px 20px;font-size:.82rem;font-weight:700;z-index:10000;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.3)">
+    🔄 Yeni sürüm yükleniyor...
+  </div>
+
   <!-- ESNAF PANELİ -->
   <div class="sayfa" id="sayfa-panel">
     <div class="panel-header">
@@ -485,6 +502,7 @@ firebase.initializeApp({
       <div class="stats-row" id="panel-stats-row" style="display:none">
         <div class="stat-box"><div class="val" id="panel-siparis-sayi">0</div><div class="lbl">Siparis</div></div>
         <div class="stat-box"><div class="val" id="panel-toplam">₺0</div><div class="lbl">Kazanc</div></div>
+        <div class="stat-box"><div class="val" id="panel-goruntuleme">0</div><div class="lbl">Goruntuleme</div></div>
       </div>
     </div>
 
@@ -499,12 +517,55 @@ firebase.initializeApp({
 
     <!-- PANEL İÇERİĞİ -->
     <div id="panel-icerik" class="content" style="display:none">
+
+      <!-- İstatistik Kartları -->
+      <div class="s-title"><span>📊 İstatistikler</span><button class="add-btn-small" onclick="panelIstatistikYukle()">Yenile</button></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+        <div style="background:#fff8f5;border-radius:12px;padding:12px 8px;text-align:center;border:1.5px solid #ffe0cc">
+          <div style="font-size:.62rem;color:#ff6b35;font-weight:700;text-transform:uppercase;margin-bottom:4px">Bu Hafta</div>
+          <div id="stat-hafta-sayi" style="font-size:1.3rem;font-weight:900;color:#1a1a2e">—</div>
+          <div style="font-size:.68rem;color:#888">sipariş</div>
+          <div id="stat-hafta-tutar" style="font-size:.78rem;font-weight:800;color:#ff6b35;margin-top:2px">—</div>
+        </div>
+        <div style="background:#f0f7ff;border-radius:12px;padding:12px 8px;text-align:center;border:1.5px solid #c8e0ff">
+          <div style="font-size:.62rem;color:#1976d2;font-weight:700;text-transform:uppercase;margin-bottom:4px">Bu Ay</div>
+          <div id="stat-ay-sayi" style="font-size:1.3rem;font-weight:900;color:#1a1a2e">—</div>
+          <div style="font-size:.68rem;color:#888">sipariş</div>
+          <div id="stat-ay-tutar" style="font-size:.78rem;font-weight:800;color:#1976d2;margin-top:2px">—</div>
+        </div>
+        <div style="background:#f5f0ff;border-radius:12px;padding:12px 8px;text-align:center;border:1.5px solid #d8c0ff">
+          <div style="font-size:.62rem;color:#7b1fa2;font-weight:700;text-transform:uppercase;margin-bottom:4px">Toplam</div>
+          <div id="stat-toplam-sayi" style="font-size:1.3rem;font-weight:900;color:#1a1a2e">—</div>
+          <div style="font-size:.68rem;color:#888">sipariş</div>
+          <div id="stat-toplam-tutar" style="font-size:.78rem;font-weight:800;color:#7b1fa2;margin-top:2px">—</div>
+        </div>
+      </div>
+      <div id="stat-en-cok" style="background:#fff;border-radius:12px;padding:12px;margin-bottom:14px;box-shadow:0 1px 6px rgba(0,0,0,.06)"></div>
+
+      <!-- Profil & Sosyal Medya -->
+      <div class="s-title" style="margin-top:4px"><span>🏪 Profil Bilgileri</span></div>
+      <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 1px 6px rgba(0,0,0,.06)">
+        <input type="text" id="panel-profil-ad" class="form-input" placeholder="İşletme adı *">
+        <input type="tel" id="panel-profil-telefon" class="form-input" placeholder="Telefon *">
+        <input type="text" id="panel-profil-adres" class="form-input" placeholder="Adres">
+        <select id="panel-profil-kategori" class="form-input">
+          <option value="yemek">🍽️ Yemek</option>
+          <option value="urun">🛍️ Ürün</option>
+          <option value="hizmet">🔧 Hizmet</option>
+        </select>
+        <label style="font-size:.75rem;color:#888;margin-bottom:4px;display:block">Instagram URL</label>
+        <input type="url" id="panel-profil-instagram" class="form-input" placeholder="https://instagram.com/isletmeniz">
+        <label style="font-size:.75rem;color:#888;margin-bottom:4px;display:block">Google Maps URL</label>
+        <input type="url" id="panel-profil-gmaps" class="form-input" placeholder="https://maps.google.com/...">
+        <button class="btn-p" onclick="panelProfilKaydet()" style="margin-top:4px">💾 Profili Kaydet</button>
+      </div>
+
       <div class="s-title">
         <span>📦 Siparisler</span>
         <button class="add-btn-small" onclick="panelYukle()">Yenile</button>
       </div>
       <div id="panel-siparisler"><div class="yukleniyor">Yukleniyor...</div></div>
-      <div class="s-title" style="margin-top:8px">
+      <div class="s-title" style="margin-top:16px">
         <span>🛍️ Urunlerim</span>
         <button class="add-btn-small" id="urun-ekle-btn">+ Ekle</button>
       </div>

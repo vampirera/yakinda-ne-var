@@ -1293,6 +1293,7 @@ function gorselAramaBaslat() {
 
 function esnafDetay(id) {
   sayfaGoster('detay');
+  fetch(API_URL + '/api/esnaflar/' + id + '/goruntuleme', { method: 'PUT' }).catch(function(){});
   durum.sepet = [];
   durum.secilenEsnaf = null;
   document.getElementById('detay-adi').textContent = 'Yukleniyor...';
@@ -1339,6 +1340,16 @@ function detayDoldur(e) {
     '<div class="ulasim-btn active"><div class="u-icon">🚶</div><div class="u-sure">~10dk</div><div class="u-label">Yuruyus</div></div>' +
     '<div class="ulasim-btn"><div class="u-icon">🚗</div><div class="u-sure">~3dk</div><div class="u-label">Arac</div></div>' +
     '<button class="yol-btn" onclick="yolTarifi()">🗺 Yol Tarifi</button>';
+
+  var sosyal = [];
+  if (e.instagram_url) {
+    sosyal.push('<a href="' + e.instagram_url + '" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:linear-gradient(135deg,#833ab4,#e1306c,#f77737);color:#fff;border-radius:10px;padding:9px 8px;font-size:.78rem;font-weight:700;text-decoration:none">📸 Instagram</a>');
+  }
+  if (e.google_maps_url) {
+    sosyal.push('<a href="' + e.google_maps_url + '" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#fff;border:1.5px solid #4285f4;color:#4285f4;border-radius:10px;padding:9px 8px;font-size:.78rem;font-weight:700;text-decoration:none">⭐ Google Yorumları</a>');
+  }
+  var sosyalEl = document.getElementById('detay-sosyal');
+  if (sosyalEl) sosyalEl.innerHTML = sosyal.join('');
 
   // Detay haritası
   setTimeout(function() {
@@ -2286,6 +2297,93 @@ function panelYukle() {
 
   calismaSaatleriYukle(esnafId);
   kampanyalariYukle(esnafId);
+  panelIstatistikYukle();
+  panelProfilFormYukle(esnafId);
+}
+
+function panelIstatistikYukle() {
+  var esnafId = durum.panelEsnafId;
+  if (!esnafId) return;
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/istatistik')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.basari) return;
+      var v = data.veri;
+      document.getElementById('stat-hafta-sayi').textContent  = v.hafta.sayi;
+      document.getElementById('stat-hafta-tutar').textContent = '₺' + Math.round(v.hafta.tutar);
+      document.getElementById('stat-ay-sayi').textContent     = v.ay.sayi;
+      document.getElementById('stat-ay-tutar').textContent    = '₺' + Math.round(v.ay.tutar);
+      document.getElementById('stat-toplam-sayi').textContent = v.toplam.sayi;
+      document.getElementById('stat-toplam-tutar').textContent= '₺' + Math.round(v.toplam.tutar);
+      document.getElementById('panel-goruntuleme').textContent = v.goruntuleme;
+
+      var enCok = document.getElementById('stat-en-cok');
+      if (!v.en_cok_satanlar.length) {
+        enCok.style.display = 'none';
+        return;
+      }
+      enCok.style.display = '';
+      enCok.innerHTML = '<div style="font-size:.72rem;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">En Çok Satan Ürünler</div>' +
+        v.en_cok_satanlar.map(function(u, i) {
+          var madalya = ['🥇','🥈','🥉'][i] || '';
+          var maxAdet = v.en_cok_satanlar[0].adet || 1;
+          var yuzde = Math.round((u.adet / maxAdet) * 100);
+          return '<div style="margin-bottom:8px">' +
+            '<div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:3px">' +
+              '<span>' + madalya + ' ' + u.ad + '</span>' +
+              '<span style="font-weight:800;color:#ff6b35">' + u.adet + ' adet</span>' +
+            '</div>' +
+            '<div style="background:#f0f0f0;border-radius:6px;height:5px">' +
+              '<div style="background:#ff6b35;height:5px;border-radius:6px;width:' + yuzde + '%;transition:width .5s"></div>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+    })
+    .catch(function() {});
+}
+
+function panelProfilFormYukle(esnafId) {
+  fetch(API_URL + '/api/esnaflar/' + esnafId)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.basari) return;
+      var e = data.veri;
+      var adEl = document.getElementById('panel-profil-ad');
+      var telEl = document.getElementById('panel-profil-telefon');
+      var adrEl = document.getElementById('panel-profil-adres');
+      var katEl = document.getElementById('panel-profil-kategori');
+      var igEl  = document.getElementById('panel-profil-instagram');
+      var gmEl  = document.getElementById('panel-profil-gmaps');
+      if (adEl)  adEl.value  = e.ad || '';
+      if (telEl) telEl.value = e.telefon || '';
+      if (adrEl) adrEl.value = e.adres || '';
+      if (katEl) katEl.value = e.kategori || 'yemek';
+      if (igEl)  igEl.value  = e.instagram_url || '';
+      if (gmEl)  gmEl.value  = e.google_maps_url || '';
+    })
+    .catch(function() {});
+}
+
+function panelProfilKaydet() {
+  var esnafId = durum.panelEsnafId;
+  if (!esnafId) { alert('Esnaf ID bulunamadi.'); return; }
+  var ad       = document.getElementById('panel-profil-ad').value.trim();
+  var telefon  = document.getElementById('panel-profil-telefon').value.trim();
+  var adres    = document.getElementById('panel-profil-adres').value.trim();
+  var kategori = document.getElementById('panel-profil-kategori').value;
+  var instagram_url   = document.getElementById('panel-profil-instagram').value.trim();
+  var google_maps_url = document.getElementById('panel-profil-gmaps').value.trim();
+  if (!ad || !telefon) { alert('Ad ve telefon zorunludur.'); return; }
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/profil', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ad: ad, telefon: telefon, adres: adres, kategori: kategori, instagram_url: instagram_url, google_maps_url: google_maps_url })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      alert(data.mesaj || (data.basari ? 'Profil kaydedildi.' : 'Hata olustu.'));
+    })
+    .catch(function() { alert('Baglanamadi.'); });
 }
 
 function calismaSaatleriYukle(esnafId) {
