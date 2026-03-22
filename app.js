@@ -1492,11 +1492,11 @@ function musteriKayitGonder() {
         mesaj.textContent = 'Hata: ' + data.mesaj;
       }
     })
-    .catch(function() {
+    .catch(function(err) {
       btn.disabled = false;
       btn.textContent = 'Kayıt Ol';
       mesaj.style.color = '#e53935';
-      mesaj.textContent = 'Bağlantı hatası.';
+      mesaj.textContent = 'Bağlantı hatası: ' + err.message;
     });
 }
 
@@ -1926,6 +1926,7 @@ function girisYap(telefon, sifre, btn, callback) {
       if (!data.basari) { alert(data.mesaj); return; }
       data.veri.sifre = sifre; data.veri.sifre = sifre; oturumKaydet(data.veri);
       oturumaGoreNavGuncelle();
+      bildirimIzniAl();
       if (callback) callback(data.veri);
     })
     .catch(function() {
@@ -2205,9 +2206,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Konum al → esnafları yükle
   konumAl();
-
-  // Push bildirim izni
-  bildirimIzniAl();
 
   // Buton event'leri
   document.getElementById('sepet-btn').addEventListener('click', siparisVer);
