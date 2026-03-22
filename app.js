@@ -2,6 +2,10 @@
 // Yakinda Ne Var - Frontend App
 // =============================================================
 
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/yakinda-ne-var/sw.js');
+}
+
 var API_URL = 'https://yakinda-ne-var-backend-production.up.railway.app';
 
 var durum = {
