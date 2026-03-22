@@ -353,17 +353,24 @@ var siparisTakip = {
 };
 
 var durumAdim = ['bekliyor', 'hazirlaniyor', 'yolda', 'teslim edildi'];
-var durumIkon  = { 'bekliyor': '⏳', 'hazirlaniyor': '👨‍🍳', 'yolda': '🛵', 'teslim edildi': '✅' };
-var durumRenk  = { 'bekliyor': '#ff9800', 'hazirlaniyor': '#2196f3', 'yolda': '#9c27b0', 'teslim edildi': '#4caf50' };
+var durumIkon  = { 'bekliyor': '⏳', 'hazirlaniyor': '👨‍🍳', 'yolda': '🛵', 'teslim edildi': '✅', 'iptal': '❌' };
+var durumRenk  = { 'bekliyor': '#ff9800', 'hazirlaniyor': '#2196f3', 'yolda': '#9c27b0', 'teslim edildi': '#4caf50', 'iptal': '#f44336' };
+var aktifDurumlar = ['bekliyor', 'hazirlaniyor', 'yolda'];
+
+function telefon() {
+  var oturum = oturumAl();
+  var profil = profilYukle();
+  return (oturum && oturum.telefon) || (profil && profil.telefon) || null;
+}
 
 function siparislerimSayfasiAc(siparisId) {
   siparisTakip.siparisId = siparisId;
   sayfaGoster('siparislerim');
-  siparisGuncelle();
+  siparislerListele();
   if (siparisTakip.interval) clearInterval(siparisTakip.interval);
   siparisTakip.interval = setInterval(function() {
     if (document.getElementById('sayfa-siparislerim').classList.contains('aktif')) {
-      siparisGuncelle();
+      siparisAktifGuncelle();
     } else {
       clearInterval(siparisTakip.interval);
     }
@@ -371,115 +378,201 @@ function siparislerimSayfasiAc(siparisId) {
 }
 
 function siparisGuncelle() {
+  siparisAktifGuncelle();
+}
+
+function siparisAktifGuncelle() {
   if (!siparisTakip.siparisId) return;
   fetch(API_URL + '/api/siparis-detay/' + siparisTakip.siparisId)
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (!data.basari) throw new Error(data.mesaj);
-      siparisDetayGoster(data.veri);
-    })
-    .catch(function(err) {
-      document.getElementById('siparislerim-icerik').innerHTML =
-        '<div class="hata">Siparis bilgisi alinamadi: ' + err.message + '</div>';
+      if (!data.basari) return;
+      var el = document.getElementById('aktif-siparis-kart-' + data.veri.id);
+      if (el) {
+        el.outerHTML = aktifSiparisKart(data.veri);
+      }
     });
 }
 
-function siparisDetayGoster(s) {
+function aktifSiparisKart(s) {
   var urunler = Array.isArray(s.urunler) ? s.urunler :
-    (typeof s.urunler === 'string' ? JSON.parse(s.urunler) : []);
+    (typeof s.urunler === 'string' ? JSON.parse(s.urunler || '[]') : []);
   var aktifAdim = durumAdim.indexOf(s.durum);
+  var ilerlemeYuzde = aktifAdim >= 0 ? Math.round((aktifAdim / (durumAdim.length - 1)) * 100) : 0;
 
-  var adimlerHtml = '<div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 8px">' +
+  var adimlerHtml = '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin:14px 0 6px">' +
     durumAdim.map(function(ad, i) {
-      var gecti  = i <= aktifAdim;
-      var aktif  = i === aktifAdim;
-      var renk   = gecti ? (durumRenk[ad] || '#4caf50') : '#ddd';
-      var boyut  = aktif ? '2rem' : '1.4rem';
-      return '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1">' +
-        '<span style="font-size:' + boyut + ';filter:' + (gecti ? 'none' : 'grayscale(1)') + '">' + (durumIkon[ad] || '•') + '</span>' +
-        '<span style="font-size:.6rem;font-weight:' + (aktif ? '800' : '400') + ';color:' + renk + ';text-align:center">' + ad + '</span>' +
+      var gecti = i <= aktifAdim;
+      var aktif = i === aktifAdim;
+      var renk  = gecti ? (durumRenk[ad] || '#4caf50') : '#ccc';
+      return '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">' +
+        '<span style="font-size:' + (aktif ? '1.8rem' : '1.2rem') + ';filter:' + (gecti ? 'none' : 'grayscale(1)') + ';transition:font-size .3s">' + (durumIkon[ad] || '•') + '</span>' +
+        '<span style="font-size:.55rem;font-weight:' + (aktif ? '800' : '400') + ';color:' + renk + ';text-align:center;line-height:1.2">' + ad + '</span>' +
       '</div>';
-    }).join('<div style="flex:0 0 2px;height:2px;background:#eee;margin-top:16px"></div>') +
+    }).join('<div style="width:2px;height:24px;background:#eee;margin-top:8px;flex-shrink:0"></div>') +
   '</div>';
 
-  var ilerlemeYuzde = aktifAdim >= 0 ? Math.round((aktifAdim / (durumAdim.length - 1)) * 100) : 0;
-  var ilerlemeBar = '<div style="background:#f0f0f0;border-radius:10px;height:6px;margin-bottom:20px">' +
-    '<div style="background:' + (durumRenk[s.durum] || '#4caf50') + ';height:6px;border-radius:10px;width:' + ilerlemeYuzde + '%;transition:width .5s"></div>' +
+  var ilerlemeBar = '<div style="background:#f0f0f0;border-radius:10px;height:5px;margin-bottom:14px">' +
+    '<div style="background:' + (durumRenk[s.durum] || '#4caf50') + ';height:5px;border-radius:10px;width:' + ilerlemeYuzde + '%;transition:width .6s ease"></div>' +
   '</div>';
 
   var urunlerHtml = urunler.map(function(u) {
-    return '<div style="display:flex;justify-content:space-between;font-size:.85rem;padding:4px 0;border-bottom:1px solid #f5f5f5">' +
-      '<span>' + u.ad + ' <span style="color:#aaa">x' + u.adet + '</span></span>' +
+    return '<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:4px 0;border-bottom:1px solid #f8f8f8">' +
+      '<span>' + u.ad + ' <span style="color:#bbb">x' + u.adet + '</span></span>' +
       '<span style="font-weight:700;color:#ff6b35">₺' + (u.fiyat * u.adet) + '</span>' +
     '</div>';
   }).join('');
 
-  document.getElementById('siparislerim-icerik').innerHTML =
-    '<div style="background:#fff;border-radius:16px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.07);margin-bottom:12px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
-        '<span style="font-weight:800;font-size:1rem">Siparis #' + s.id + '</span>' +
-        '<span style="background:' + (durumRenk[s.durum] || '#ccc') + ';color:#fff;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:700">' +
-          (durumIkon[s.durum] || '') + ' ' + (s.durum || '') + '</span>' +
+  var kuryeHtml = '';
+  if (s.durum === 'yolda' && s.kurye_ad) {
+    kuryeHtml = '<div style="background:#f3e8ff;border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;gap:10px">' +
+      '<span style="font-size:1.6rem">🛵</span>' +
+      '<div>' +
+        '<div style="font-size:.78rem;color:#7b3fa0;font-weight:700">Kuryeniz yolda!</div>' +
+        '<div style="font-size:.82rem;font-weight:800">' + s.kurye_ad + '</div>' +
+        (s.kurye_arac ? '<div style="font-size:.72rem;color:#888">' + s.kurye_arac + '</div>' : '') +
+        (s.kurye_telefon ? '<a href="tel:' + s.kurye_telefon + '" style="font-size:.75rem;color:#9c27b0;font-weight:700;text-decoration:none">📞 ' + s.kurye_telefon + '</a>' : '') +
       '</div>' +
-      '<div style="font-size:.8rem;color:#aaa;margin-bottom:16px">' + (s.esnaf_adi || '') + ' · ' +
-        (s.teslimat_turu || '') + (s.adres ? ' · ' + s.adres : '') + '</div>' +
-      adimlerHtml +
-      ilerlemeBar +
-      '<div style="font-size:.8rem;font-weight:700;color:#666;margin-bottom:6px">Urunler</div>' +
-      urunlerHtml +
-      '<div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:2px solid #f0f0f0">' +
-        '<span style="font-size:.85rem;color:#666">Toplam</span>' +
-        '<span style="font-weight:800;font-size:1rem;color:#ff6b35">₺' + (parseFloat(s.genel_toplam) || 0) + '</span>' +
-      '</div>' +
+    '</div>';
+  }
+
+  var iptalBtn = '';
+  if (s.durum === 'bekliyor') {
+    iptalBtn = '<div style="margin-top:10px">' +
+      '<button onclick="siparisIptal(' + s.id + ')" style="width:100%;padding:9px;background:#fff;border:1.5px solid #f44336;color:#f44336;border-radius:10px;font-size:.82rem;font-weight:700;cursor:pointer">İptal Et</button>' +
+    '</div>';
+  }
+
+  var tarih = new Date(s.tarih).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+
+  return '<div id="aktif-siparis-kart-' + s.id + '" style="background:#fff;border-radius:16px;padding:16px;box-shadow:0 2px 12px rgba(0,0,0,.09);margin-bottom:12px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">' +
+      '<span style="font-weight:800;font-size:.97rem">Sipariş #' + s.id + '</span>' +
+      '<span style="background:' + (durumRenk[s.durum] || '#ccc') + ';color:#fff;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700">' +
+        (durumIkon[s.durum] || '') + ' ' + (s.durum || '') + '</span>' +
     '</div>' +
-    '<div style="text-align:center;font-size:.75rem;color:#bbb;margin-top:8px">🔄 Her 10 saniyede otomatik güncellenir</div>';
+    '<div style="font-size:.78rem;color:#aaa;margin-bottom:12px">' + (s.esnaf_adi || '') + ' · ' + tarih + '</div>' +
+    adimlerHtml +
+    ilerlemeBar +
+    kuryeHtml +
+    '<div style="font-size:.78rem;font-weight:700;color:#888;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Ürünler</div>' +
+    urunlerHtml +
+    '<div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:2px solid #f5f5f5">' +
+      '<span style="font-size:.83rem;color:#666">' + (s.teslimat_turu === 'kurye' ? '🛵 Kurye ile teslimat' : '🚶 Gel-al') + (s.adres ? ' · ' + s.adres : '') + '</span>' +
+      '<span style="font-weight:900;font-size:1rem;color:#ff6b35">₺' + (parseFloat(s.genel_toplam) || 0) + '</span>' +
+    '</div>' +
+    iptalBtn +
+  '</div>';
+}
+
+function siparisIptal(id) {
+  if (!confirm('Siparişi iptal etmek istediğinize emin misiniz?')) return;
+  var tel = telefon();
+  fetch(API_URL + '/api/siparis-iptal/' + id, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ musteri_telefon: tel })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.basari) {
+        siparislerListele();
+      } else {
+        alert(data.mesaj);
+      }
+    })
+    .catch(function() { alert('Bağlantı hatası.'); });
+}
+
+function siparisGecmisKart(s) {
+  var urunler = Array.isArray(s.urunler) ? s.urunler :
+    (typeof s.urunler === 'string' ? JSON.parse(s.urunler || '[]') : []);
+  var tarih = new Date(s.tarih).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  var renk = durumRenk[s.durum] || '#aaa';
+  var urunOzet = urunler.slice(0, 2).map(function(u) { return u.ad; }).join(', ') + (urunler.length > 2 ? ' +' + (urunler.length - 2) : '');
+  return '<div style="background:#fff;border-radius:14px;padding:13px 15px;box-shadow:0 1px 6px rgba(0,0,0,.06);margin-bottom:8px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">' +
+      '<span style="font-weight:800;font-size:.9rem">' + (s.esnaf_adi || 'Esnaf') + '</span>' +
+      '<span style="background:' + renk + ';color:#fff;padding:2px 8px;border-radius:12px;font-size:.68rem;font-weight:700">' + (durumIkon[s.durum] || '') + ' ' + (s.durum || '') + '</span>' +
+    '</div>' +
+    (urunOzet ? '<div style="font-size:.78rem;color:#888;margin-bottom:3px">' + urunOzet + '</div>' : '') +
+    '<div style="display:flex;justify-content:space-between;align-items:center">' +
+      '<span style="font-size:.73rem;color:#bbb">' + tarih + '</span>' +
+      '<span style="font-weight:800;font-size:.9rem;color:#ff6b35">₺' + (parseFloat(s.genel_toplam) || 0) + '</span>' +
+    '</div>' +
+  '</div>';
 }
 
 function siparislerListele() {
-  var profil = profilYukle();
+  var tel = telefon();
   var icerik = document.getElementById('siparislerim-icerik');
   if (!icerik) return;
 
-  // Aktif takip varsa önce onu göster
-  if (siparisTakip.siparisId) {
-    siparisGuncelle();
-    return;
-  }
-
-  if (!profil || !profil.telefon) {
-    icerik.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa">Siparişlerinizi görmek için profilinizde telefon numarası kaydedin.</div>';
+  if (!tel) {
+    icerik.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa"><div style="font-size:2.5rem;margin-bottom:8px">🛵</div>Siparişlerinizi görmek için giriş yapın.</div>';
     return;
   }
 
   icerik.innerHTML = '<div style="text-align:center;padding:20px;color:#aaa">Yükleniyor...</div>';
 
-  fetch(API_URL + '/api/siparislerim?telefon=' + encodeURIComponent(profil.telefon))
+  fetch(API_URL + '/api/siparislerim?telefon=' + encodeURIComponent(tel))
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (!data.basari) throw new Error(data.mesaj);
       var siparisler = data.veri;
       if (!siparisler.length) {
-        icerik.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa">Henüz siparişiniz yok.</div>';
+        icerik.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa"><div style="font-size:2.5rem;margin-bottom:8px">🛵</div>Henüz siparişiniz yok.</div>';
         return;
       }
-      icerik.innerHTML = siparisler.map(function(s) {
-        var tarih = new Date(s.tarih).toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-        var renk = durumRenk[s.durum] || '#aaa';
-        return '<div style="background:#fff;border-radius:14px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:10px;cursor:pointer" onclick="siparisTakip.siparisId=' + s.id + ';siparisGuncelle()">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
-            '<span style="font-weight:800;font-size:.95rem">Siparis #' + s.id + '</span>' +
-            '<span style="background:' + renk + ';color:#fff;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700">' + (durumIkon[s.durum] || '') + ' ' + (s.durum || '') + '</span>' +
-          '</div>' +
-          '<div style="font-size:.82rem;color:#666;margin-bottom:4px">' + (s.esnaf_adi || '') + '</div>' +
-          '<div style="display:flex;justify-content:space-between;align-items:center">' +
-            '<span style="font-size:.75rem;color:#bbb">' + tarih + '</span>' +
-            '<span style="font-weight:800;color:#ff6b35">₺' + (parseFloat(s.genel_toplam) || 0) + '</span>' +
-          '</div>' +
-        '</div>';
-      }).join('');
+
+      var aktif   = siparisler.filter(function(s) { return aktifDurumlar.indexOf(s.durum) !== -1; });
+      var gecmis  = siparisler.filter(function(s) { return aktifDurumlar.indexOf(s.durum) === -1; });
+
+      // Aktif sipariş varsa takibi başlat
+      if (aktif.length && !siparisTakip.siparisId) {
+        siparisTakip.siparisId = aktif[0].id;
+      }
+
+      var html = '';
+
+      if (aktif.length) {
+        html += '<div style="font-size:.75rem;font-weight:800;color:#ff6b35;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Aktif Siparişler</div>';
+        html += aktif.map(aktifSiparisKart).join('');
+        html += '<div style="text-align:center;font-size:.7rem;color:#ccc;margin-bottom:16px">🔄 Her 10 saniyede otomatik güncellenir</div>';
+      }
+
+      if (gecmis.length) {
+        html += '<div style="font-size:.75rem;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px"' +
+          (aktif.length ? ' style="margin-top:4px"' : '') + '>Geçmiş Siparişler</div>';
+        html += gecmis.map(siparisGecmisKart).join('');
+      }
+
+      icerik.innerHTML = html;
+
+      // Canlı takip başlat
+      if (aktif.length) {
+        if (siparisTakip.interval) clearInterval(siparisTakip.interval);
+        siparisTakip.interval = setInterval(function() {
+          if (document.getElementById('sayfa-siparislerim').classList.contains('aktif')) {
+            aktif.forEach(function(s) {
+              fetch(API_URL + '/api/siparis-detay/' + s.id)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                  if (!data.basari) return;
+                  var el = document.getElementById('aktif-siparis-kart-' + data.veri.id);
+                  if (el) el.outerHTML = aktifSiparisKart(data.veri);
+                  // Durum değiştiyse listeyi yenile
+                  if (aktifDurumlar.indexOf(data.veri.durum) === -1) siparislerListele();
+                });
+            });
+          } else {
+            clearInterval(siparisTakip.interval);
+          }
+        }, 10000);
+      }
     })
     .catch(function(err) {
-      icerik.innerHTML = '<div class="hata">Siparisler alinamadi: ' + err.message + '</div>';
+      icerik.innerHTML = '<div style="text-align:center;padding:20px;color:#f44336">Siparişler alınamadı: ' + err.message + '</div>';
     });
 }
 
