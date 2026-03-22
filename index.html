@@ -430,7 +430,12 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
       <div class="header-top">
         <button id="admin-geri" style="background:#f5f5f5;color:#222;width:34px;height:34px;border-radius:50%;border:none;font-size:1rem;cursor:pointer">←</button>
         <div style="font-weight:800;font-size:1rem">Admin Panel</div>
-        <div></div>
+        <button id="admin-cikis" style="background:#ffebee;color:#c62828;border:none;border-radius:8px;padding:5px 10px;font-size:.75rem;font-weight:700;cursor:pointer">Çıkış</button>
+      </div>
+      <div style="display:flex;gap:6px;padding:8px 0 4px">
+        <button class="admin-sekme aktif-sekme" data-sekme="esnaflar" style="flex:1;border:none;border-radius:8px;padding:7px 4px;font-size:.75rem;font-weight:700;cursor:pointer;background:#1a1a2e;color:#fff">🏪 Esnaflar</button>
+        <button class="admin-sekme" data-sekme="kuryeler" style="flex:1;border:none;border-radius:8px;padding:7px 4px;font-size:.75rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444">🛵 Kuryeler</button>
+        <button class="admin-sekme" data-sekme="musteriler" style="flex:1;border:none;border-radius:8px;padding:7px 4px;font-size:.75rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444">👤 Müşteriler</button>
       </div>
     </div>
     <div style="padding:16px" id="admin-icerik"><div class="yukleniyor">Yukleniyor...</div></div>
