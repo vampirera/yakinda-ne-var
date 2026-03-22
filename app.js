@@ -748,6 +748,12 @@ function navTikla(id) {
     sayfaGoster('siparislerim');
     siparislerListele();
   } else if (id === 'profil') {
+    var _oturum = oturumAl();
+    if (_oturum && (_oturum.tip === 'esnaf' || _oturum.tip === 'kurye')) {
+      sayfaGoster('panel');
+      panelGoruntule();
+      return;
+    }
     profilSayfasiGoster();
   } else if (id === 'favoriler') {
     favorilerSayfasiGoster();
@@ -1626,9 +1632,20 @@ function kayitFormuBaslat() {
           kayitGonderBtn.disabled = false;
           kayitGonderBtn.textContent = 'Kayit Ol ve WhatsApp ile Onayla';
           if (data.basari) {
-            alert('Kaydiniz alindi! Kayit ID: ' + data.kayit_id);
-            if (data.whatsapp_url) window.open(data.whatsapp_url, '_blank');
-            sayfaGoster('ana');
+            var formu = document.querySelector('#sayfa-kayit .content') || document.getElementById('kayit-form-wrap');
+            var onayHtml = '<div style="text-align:center;padding:20px 10px">' +
+              '<div style="font-size:3rem;margin-bottom:12px">✅</div>' +
+              '<h3 style="font-weight:800;font-size:1.1rem;margin-bottom:8px;color:#2e7d32">Başvurunuz Alındı!</h3>' +
+              '<p style="font-size:.85rem;color:#555;margin-bottom:6px">Kayıt No: <b>#' + data.kayit_id + '</b></p>' +
+              '<p style="font-size:.82rem;color:#888;margin-bottom:20px">İşletmeniz incelendikten sonra listelenmesi için onay vermeniz gerekiyor. Aşağıdaki butona basarak WhatsApp üzerinden onay isteyin.</p>' +
+              (data.whatsapp_url
+                ? '<a href="' + data.whatsapp_url + '" target="_blank" rel="noopener" style="display:block;background:#25d366;color:#fff;text-decoration:none;border-radius:14px;padding:14px;font-weight:800;font-size:.95rem;margin-bottom:12px">💬 WhatsApp ile Onay İste</a>'
+                : '') +
+              '<button onclick="sayfaGoster(\'kayit-secim\')" style="width:100%;background:#1a1a2e;color:#fff;border:none;border-radius:14px;padding:13px;font-weight:700;font-size:.9rem;cursor:pointer">Giriş Yap</button>' +
+            '</div>';
+            var icerikEl = document.querySelector('#sayfa-kayit .content');
+            if (icerikEl) icerikEl.innerHTML = onayHtml;
+            else sayfaGoster('ana');
           } else { alert('Hata: ' + data.mesaj); }
         })
         .catch(function() {
@@ -2360,6 +2377,23 @@ function panelProfilFormYukle(esnafId) {
       if (katEl) katEl.value = e.kategori || 'yemek';
       if (igEl)  igEl.value  = e.instagram_url || '';
       if (gmEl)  gmEl.value  = e.google_maps_url || '';
+
+      // Onay durumu banneri
+      var bannerEl = document.getElementById('panel-onay-banner');
+      if (bannerEl) {
+        if (!e.onaylandi) {
+          bannerEl.style.display = 'block';
+          fetch(API_URL + '/api/config').then(function(r){return r.json();}).then(function(cfg){
+            var waBtn = document.getElementById('panel-onay-wa-btn');
+            if (waBtn && cfg.admin_wa) {
+              var msg = encodeURIComponent('Merhaba! Yakinda Ne Var uygulamasindaki ' + e.ad + ' isletmemi onaylar misiniz? Kayit ID: ' + esnafId);
+              waBtn.href = cfg.admin_wa + '?text=' + msg;
+            }
+          }).catch(function(){});
+        } else {
+          bannerEl.style.display = 'none';
+        }
+      }
     })
     .catch(function() {});
 }
