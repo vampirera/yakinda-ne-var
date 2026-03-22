@@ -109,70 +109,118 @@ function profilSayfasiGoster() {
   var oturum  = oturumAl();
   sayfaGoster('profil');
 
-  // Oturumdan gelen bilgiler
   var ad      = (oturum && oturum.ad) ? oturum.ad : (profil.isim || '');
   var telefon = (oturum && oturum.telefon) ? oturum.telefon : (profil.telefon || '');
   var tip     = oturum ? oturum.tip : '';
   var tipEtiket = { musteri: '👤 Müşteri', esnaf: '🏪 Esnaf', kurye: '🛵 Kurye', admin: '⚙️ Admin' };
 
-  document.getElementById('profil-hosgeldin').textContent = 'Merhaba, ' + (ad || 'Misafir') + '!';
-  document.getElementById('profil-tip-rozet').textContent = tipEtiket[tip] || '';
-  document.getElementById('profil-isim').value      = ad;
-  document.getElementById('profil-soyad').value     = profil.soyad    || '';
-  document.getElementById('profil-telefon').value   = telefon;
-  document.getElementById('profil-email').value     = profil.email    || '';
-  document.getElementById('profil-adres1').value    = profil.adres1   || '';
-  document.getElementById('profil-lat').value       = profil.lat      || '';
-  document.getElementById('profil-lng').value       = profil.lng      || '';
-  document.getElementById('profil-kart-ad').value   = profil.kart_ad  || '';
-  document.getElementById('profil-kart-son4').value = profil.kart_son4 || '';
-  document.getElementById('profil-kart-tarih').value= profil.kart_tarih || '';
+  document.getElementById('profil-hosgeldin').textContent  = 'Merhaba, ' + (ad || 'Misafir') + '!';
+  document.getElementById('profil-tip-rozet').textContent  = tipEtiket[tip] || '';
+  document.getElementById('profil-isim').value             = ad;
+  document.getElementById('profil-telefon').value          = telefon;
+  document.getElementById('profil-email').value            = profil.email || '';
+  document.getElementById('profil-kart-ad').value          = profil.kart_ad    || '';
+  document.getElementById('profil-kart-son4').value        = profil.kart_son4  || '';
+  document.getElementById('profil-kart-tarih').value       = profil.kart_tarih || '';
+  document.getElementById('profil-lat').value              = '';
+  document.getElementById('profil-lng').value              = '';
+  document.getElementById('profil-harita-wrap').style.display = 'none';
+  document.getElementById('yeni-adres-input').value        = '';
+  document.getElementById('yeni-adres-baslik').value       = '';
 
-  if (profil.lat && profil.lng) {
-    document.getElementById('profil-harita-wrap').style.display = 'block';
-    setTimeout(function() {
-      if (!durum.profilHarita) {
-        durum.profilHarita = L.map('profil-harita', { zoomControl: false, attributionControl: false });
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(durum.profilHarita);
-      }
-      durum.profilHarita.setView([profil.lat, profil.lng], 16);
-      durum.profilHarita.invalidateSize();
-      if (durum.profilHaritaMarker) durum.profilHaritaMarker.remove();
-      durum.profilHaritaMarker = L.marker([profil.lat, profil.lng]).addTo(durum.profilHarita).bindPopup('Konumunuz').openPopup();
-      reverseGeocode(profil.lat, profil.lng, function(adres) {
-        document.getElementById('profil-konum-bilgi').textContent = '📍 ' + adres;
-      });
-    }, 150);
-  } else {
-    document.getElementById('profil-harita-wrap').style.display = 'none';
+  // Ödeme accordion kapalı başlasın
+  document.getElementById('odeme-icerik').style.display = 'none';
+  document.getElementById('odeme-ok').textContent = '▼';
+
+  adresListesiGoster();
+}
+
+function adresListesiGoster() {
+  var profil  = profilYukle() || {};
+  var adresler = profil.adresler || [];
+  var el = document.getElementById('adres-listesi');
+  if (!adresler.length) {
+    el.innerHTML = '<div style="color:#aaa;font-size:.8rem;padding:4px 0">Henüz kayıtlı adres yok.</div>';
+    return;
   }
+  el.innerHTML = adresler.map(function(a, i) {
+    var secili = a.secili;
+    return '<div onclick="adresSec(' + i + ')" style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;margin-bottom:6px;cursor:pointer;border:2px solid ' + (secili ? '#ff6b35' : '#eee') + ';background:' + (secili ? '#fff8f5' : '#fafafa') + '">' +
+      '<div style="width:18px;height:18px;border-radius:50%;border:2px solid ' + (secili ? '#ff6b35' : '#ccc') + ';background:' + (secili ? '#ff6b35' : '#fff') + ';flex-shrink:0"></div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-weight:700;font-size:.82rem;color:#333">' + (a.baslik || 'Adres') + '</div>' +
+        '<div style="font-size:.75rem;color:#777;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + a.adres + '</div>' +
+      '</div>' +
+      '<button onclick="event.stopPropagation();adresSil(' + i + ')" style="background:none;border:none;color:#ccc;font-size:1rem;cursor:pointer;padding:2px 4px">✕</button>' +
+    '</div>';
+  }).join('');
+}
+
+function adresSec(index) {
+  var profil = profilYukle() || {};
+  var adresler = profil.adresler || [];
+  adresler.forEach(function(a, i) { a.secili = (i === index); });
+  profil.adresler = adresler;
+  profilKaydet(profil);
+  adresListesiGoster();
+}
+
+function adresSil(index) {
+  var profil = profilYukle() || {};
+  var adresler = profil.adresler || [];
+  adresler.splice(index, 1);
+  if (adresler.length && !adresler.some(function(a) { return a.secili; })) adresler[0].secili = true;
+  profil.adresler = adresler;
+  profilKaydet(profil);
+  adresListesiGoster();
+}
+
+function odemeToggle() {
+  var icerik = document.getElementById('odeme-icerik');
+  var ok     = document.getElementById('odeme-ok');
+  var acik   = icerik.style.display !== 'none';
+  icerik.style.display = acik ? 'none' : 'block';
+  ok.textContent = acik ? '▼' : '▲';
 }
 
 function profilFormuBaslat() {
   document.getElementById('profil-kaydet').addEventListener('click', function() {
-    var isim  = document.getElementById('profil-isim').value.trim();
-    if (!isim) { alert('Ad zorunludur.'); return; }
+    var isim = document.getElementById('profil-isim').value.trim();
+    if (!isim) { alert('Ad Soyad zorunludur.'); return; }
     var mevcutProfil = profilYukle() || {};
-    profilKaydet({
-      isim:        isim,
-      soyad:       document.getElementById('profil-soyad').value.trim(),
-      telefon:     document.getElementById('profil-telefon').value.trim(),
-      email:       document.getElementById('profil-email').value.trim(),
-      adres1:      document.getElementById('profil-adres1').value.trim(),
-      lat:         mevcutProfil.lat  || null,
-      lng:         mevcutProfil.lng  || null,
-      kart_ad:     document.getElementById('profil-kart-ad').value.trim().toUpperCase(),
-      kart_son4:   document.getElementById('profil-kart-son4').value.trim(),
-      kart_tarih:  document.getElementById('profil-kart-tarih').value.trim()
-    });
+    profilKaydet(Object.assign(mevcutProfil, {
+      isim:       isim,
+      telefon:    document.getElementById('profil-telefon').value.trim(),
+      email:      document.getElementById('profil-email').value.trim(),
+      kart_ad:    document.getElementById('profil-kart-ad').value.trim().toUpperCase(),
+      kart_son4:  document.getElementById('profil-kart-son4').value.trim(),
+      kart_tarih: document.getElementById('profil-kart-tarih').value.trim()
+    }));
     document.getElementById('profil-hosgeldin').textContent = 'Merhaba, ' + isim + '!';
     alert('Profil kaydedildi!');
     sayfaGoster('ana');
   });
 
-  function cikisYapProfil() {
-    cikisYap();
-  }
+  document.getElementById('adres-ekle-btn').addEventListener('click', function() {
+    var adres  = document.getElementById('yeni-adres-input').value.trim();
+    var baslik = document.getElementById('yeni-adres-baslik').value.trim() || 'Adres';
+    if (!adres) { alert('Adres boş olamaz.'); return; }
+    var lat = document.getElementById('profil-lat').value;
+    var lng = document.getElementById('profil-lng').value;
+    var profil = profilYukle() || {};
+    var adresler = profil.adresler || [];
+    adresler.push({ baslik: baslik, adres: adres, lat: lat || null, lng: lng || null, secili: adresler.length === 0 });
+    profil.adresler = adresler;
+    profilKaydet(profil);
+    document.getElementById('yeni-adres-input').value  = '';
+    document.getElementById('yeni-adres-baslik').value = '';
+    document.getElementById('profil-lat').value        = '';
+    document.getElementById('profil-lng').value        = '';
+    document.getElementById('profil-harita-wrap').style.display = 'none';
+    adresListesiGoster();
+  });
+
+  function cikisYapProfil() { cikisYap(); }
   document.getElementById('profil-cikis-btn').addEventListener('click', cikisYapProfil);
   document.getElementById('profil-cikis-alt').addEventListener('click', cikisYapProfil);
 
@@ -199,9 +247,8 @@ function profilFormuBaslat() {
           konumButonuEkle(durum.profilHarita, function(latlng) {
             if (durum.profilHaritaMarker) durum.profilHaritaMarker.remove();
             durum.profilHaritaMarker = L.marker(latlng).addTo(durum.profilHarita).bindPopup('Konumunuz').openPopup();
-            var profil = profilYukle() || {};
-            profil.lat = latlng[0]; profil.lng = latlng[1];
-            profilKaydet(profil);
+            document.getElementById('profil-lat').value = latlng[0];
+            document.getElementById('profil-lng').value = latlng[1];
             durum.lat = latlng[0]; durum.lng = latlng[1];
             reverseGeocode(latlng[0], latlng[1], function(adres) {
               document.getElementById('profil-konum-bilgi').textContent = '📍 ' + adres;
@@ -217,19 +264,13 @@ function profilFormuBaslat() {
         });
       }, 100);
 
-      // localStorage'a kaydet
-      var profil = profilYukle() || {};
-      profil.lat = lat;
-      profil.lng = lng;
-      profilKaydet(profil);
       durum.lat = lat;
       durum.lng = lng;
-
-      btn.textContent = '✅ Konum Alindi';
+      btn.textContent = '✅ Konum Alındı';
       btn.disabled = false;
     }, function() {
-      alert('Konum alinamadi. Lutfen izin verin.');
-      btn.textContent = '📍 Konumumu Kullan';
+      alert('Konum alınamadı. Lütfen izin verin.');
+      btn.textContent = '📍 Konum Al';
       btn.disabled = false;
     });
   });
