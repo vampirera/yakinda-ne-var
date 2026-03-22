@@ -329,8 +329,15 @@ firebase.initializeApp({
       <button id="urun-satir-ekle" style="width:100%;background:#f5f5f5;color:#666;border:2px dashed #ddd;border-radius:10px;padding:9px;font-size:.82rem;cursor:pointer;margin-bottom:16px">+ Urun/Hizmet Ekle</button>
       <label class="form-label">Şifre *</label>
       <input type="password" id="k-sifre" placeholder="En az 6 karakter" class="form-input">
-      <button id="kayit-gonder" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:14px;padding:14px;font-weight:700;font-size:1rem;cursor:pointer">Kayit Ol ve WhatsApp ile Onayla</button>
-      <p style="text-align:center;font-size:.75rem;color:#aaa;margin-top:8px">Kaydiniz incelendikten sonra onaylanacak.</p>
+      <div id="esnaf-otp-bolum" style="display:none;margin-top:4px">
+        <label class="form-label">SMS Doğrulama Kodu *</label>
+        <input type="text" id="esnaf-otp" placeholder="6 haneli kodu girin" class="form-input" maxlength="6" inputmode="numeric">
+        <p style="font-size:.72rem;color:#888;margin:2px 0 8px">Telefonunuza SMS ile gönderilen 6 haneli kodu girin.</p>
+      </div>
+      <div id="recaptcha-esnaf"></div>
+      <button id="kayit-gonder" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:14px;padding:14px;font-weight:700;font-size:1rem;cursor:pointer">Kayıt Ol</button>
+      <p id="esnaf-kayit-mesaj" style="text-align:center;font-size:.8rem;color:#aaa;margin-top:8px"></p>
+      <p style="text-align:center;font-size:.75rem;color:#aaa;margin-top:4px">Kaydiniz incelendikten sonra onaylanacak.</p>
     </div>
   </div>
 
