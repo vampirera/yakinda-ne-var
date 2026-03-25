@@ -1408,7 +1408,9 @@ function detayDoldur(e) {
   }, 100);
 
   // Tablar
-  document.getElementById('detay-tabs').innerHTML = ['Menu', 'Yorumlar', 'Yorum Yaz'].map(function(t, i) {
+  var tablar = ['Menu', 'Yorumlar', 'Yorum Yaz'];
+  if (e.randevu_modu) tablar.push('📅 Randevu');
+  document.getElementById('detay-tabs').innerHTML = tablar.map(function(t, i) {
     return '<div class="detay-tab' + (i === 0 ? ' active' : '') + '" onclick="tabSec(this,' + i + ')">' + t + '</div>';
   }).join('');
 
@@ -1419,6 +1421,18 @@ function detayDoldur(e) {
   document.getElementById('tab-menu').style.display = '';
   document.getElementById('tab-yorumlar').style.display = 'none';
   document.getElementById('tab-yorum-ekle').style.display = 'none';
+  document.getElementById('tab-randevu').style.display = 'none';
+
+  // Randevu modu aktifse hazırla
+  if (e.randevu_modu) {
+    var bugun = new Date().toISOString().split('T')[0];
+    document.getElementById('det-randevu-tarih').min = bugun;
+    document.getElementById('det-randevu-tarih').value = bugun;
+    document.getElementById('det-slot-bolum').style.display = 'none';
+    document.getElementById('det-randevu-form').style.display = 'none';
+    detHizmetleriYukle(e.id);
+    detSlotlarYukle();
+  }
 }
 
 function tabSec(el, idx) {
@@ -1427,6 +1441,125 @@ function tabSec(el, idx) {
   document.getElementById('tab-menu').style.display = idx === 0 ? '' : 'none';
   document.getElementById('tab-yorumlar').style.display = idx === 1 ? '' : 'none';
   document.getElementById('tab-yorum-ekle').style.display = idx === 2 ? '' : 'none';
+  document.getElementById('tab-randevu').style.display = idx === 3 ? '' : 'none';
+}
+
+// =============================================================
+// RANDEVU — MÜŞTERİ DETAY SAYFASI
+// =============================================================
+
+var _detSecilenSlot = null;
+
+function detHizmetleriYukle(esnafId) {
+  fetch(API_URL + '/api/esnaf/' + esnafId + '/hizmetler')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var select = document.getElementById('det-randevu-hizmet');
+      if (!select) return;
+      select.innerHTML = '<option value="">-- Hizmet seçin (opsiyonel) --</option>';
+      (data.veri || []).forEach(function(h) {
+        var opt = document.createElement('option');
+        opt.value = h.id;
+        opt.textContent = h.ad + ' · ' + h.sure + ' dk' + (parseFloat(h.fiyat) > 0 ? ' · ₺' + h.fiyat : '');
+        select.appendChild(opt);
+      });
+    }).catch(function() {});
+}
+
+function detSlotlarYukle() {
+  var e = durum.secilenEsnaf;
+  if (!e) return;
+  var tarih = document.getElementById('det-randevu-tarih').value;
+  var hizmetId = document.getElementById('det-randevu-hizmet').value;
+  if (!tarih) return;
+
+  _detSecilenSlot = null;
+  document.getElementById('det-randevu-form').style.display = 'none';
+
+  var url = API_URL + '/api/esnaf/' + e.id + '/musait-slotlar?tarih=' + tarih;
+  if (hizmetId) url += '&hizmet_id=' + hizmetId;
+
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var bolum = document.getElementById('det-slot-bolum');
+      var grid = document.getElementById('det-slot-grid');
+      bolum.style.display = '';
+      if (!data.basari || !data.veri || !data.veri.length) {
+        grid.innerHTML = '<div style="grid-column:1/-1;color:#aaa;text-align:center;padding:10px;font-size:.82rem">Bu tarih için müsait slot yok.</div>';
+        return;
+      }
+      grid.innerHTML = data.veri.map(function(s) {
+        var style = s.musait
+          ? 'background:#fff;border:1.5px solid #e0e0e0;border-radius:10px;padding:10px 6px;font-size:.82rem;font-weight:700;cursor:pointer;text-align:center'
+          : 'background:#f5f5f5;border:1.5px solid #eee;border-radius:10px;padding:10px 6px;font-size:.82rem;color:#ccc;text-decoration:line-through;text-align:center';
+        return '<button style="' + style + '" ' +
+          (s.musait ? 'onclick="detSlotSec(this,\'' + s.saat + '\')"' : 'disabled') + '>' +
+          s.saat + '</button>';
+      }).join('');
+    }).catch(function() {
+      document.getElementById('det-slot-bolum').style.display = '';
+      document.getElementById('det-slot-grid').innerHTML = '<div style="color:#e53935;font-size:.8rem">Bağlantı hatası.</div>';
+    });
+}
+
+function detSlotSec(btn, saat) {
+  document.querySelectorAll('#det-slot-grid button').forEach(function(b) {
+    b.style.background = '#fff'; b.style.color = '#222'; b.style.borderColor = '#e0e0e0';
+  });
+  btn.style.background = '#ff6b35'; btn.style.color = '#fff'; btn.style.borderColor = '#ff6b35';
+  _detSecilenSlot = saat;
+  // Oturum varsa telefon/adı prefill
+  var oturum = oturumAl();
+  if (oturum) {
+    if (oturum.ad) document.getElementById('det-randevu-ad').value = oturum.ad;
+    if (oturum.telefon) document.getElementById('det-randevu-tel').value = oturum.telefon;
+  }
+  document.getElementById('det-randevu-form').style.display = '';
+}
+
+function detRandevuOlustur() {
+  var e = durum.secilenEsnaf;
+  if (!e) return;
+  var ad = document.getElementById('det-randevu-ad').value.trim();
+  var tel = document.getElementById('det-randevu-tel').value.trim();
+  var not = document.getElementById('det-randevu-not').value.trim();
+  var tarih = document.getElementById('det-randevu-tarih').value;
+  var hizmetId = document.getElementById('det-randevu-hizmet').value || null;
+
+  if (!ad || !tel) { alert('Ad ve telefon zorunlu.'); return; }
+  if (!_detSecilenSlot) { alert('Lütfen bir saat seçin.'); return; }
+
+  fetch(API_URL + '/api/randevu', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      esnaf_id: e.id,
+      musteri_ad: ad,
+      musteri_telefon: tel,
+      hizmet_id: hizmetId ? parseInt(hizmetId) : null,
+      tarih: tarih,
+      saat: _detSecilenSlot,
+      notlar: not || null
+    })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.bekleme) {
+        alert('Bu saat dolmuş. Bekleme listesine eklendiniz!\nSlot açıldığında WhatsApp ile bildirim alacaksınız.');
+      } else if (data.basari) {
+        alert('🎉 Randevunuz oluşturuldu!\n📅 ' + tarih + ' · ' + _detSecilenSlot + '\n📱 WhatsApp onayı gönderildi.');
+        document.getElementById('det-randevu-ad').value = '';
+        document.getElementById('det-randevu-tel').value = '';
+        document.getElementById('det-randevu-not').value = '';
+        _detSecilenSlot = null;
+        document.getElementById('det-randevu-form').style.display = 'none';
+        detSlotlarYukle();
+      } else {
+        alert('Hata: ' + (data.mesaj || 'Bilinmeyen hata.'));
+      }
+    })
+    .catch(function() { alert('Bağlantı hatası.'); });
 }
 
 function menuGoster(urunler) {
