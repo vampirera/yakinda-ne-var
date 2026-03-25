@@ -568,7 +568,7 @@ function siparislerListele() {
   var telEnc = encodeURIComponent(tel);
   Promise.all([
     fetch(API_URL + '/api/siparislerim?telefon=' + telEnc).then(function(r) { return r.json(); }),
-    fetch(API_URL + '/api/randevularim/' + telEnc).then(function(r) { return r.json(); }).catch(function() { return { basari: false, veri: [] }; })
+    fetch(API_URL + '/api/randevularim?telefon=' + telEnc).then(function(r) { return r.json(); }).catch(function() { return { basari: false, veri: [] }; })
   ])
     .then(function(results) {
       var sipData = results[0];
@@ -628,10 +628,12 @@ function siparislerListele() {
 
       icerik.innerHTML = html;
 
-      if (aktif.length) {
-        if (siparisTakip.interval) clearInterval(siparisTakip.interval);
-        siparisTakip.interval = setInterval(function() {
-          if (document.getElementById('sayfa-siparislerim').classList.contains('aktif')) {
+      // Polling: aktif sipariş varsa 10sn, sadece randevu varsa 30sn
+      if (siparisTakip.interval) clearInterval(siparisTakip.interval);
+      var pollInterval = aktif.length ? 10000 : 30000;
+      siparisTakip.interval = setInterval(function() {
+        if (document.getElementById('sayfa-siparislerim').classList.contains('aktif')) {
+          if (aktif.length) {
             aktif.forEach(function(s) {
               fetch(API_URL + '/api/siparis-detay/' + s.id)
                 .then(function(r) { return r.json(); })
@@ -643,10 +645,13 @@ function siparislerListele() {
                 });
             });
           } else {
-            clearInterval(siparisTakip.interval);
+            // Sadece randevu varsa tüm listeyi yenile (durum değişikliği için)
+            siparislerListele();
           }
-        }, 10000);
-      }
+        } else {
+          clearInterval(siparisTakip.interval);
+        }
+      }, pollInterval);
     })
     .catch(function(err) {
       icerik.innerHTML = '<div style="text-align:center;padding:20px;color:#f44336">Siparişler alınamadı: ' + err.message + '</div>';
@@ -655,7 +660,7 @@ function siparislerListele() {
 
 function musteriRandevuIptal(randevuId) {
   if (!confirm('Randevunuz iptal edilecek. Emin misiniz?')) return;
-  var tel = telefon();
+  var tel = oturumAl() && oturumAl().telefon;
   if (!tel) return;
   fetch(API_URL + '/api/randevu/' + randevuId + '/iptal', {
     method: 'PUT',
