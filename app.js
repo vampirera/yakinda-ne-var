@@ -565,41 +565,69 @@ function siparislerListele() {
 
   icerik.innerHTML = '<div style="text-align:center;padding:20px;color:#aaa">Yükleniyor...</div>';
 
-  fetch(API_URL + '/api/siparislerim?telefon=' + encodeURIComponent(tel))
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (!data.basari) throw new Error(data.mesaj);
-      var siparisler = data.veri;
-      if (!siparisler.length) {
-        icerik.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa"><div style="font-size:2.5rem;margin-bottom:8px">🛵</div>Henüz siparişiniz yok.</div>';
-        return;
-      }
+  var telEnc = encodeURIComponent(tel);
+  Promise.all([
+    fetch(API_URL + '/api/siparislerim?telefon=' + telEnc).then(function(r) { return r.json(); }),
+    fetch(API_URL + '/api/randevularim/' + telEnc).then(function(r) { return r.json(); }).catch(function() { return { basari: false, veri: [] }; })
+  ])
+    .then(function(results) {
+      var sipData = results[0];
+      var ranData = results[1];
+      if (!sipData.basari) throw new Error(sipData.mesaj);
 
-      var aktif   = siparisler.filter(function(s) { return aktifDurumlar.indexOf(s.durum) !== -1; });
-      var gecmis  = siparisler.filter(function(s) { return aktifDurumlar.indexOf(s.durum) === -1; });
+      var siparisler = sipData.veri;
+      var randevular = (ranData.basari ? ranData.veri : []).filter(function(r) { return r.durum !== 'iptal'; });
 
-      // Aktif sipariş varsa takibi başlat
+      var aktif  = siparisler.filter(function(s) { return aktifDurumlar.indexOf(s.durum) !== -1; });
+      var gecmis = siparisler.filter(function(s) { return aktifDurumlar.indexOf(s.durum) === -1; });
+
       if (aktif.length && !siparisTakip.siparisId) {
         siparisTakip.siparisId = aktif[0].id;
       }
 
       var html = '';
 
+      // Randevular bölümü
+      if (randevular.length) {
+        html += '<div style="font-size:.75rem;font-weight:800;color:#7b1fa2;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">📅 Randevularım</div>';
+        var durumRenk = { bekliyor:'#ff6b35', onaylandi:'#2e7d32', tamamlandi:'#888', iptal:'#c62828' };
+        var durumMetin = { bekliyor:'Bekliyor', onaylandi:'Onaylandı', tamamlandi:'Tamamlandı', iptal:'İptal' };
+        html += randevular.map(function(r) {
+          var tarihStr = new Date(r.tarih).toLocaleDateString('tr-TR', { day:'numeric', month:'long', year:'numeric' });
+          var renk = durumRenk[r.durum] || '#888';
+          return '<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.06);border-left:4px solid ' + renk + '">' +
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+              '<div>' +
+                '<div style="font-weight:800;font-size:.9rem">' + (r.esnaf_adi || 'İşletme') + '</div>' +
+                '<div style="font-size:.8rem;color:#555;margin-top:3px">📅 ' + tarihStr + ' · ' + (r.saat||'').slice(0,5) + '</div>' +
+                (r.hizmet_adi ? '<div style="font-size:.75rem;color:#888;margin-top:2px">💼 ' + r.hizmet_adi + '</div>' : '') +
+              '</div>' +
+              '<span style="font-size:.72rem;font-weight:700;color:' + renk + ';padding:3px 8px;background:' + renk + '18;border-radius:8px">' + (durumMetin[r.durum] || r.durum) + '</span>' +
+            '</div>' +
+            (r.durum === 'bekliyor' || r.durum === 'onaylandi'
+              ? '<button onclick="musteriRandevuIptal(' + r.id + ')" style="margin-top:10px;width:100%;background:#ffebee;color:#c62828;border:none;border-radius:8px;padding:8px;font-size:.78rem;font-weight:700;cursor:pointer">İptal Et</button>'
+              : '') +
+          '</div>';
+        }).join('');
+      }
+
       if (aktif.length) {
-        html += '<div style="font-size:.75rem;font-weight:800;color:#ff6b35;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Aktif Siparişler</div>';
+        html += '<div style="font-size:.75rem;font-weight:800;color:#ff6b35;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px' + (randevular.length ? ';margin-top:16px' : '') + '">Aktif Siparişler</div>';
         html += aktif.map(aktifSiparisKart).join('');
         html += '<div style="text-align:center;font-size:.7rem;color:#ccc;margin-bottom:16px">🔄 Her 10 saniyede otomatik güncellenir</div>';
       }
 
       if (gecmis.length) {
-        html += '<div style="font-size:.75rem;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px"' +
-          (aktif.length ? ' style="margin-top:4px"' : '') + '>Geçmiş Siparişler</div>';
+        html += '<div style="font-size:.75rem;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px' + (aktif.length || randevular.length ? ';margin-top:4px' : '') + '">Geçmiş Siparişler</div>';
         html += gecmis.map(siparisGecmisKart).join('');
+      }
+
+      if (!siparisler.length && !randevular.length) {
+        html = '<div style="text-align:center;padding:40px;color:#aaa"><div style="font-size:2.5rem;margin-bottom:8px">🛵</div>Henüz sipariş veya randevunuz yok.</div>';
       }
 
       icerik.innerHTML = html;
 
-      // Canlı takip başlat
       if (aktif.length) {
         if (siparisTakip.interval) clearInterval(siparisTakip.interval);
         siparisTakip.interval = setInterval(function() {
@@ -611,7 +639,6 @@ function siparislerListele() {
                   if (!data.basari) return;
                   var el = document.getElementById('aktif-siparis-kart-' + data.veri.id);
                   if (el) el.outerHTML = aktifSiparisKart(data.veri);
-                  // Durum değiştiyse listeyi yenile
                   if (aktifDurumlar.indexOf(data.veri.durum) === -1) siparislerListele();
                 });
             });
@@ -624,6 +651,23 @@ function siparislerListele() {
     .catch(function(err) {
       icerik.innerHTML = '<div style="text-align:center;padding:20px;color:#f44336">Siparişler alınamadı: ' + err.message + '</div>';
     });
+}
+
+function musteriRandevuIptal(randevuId) {
+  if (!confirm('Randevunuz iptal edilecek. Emin misiniz?')) return;
+  var tel = telefon();
+  if (!tel) return;
+  fetch(API_URL + '/api/randevu/' + randevuId + '/iptal', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ musteri_telefon: tel })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.basari) siparislerListele();
+      else alert(data.mesaj || 'İptal edilemedi.');
+    })
+    .catch(function() { alert('Bağlantı hatası.'); });
 }
 
 // =============================================================
@@ -1554,6 +1598,7 @@ function detRandevuOlustur() {
         document.getElementById('det-randevu-not').value = '';
         _detSecilenSlot = null;
         document.getElementById('det-randevu-form').style.display = 'none';
+        // Anında slot grid'ini güncelle (başka müşteri aynı saati seçemesin)
         detSlotlarYukle();
       } else {
         alert('Hata: ' + (data.mesaj || 'Bilinmeyen hata.'));
