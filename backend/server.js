@@ -1129,9 +1129,11 @@ app.post('/api/randevu', async function(req, res) {
 });
 
 // Müşterinin randevularını listele
-app.get('/api/randevularim/:telefon', async function(req, res) {
+app.get('/api/randevularim', async function(req, res) {
   try {
-    var telefon = telefonNormalize(req.params.telefon);
+    var rawTel = req.query.telefon;
+    if (!rawTel) return res.status(400).json({ basari: false, mesaj: 'Telefon gerekli.' });
+    var telefon = telefonNormalize(rawTel);
     var r = await pool.query(
       `SELECT r.*, e.ad as esnaf_adi, h.ad as hizmet_adi
        FROM randevular r
