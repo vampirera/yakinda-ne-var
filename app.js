@@ -1757,45 +1757,16 @@ function musteriKayitGonder() {
     mesaj.style.color = '#e53935'; mesaj.textContent = 'Şifre en az 4 karakter olmalı.'; return;
   }
 
-  // Adım 1: SMS gönder
-  if (!_musConfirmation) {
-    btn.disabled = true; btn.textContent = 'Gönderiliyor...'; mesaj.textContent = '';
-    if (!_musRecaptcha) {
-      _musRecaptcha = new firebase.auth.RecaptchaVerifier('recaptcha-mus', { size: 'invisible' });
-    }
-    firebase.auth().signInWithPhoneNumber(telefonIntlFormat(telefon), _musRecaptcha)
-      .then(function(result) {
-        _musConfirmation = result;
-        btn.disabled = false; btn.textContent = 'Doğrula ve Kayıt Ol';
-        document.getElementById('mus-otp-bolum').style.display = 'block';
-        mesaj.style.color = '#2e7d32'; mesaj.textContent = '✅ SMS ile doğrulama kodu gönderildi.';
-      })
-      .catch(function(e) {
-        btn.disabled = false; btn.textContent = 'Kayıt Ol';
-        mesaj.style.color = '#e53935'; mesaj.textContent = 'SMS gönderilemedi: ' + e.message;
-        if (_musRecaptcha) { _musRecaptcha.clear(); _musRecaptcha = null; }
-      });
-    return;
-  }
-
-  // Adım 2: Kodu doğrula ve kayıt tamamla
-  var otp = document.getElementById('mus-otp').value.trim();
-  if (!otp) { mesaj.style.color = '#e53935'; mesaj.textContent = 'Doğrulama kodunu girin.'; return; }
-
+  // SMS doğrulaması geçici olarak devre dışı — direkt kayıt
   btn.disabled = true; btn.textContent = 'Kaydediliyor...'; mesaj.textContent = '';
 
-  _musConfirmation.confirm(otp)
-    .then(function() {
-      return fetch(API_URL + '/api/kayit', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ad: ad, telefon: telefon, sifre: sifre })
-      });
-    })
+  fetch(API_URL + '/api/kayit', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ad: ad, telefon: telefon, sifre: sifre })
+  })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      btn.disabled = false; btn.textContent = 'Doğrula ve Kayıt Ol';
-      _musConfirmation = null; _musRecaptcha = null;
-      document.getElementById('mus-otp-bolum').style.display = 'none';
+      btn.disabled = false; btn.textContent = 'Kayıt Ol';
       if (data.basari) {
         var v = { kullanici_id: data.kullanici_id, ad: ad, telefon: telefon, tip: 'musteri', sifre: sifre };
         oturumKaydet(v); oturumaGoreNavGuncelle();
@@ -1805,9 +1776,9 @@ function musteriKayitGonder() {
         mesaj.style.color = '#e53935'; mesaj.textContent = 'Hata: ' + data.mesaj;
       }
     })
-    .catch(function(e) {
-      btn.disabled = false; btn.textContent = 'Doğrula ve Kayıt Ol';
-      mesaj.style.color = '#e53935'; mesaj.textContent = 'Kod hatalı veya süresi dolmuş.';
+    .catch(function() {
+      btn.disabled = false; btn.textContent = 'Kayıt Ol';
+      mesaj.style.color = '#e53935'; mesaj.textContent = 'Bağlantı hatası.';
     });
 }
 
@@ -2372,6 +2343,9 @@ function panelYukle() {
   kampanyalariYukle(esnafId);
   panelIstatistikYukle();
   panelProfilFormYukle(esnafId);
+  randevuAyarlariniYukle(esnafId);
+  hizmetleriYukle(esnafId);
+  randevulariYukle();
 }
 
 function panelIstatistikYukle() {
@@ -2588,6 +2562,148 @@ function siparisKabul(id) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ durum: 'tamamlandi' })
   }).then(function() { panelYukle(); });
+}
+
+// =============================================================
+// RANDEVU SİSTEMİ — ESNAF PANELİ
+// =============================================================
+
+function randevuAyarlariniYukle(esnafId) {
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/randevu-ayar')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.basari) return;
+      var v = data.veri;
+      var toggle = document.getElementById('randevu-modu-toggle');
+      var slider = document.getElementById('randevu-toggle-slider');
+      var knob = document.getElementById('randevu-toggle-knob');
+      if (toggle) {
+        toggle.checked = !!v.randevu_modu;
+        slider.style.background = v.randevu_modu ? '#ff6b35' : '#ccc';
+        knob.style.transform = v.randevu_modu ? 'translateX(20px)' : 'translateX(0)';
+      }
+      var slotEl = document.getElementById('randevu-slot-suresi');
+      if (slotEl) slotEl.value = v.slot_suresi || 30;
+    });
+}
+
+function randevuModuToggle() {
+  var toggle = document.getElementById('randevu-modu-toggle');
+  var slider = document.getElementById('randevu-toggle-slider');
+  var knob = document.getElementById('randevu-toggle-knob');
+  slider.style.background = toggle.checked ? '#ff6b35' : '#ccc';
+  knob.style.transform = toggle.checked ? 'translateX(20px)' : 'translateX(0)';
+}
+
+function randevuAyarKaydet() {
+  var esnafId = durum.panelEsnafId;
+  if (!esnafId) return;
+  var modu = document.getElementById('randevu-modu-toggle').checked;
+  var sure = parseInt(document.getElementById('randevu-slot-suresi').value) || 30;
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/randevu-ayar', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ randevu_modu: modu, slot_suresi: sure })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { alert(data.mesaj || (data.basari ? 'Kaydedildi.' : 'Hata.')); });
+}
+
+function hizmetleriYukle(esnafId) {
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/hizmetler')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.basari) return;
+      var con = document.getElementById('panel-hizmetler-liste');
+      if (!data.veri.length) { con.innerHTML = '<div style="color:#aaa;font-size:.82rem;padding:4px 0">Henüz hizmet eklenmedi.</div>'; return; }
+      con.innerHTML = data.veri.map(function(h) {
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f0f0f0">' +
+          '<div>' +
+            '<span style="font-size:.84rem;font-weight:700">' + h.ad + '</span>' +
+            '<span style="font-size:.75rem;color:#888;margin-left:6px">' + h.sure + ' dk · ₺' + h.fiyat + '</span>' +
+          '</div>' +
+          '<button onclick="hizmetSil(' + esnafId + ',' + h.id + ')" style="background:none;border:none;color:#ff4444;cursor:pointer;font-size:1rem">🗑</button>' +
+        '</div>';
+      }).join('');
+    });
+}
+
+function hizmetEkle() {
+  var esnafId = durum.panelEsnafId;
+  if (!esnafId) return;
+  var ad = document.getElementById('hiz-ad').value.trim();
+  if (!ad) { alert('Hizmet adı zorunlu.'); return; }
+  var sure = parseInt(document.getElementById('hiz-sure').value) || 30;
+  var fiyat = parseFloat(document.getElementById('hiz-fiyat').value) || 0;
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/hizmet', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ad: ad, sure: sure, fiyat: fiyat })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.basari) { alert(data.mesaj); return; }
+      document.getElementById('hiz-ad').value = '';
+      document.getElementById('hiz-sure').value = '30';
+      document.getElementById('hiz-fiyat').value = '';
+      hizmetleriYukle(esnafId);
+    });
+}
+
+function hizmetSil(esnafId, hizmetId) {
+  if (!confirm('Hizmet silinecek. Emin misiniz?')) return;
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/hizmet/' + hizmetId, { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (data.basari) hizmetleriYukle(esnafId); else alert(data.mesaj); });
+}
+
+function randevulariYukle() {
+  var esnafId = durum.panelEsnafId;
+  if (!esnafId) return;
+  var tarih = document.getElementById('randevu-tarih-filtre') ? document.getElementById('randevu-tarih-filtre').value : '';
+  var url = API_URL + '/api/esnaf-panel/' + esnafId + '/randevular' + (tarih ? '?tarih=' + tarih : '');
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var con = document.getElementById('panel-randevular-liste');
+      if (!data.basari || !data.veri.length) { con.innerHTML = '<div style="color:#aaa;font-size:.82rem">Randevu yok.</div>'; return; }
+      var durumRenk = { bekliyor: '#ff6b35', onaylandi: '#2e7d32', tamamlandi: '#888', iptal: '#c62828' };
+      var durumMetin = { bekliyor: 'Bekliyor', onaylandi: 'Onaylandı', tamamlandi: 'Tamamlandı', iptal: 'İptal' };
+      con.innerHTML = data.veri.map(function(r) {
+        var tarihStr = new Date(r.tarih).toLocaleDateString('tr-TR', { day:'numeric', month:'short' });
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0">' +
+          '<div>' +
+            '<div style="font-size:.84rem;font-weight:700">' + r.musteri_ad + '</div>' +
+            '<div style="font-size:.72rem;color:#888">' + tarihStr + ' · ' + (r.saat||'').slice(0,5) + ' · ' + (r.hizmet_adi||'Genel') + '</div>' +
+            '<div style="font-size:.7rem;color:#aaa">' + r.musteri_telefon + '</div>' +
+          '</div>' +
+          '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">' +
+            '<span style="font-size:.7rem;font-weight:700;color:' + (durumRenk[r.durum]||'#888') + '">' + (durumMetin[r.durum]||r.durum) + '</span>' +
+            (r.durum === 'bekliyor' ? '<button onclick="panelRandevuOnayla(' + r.id + ')" style="font-size:.65rem;padding:3px 7px;background:#e8f5e9;color:#2e7d32;border:none;border-radius:6px;cursor:pointer">Onayla</button>' : '') +
+            (r.durum !== 'iptal' && r.durum !== 'tamamlandi' ? '<button onclick="panelRandevuIptal(' + r.id + ')" style="font-size:.65rem;padding:3px 7px;background:#ffebee;color:#c62828;border:none;border-radius:6px;cursor:pointer">İptal</button>' : '') +
+          '</div>' +
+        '</div>';
+      }).join('');
+    });
+}
+
+function panelRandevuOnayla(randevuId) {
+  var esnafId = durum.panelEsnafId;
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/randevu/' + randevuId + '/durum', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ durum: 'onaylandi' })
+  }).then(function() { randevulariYukle(); });
+}
+
+function panelRandevuIptal(randevuId) {
+  if (!confirm('Randevu iptal edilecek. Emin misiniz?')) return;
+  var esnafId = durum.panelEsnafId;
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/randevu/' + randevuId + '/durum', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ durum: 'iptal' })
+  }).then(function() { randevulariYukle(); });
 }
 
 // =============================================================

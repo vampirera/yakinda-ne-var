@@ -599,6 +599,57 @@ firebase.initializeApp({
         </div>
         <button class="btn-p" onclick="kampanyaEkle()" style="margin-top:4px">+ Kampanya Ekle</button>
       </div>
+
+      <!-- RANDEVU SİSTEMİ -->
+      <div class="s-title" style="margin-top:16px">
+        <span>📅 Randevu Sistemi</span>
+        <button class="add-btn-small" onclick="randevulariYukle()">Yenile</button>
+      </div>
+
+      <!-- Randevu Modu Toggle -->
+      <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.06)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <div style="font-weight:700;font-size:.88rem">Randevu Modu</div>
+            <div style="font-size:.72rem;color:#888">Açık olduğunda müşteriler randevu alabilir</div>
+          </div>
+          <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
+            <input type="checkbox" id="randevu-modu-toggle" onchange="randevuModuToggle()" style="opacity:0;width:0;height:0;position:absolute">
+            <span id="randevu-toggle-slider" style="position:absolute;top:0;left:0;right:0;bottom:0;background:#ccc;border-radius:24px;transition:.3s">
+              <span style="position:absolute;content:'';height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;display:block" id="randevu-toggle-knob"></span>
+            </span>
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <label style="font-size:.78rem;color:#666;white-space:nowrap">Slot süresi (dk):</label>
+          <input type="number" id="randevu-slot-suresi" class="form-input" min="15" max="240" step="15" value="30" style="width:80px;margin-bottom:0">
+          <button class="btn-p" onclick="randevuAyarKaydet()" style="padding:8px 12px;font-size:.78rem">Kaydet</button>
+        </div>
+      </div>
+
+      <!-- Hizmetler -->
+      <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.06)">
+        <div style="font-weight:700;font-size:.85rem;margin-bottom:8px">Hizmetlerim</div>
+        <div id="panel-hizmetler-liste" style="margin-bottom:10px"></div>
+        <div style="background:#f9f9f9;border-radius:10px;padding:10px">
+          <input type="text" id="hiz-ad" class="form-input" placeholder="Hizmet adı *" style="margin-bottom:6px">
+          <div style="display:flex;gap:6px">
+            <input type="number" id="hiz-sure" class="form-input" placeholder="Süre (dk)" min="15" value="30" style="width:33%">
+            <input type="number" id="hiz-fiyat" class="form-input" placeholder="Fiyat (₺)" min="0" style="width:33%">
+            <button class="btn-p" onclick="hizmetEkle()" style="width:33%;padding:8px;font-size:.78rem">+ Ekle</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Randevu Takvimi -->
+      <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.06)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <div style="font-weight:700;font-size:.85rem;flex:1">Randevular</div>
+          <input type="date" id="randevu-tarih-filtre" class="form-input" style="width:140px;margin:0" oninput="randevulariYukle()">
+        </div>
+        <div id="panel-randevular-liste"><div style="color:#aaa;font-size:.82rem">Randevu yok.</div></div>
+      </div>
+
     </div>
     <div class="bottom-nav" id="panel-nav"></div>
   </div>

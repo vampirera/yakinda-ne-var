@@ -33,6 +33,11 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
 .sepet-btn.gizli{opacity:0.4;pointer-events:none}
 .yukleniyor{text-align:center;padding:40px;color:#aaa}
 .hata{text-align:center;padding:40px;color:#e53935}
+.slot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.slot-btn{background:#fff;border:1.5px solid #e0e0e0;border-radius:10px;padding:10px 6px;font-size:.82rem;font-weight:700;cursor:pointer;text-align:center;transition:.15s}
+.slot-btn.secili{background:#ff6b35;color:#fff;border-color:#ff6b35}
+.slot-btn.dolu{background:#f5f5f5;color:#ccc;cursor:default;text-decoration:line-through}
+.randevu-panel{background:#fff;border-radius:16px;padding:16px;margin-top:10px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
 </style>
 </head>
 <body>
@@ -52,14 +57,45 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
       <span class="open-badge" id="esnaf-durum">🟢 Acik</span>
     </div>
     <div class="action-btns">
-      <button class="btn-primary secili" id="btn-kurye" onclick="teslimatSec('kurye')">🛵 Siparis Ver</button>
+      <button class="btn-primary secili" id="btn-kurye" onclick="moduSec('siparis')">🛵 Siparis Ver</button>
+      <button class="btn-secondary" id="btn-randevu" onclick="moduSec('randevu')" style="display:none">📅 Randevu Al</button>
       <button class="btn-secondary" id="btn-gelal" onclick="teslimatSec('gel-al')">🚶 Gel-Al</button>
     </div>
   </div>
 
   <div class="content">
-    <div class="section-title">Menu</div>
-    <div id="urun-listesi"><div class="yukleniyor">⏳ Yukleniyor...</div></div>
+    <!-- SİPARİŞ MODU -->
+    <div id="siparis-modu">
+      <div class="section-title">Menu</div>
+      <div id="urun-listesi"><div class="yukleniyor">⏳ Yukleniyor...</div></div>
+    </div>
+
+    <!-- RANDEVU MODU -->
+    <div id="randevu-modu" style="display:none">
+      <div class="section-title">Randevu Al</div>
+      <div class="randevu-panel">
+        <div style="margin-bottom:10px">
+          <label style="font-size:.78rem;color:#666;font-weight:700;display:block;margin-bottom:4px">Hizmet Seçin</label>
+          <select id="randevu-hizmet" class="menu-item" style="width:100%;padding:10px;font-size:.88rem;border:1.5px solid #e0e0e0;border-radius:10px" onchange="slotlarYukle()">
+            <option value="">-- Hizmet seçin --</option>
+          </select>
+        </div>
+        <div style="margin-bottom:10px">
+          <label style="font-size:.78rem;color:#666;font-weight:700;display:block;margin-bottom:4px">Tarih</label>
+          <input type="date" id="randevu-tarih" style="width:100%;padding:10px;font-size:.88rem;border:1.5px solid #e0e0e0;border-radius:10px" oninput="slotlarYukle()">
+        </div>
+        <div id="slot-bolum" style="display:none">
+          <label style="font-size:.78rem;color:#666;font-weight:700;display:block;margin-bottom:4px">Saat Seçin</label>
+          <div class="slot-grid" id="slot-grid"></div>
+        </div>
+        <div id="randevu-form" style="display:none;margin-top:10px">
+          <input type="text" id="randevu-ad" placeholder="Adınız Soyadınız *" style="width:100%;padding:10px;font-size:.88rem;border:1.5px solid #e0e0e0;border-radius:10px;margin-bottom:8px">
+          <input type="tel" id="randevu-tel" placeholder="Telefon numaranız * (WhatsApp)" style="width:100%;padding:10px;font-size:.88rem;border:1.5px solid #e0e0e0;border-radius:10px;margin-bottom:8px">
+          <textarea id="randevu-not" placeholder="Not (opsiyonel)" style="width:100%;padding:10px;font-size:.82rem;border:1.5px solid #e0e0e0;border-radius:10px;resize:none;height:60px;margin-bottom:10px"></textarea>
+          <button onclick="randevuOlustur()" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:12px;padding:14px;font-weight:700;font-size:.95rem;cursor:pointer">📅 Randevu Onayla</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="sepet-bar">
@@ -92,6 +128,8 @@ async function esnafYukle() {
   }
 }
 
+let secilenSlot = null;
+
 function sayfayiDoldur() {
   document.getElementById('hero-icon').textContent = ikonlar[esnaf.kategori] || '🏪';
   document.getElementById('esnaf-adi').textContent = esnaf.ad;
@@ -100,6 +138,16 @@ function sayfayiDoldur() {
   document.getElementById('esnaf-urun-sayi').textContent = esnaf.urunler.length + ' urun';
   document.getElementById('esnaf-durum').textContent = esnaf.acik ? '🟢 Acik' : '🔴 Kapali';
   document.title = esnaf.ad;
+
+  // Randevu modu aktifse butonu göster
+  if (esnaf.randevu_modu) {
+    document.getElementById('btn-randevu').style.display = '';
+    // Minimum tarih: bugün
+    var bugun = new Date().toISOString().split('T')[0];
+    document.getElementById('randevu-tarih').min = bugun;
+    document.getElementById('randevu-tarih').value = bugun;
+    hizmetleriCek();
+  }
 
   document.getElementById('urun-listesi').innerHTML = esnaf.urunler.map(u => `
     <div class="menu-item">
@@ -113,6 +161,127 @@ function sayfayiDoldur() {
       </div>
     </div>
   `).join('');
+}
+
+function moduSec(mod) {
+  var siparisEl = document.getElementById('siparis-modu');
+  var randevuEl = document.getElementById('randevu-modu');
+  var sepetBar = document.querySelector('.sepet-bar');
+  if (mod === 'randevu') {
+    siparisEl.style.display = 'none';
+    randevuEl.style.display = '';
+    sepetBar.style.display = 'none';
+    document.getElementById('btn-kurye').classList.remove('secili');
+    document.getElementById('btn-randevu').classList.add('secili', 'btn-primary');
+    document.getElementById('btn-randevu').classList.remove('btn-secondary');
+  } else {
+    siparisEl.style.display = '';
+    randevuEl.style.display = 'none';
+    sepetBar.style.display = '';
+    document.getElementById('btn-kurye').classList.add('secili');
+    document.getElementById('btn-randevu').classList.remove('secili', 'btn-primary');
+    document.getElementById('btn-randevu').classList.add('btn-secondary');
+    teslimatSec('kurye');
+  }
+}
+
+async function hizmetleriCek() {
+  try {
+    const res = await fetch(API + '/api/esnaf/' + esnafId + '/hizmetler');
+    const data = await res.json();
+    const select = document.getElementById('randevu-hizmet');
+    select.innerHTML = '<option value="">-- Hizmet seçin (opsiyonel) --</option>';
+    (data.veri || []).forEach(function(h) {
+      var opt = document.createElement('option');
+      opt.value = h.id;
+      opt.textContent = h.ad + ' · ' + h.sure + ' dk' + (h.fiyat > 0 ? ' · ₺' + h.fiyat : '');
+      select.appendChild(opt);
+    });
+    slotlarYukle();
+  } catch(e) {}
+}
+
+async function slotlarYukle() {
+  var tarih = document.getElementById('randevu-tarih').value;
+  var hizmetId = document.getElementById('randevu-hizmet').value;
+  if (!tarih) return;
+  secilenSlot = null;
+  document.getElementById('randevu-form').style.display = 'none';
+
+  var url = API + '/api/esnaf/' + esnafId + '/musait-slotlar?tarih=' + tarih;
+  if (hizmetId) url += '&hizmet_id=' + hizmetId;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    var bolum = document.getElementById('slot-bolum');
+    var grid = document.getElementById('slot-grid');
+    if (!data.basari || !data.veri || !data.veri.length) {
+      bolum.style.display = '';
+      grid.innerHTML = '<div style="grid-column:1/-1;color:#aaa;text-align:center;padding:10px;font-size:.82rem">Bu tarih için müsait slot yok.</div>';
+      return;
+    }
+    bolum.style.display = '';
+    grid.innerHTML = data.veri.map(function(s) {
+      return '<button class="slot-btn ' + (s.musait ? '' : 'dolu') + '" ' +
+        (s.musait ? 'onclick="slotSec(this, \'' + s.saat + '\')"' : 'disabled') + '>' +
+        s.saat + '</button>';
+    }).join('');
+  } catch(e) {
+    document.getElementById('slot-bolum').style.display = '';
+    document.getElementById('slot-grid').innerHTML = '<div style="color:#e53935;font-size:.8rem">Bağlantı hatası.</div>';
+  }
+}
+
+function slotSec(btn, saat) {
+  document.querySelectorAll('.slot-btn').forEach(function(b) { b.classList.remove('secili'); });
+  btn.classList.add('secili');
+  secilenSlot = saat;
+  document.getElementById('randevu-form').style.display = '';
+}
+
+async function randevuOlustur() {
+  var ad = document.getElementById('randevu-ad').value.trim();
+  var tel = document.getElementById('randevu-tel').value.trim();
+  var not = document.getElementById('randevu-not').value.trim();
+  var tarih = document.getElementById('randevu-tarih').value;
+  var hizmetId = document.getElementById('randevu-hizmet').value || null;
+
+  if (!ad || !tel) { alert('Ad ve telefon zorunlu.'); return; }
+  if (!secilenSlot) { alert('Lütfen bir saat seçin.'); return; }
+
+  try {
+    const res = await fetch(API + '/api/randevu', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        esnaf_id: parseInt(esnafId),
+        musteri_ad: ad,
+        musteri_telefon: tel,
+        hizmet_id: hizmetId ? parseInt(hizmetId) : null,
+        tarih: tarih,
+        saat: secilenSlot,
+        notlar: not || null
+      })
+    });
+    const data = await res.json();
+    if (data.bekleme) {
+      alert('Bu saat dolmuş. Bekleme listesine eklendiniz!\nSlot açıldığında WhatsApp ile bildirim alacaksınız.');
+    } else if (data.basari) {
+      alert('🎉 Randevunuz oluşturuldu!\n📅 ' + tarih + ' · ' + secilenSlot + '\n📱 WhatsApp onayı gönderildi.');
+      // formu sıfırla
+      document.getElementById('randevu-ad').value = '';
+      document.getElementById('randevu-tel').value = '';
+      document.getElementById('randevu-not').value = '';
+      secilenSlot = null;
+      document.getElementById('randevu-form').style.display = 'none';
+      slotlarYukle();
+    } else {
+      alert('Hata: ' + (data.mesaj || 'Bilinmeyen hata.'));
+    }
+  } catch(e) {
+    alert('Bağlantı hatası. API çalışıyor mu?');
+  }
 }
 
 function sepeteEkle(id, ad, fiyat) {
