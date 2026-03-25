@@ -251,6 +251,30 @@ firebase.initializeApp({
           <button class="yorum-gonder" id="yorum-gonder-btn">Yorum Gonder</button>
         </div>
       </div>
+      <div id="tab-randevu" style="display:none;padding:14px">
+        <div style="background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 8px rgba(0,0,0,.07)">
+          <div style="margin-bottom:10px">
+            <label style="font-size:.78rem;color:#666;font-weight:700;display:block;margin-bottom:4px">Hizmet Seçin</label>
+            <select id="det-randevu-hizmet" style="width:100%;padding:10px;font-size:.88rem;border:1.5px solid #e0e0e0;border-radius:10px;background:#fff" onchange="detSlotlarYukle()">
+              <option value="">-- Hizmet seçin (opsiyonel) --</option>
+            </select>
+          </div>
+          <div style="margin-bottom:10px">
+            <label style="font-size:.78rem;color:#666;font-weight:700;display:block;margin-bottom:4px">Tarih</label>
+            <input type="date" id="det-randevu-tarih" style="width:100%;padding:10px;font-size:.88rem;border:1.5px solid #e0e0e0;border-radius:10px" oninput="detSlotlarYukle()">
+          </div>
+          <div id="det-slot-bolum" style="display:none">
+            <label style="font-size:.78rem;color:#666;font-weight:700;display:block;margin-bottom:6px">Saat Seçin</label>
+            <div id="det-slot-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px"></div>
+          </div>
+          <div id="det-randevu-form" style="display:none">
+            <input type="text" id="det-randevu-ad" placeholder="Adınız Soyadınız *" style="width:100%;padding:10px;font-size:.88rem;border:1.5px solid #e0e0e0;border-radius:10px;margin-bottom:8px">
+            <input type="tel" id="det-randevu-tel" placeholder="Telefon (WhatsApp) *" style="width:100%;padding:10px;font-size:.88rem;border:1.5px solid #e0e0e0;border-radius:10px;margin-bottom:8px">
+            <textarea id="det-randevu-not" placeholder="Not (opsiyonel)" style="width:100%;padding:10px;font-size:.82rem;border:1.5px solid #e0e0e0;border-radius:10px;resize:none;height:60px;margin-bottom:10px"></textarea>
+            <button onclick="detRandevuOlustur()" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:12px;padding:14px;font-weight:700;font-size:.95rem;cursor:pointer">📅 Randevu Onayla</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="sepet-bar">
       <button class="sepet-btn gizli" id="sepet-btn">
