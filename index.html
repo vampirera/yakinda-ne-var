@@ -497,11 +497,12 @@ firebase.initializeApp({
         <div style="font-weight:800;font-size:1rem">Admin Panel</div>
         <button id="admin-cikis" style="background:#ffebee;color:#c62828;border:none;border-radius:8px;padding:5px 10px;font-size:.75rem;font-weight:700;cursor:pointer">Çıkış</button>
       </div>
-      <div style="display:flex;gap:5px;padding:8px 0 4px">
-        <button class="admin-sekme aktif-sekme" data-sekme="esnaflar" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.7rem;font-weight:700;cursor:pointer;background:#1a1a2e;color:#fff">🏪 Esnaflar</button>
-        <button class="admin-sekme" data-sekme="kuryeler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.7rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444">🛵 Kuryeler</button>
-        <button class="admin-sekme" data-sekme="musteriler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.7rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444">👤 Müşteriler</button>
-        <button class="admin-sekme" data-sekme="siparisler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.7rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444">📦 Siparişler</button>
+      <div style="display:flex;gap:4px;padding:8px 0 4px;overflow-x:auto">
+        <button class="admin-sekme" data-sekme="ozet" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.68rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444;white-space:nowrap;min-width:52px">📊 Özet</button>
+        <button class="admin-sekme aktif-sekme" data-sekme="esnaflar" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.68rem;font-weight:700;cursor:pointer;background:#1a1a2e;color:#fff;white-space:nowrap;min-width:52px">🏪 Esnaflar</button>
+        <button class="admin-sekme" data-sekme="kuryeler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.68rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444;white-space:nowrap;min-width:52px">🛵 Kuryeler</button>
+        <button class="admin-sekme" data-sekme="musteriler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.68rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444;white-space:nowrap;min-width:52px">👤 Müşteriler</button>
+        <button class="admin-sekme" data-sekme="siparisler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.68rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444;white-space:nowrap;min-width:52px">📦 Siparişler</button>
       </div>
     </div>
     <div style="padding:16px" id="admin-icerik"><div class="yukleniyor"></div></div>

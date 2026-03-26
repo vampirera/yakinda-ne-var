@@ -1986,7 +1986,7 @@ function musteriKayitGonder() {
     });
 }
 
-var adminAktifSekme = 'esnaflar';
+var adminAktifSekme = 'ozet';
 
 function adminGoster(sekme) {
   var oturum = oturumAl(); var key = (oturum && oturum.sifre) ? oturum.sifre : prompt('Admin sifresi:');
@@ -2005,11 +2005,38 @@ function adminSekmeGuncelle(aktif) {
   });
 }
 
+function _adminOzetKart(ikon, baslik, ana, alt, renk) {
+  return '<div style="background:#fff;border-radius:12px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.06);border-left:4px solid ' + renk + '">' +
+    '<div style="font-size:1.4rem;margin-bottom:4px">' + ikon + '</div>' +
+    '<div style="font-size:.72rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.04em">' + baslik + '</div>' +
+    '<div style="font-size:1.1rem;font-weight:800;color:#1a1a2e;margin-top:2px">' + ana + '</div>' +
+    (alt ? '<div style="font-size:.72rem;color:#aaa;margin-top:2px">' + alt + '</div>' : '') +
+  '</div>';
+}
+
 function adminVerileriYukle(key, sekme) {
   var icerik = document.getElementById('admin-icerik');
   icerik.innerHTML = '<div class="yukleniyor"></div>';
 
-  if (sekme === 'esnaflar') {
+  if (sekme === 'ozet') {
+    fetch(API_URL + '/api/admin/ozet?key=' + key).then(function(r) { return r.json(); })
+    .then(function(result) {
+      if (!result.basari) { icerik.innerHTML = '<div class="hata">Yetkisiz erişim.</div>'; return; }
+      var v = result.veri;
+      icerik.innerHTML =
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">' +
+          _adminOzetKart('🏪', 'Esnaf', v.esnaf_aktif + ' aktif', v.esnaf_bekleyen + ' bekliyor', '#1a1a2e') +
+          _adminOzetKart('🛵', 'Kurye', v.kurye_aktif + ' aktif', v.kurye_bekleyen + ' bekliyor', '#6a1b9a') +
+          _adminOzetKart('👤', 'Müşteri', v.musteri + ' kayıtlı', '', '#1565c0') +
+          _adminOzetKart('📦', 'Bugün Sipariş', v.siparis_bugun + ' sipariş', 'Bu ay: ' + v.siparis_ay, '#e65100') +
+          _adminOzetKart('💰', 'Bu Ay Ciro', '₺' + Math.round(v.ciro_ay), 'Toplam: ₺' + Math.round(v.ciro_toplam), '#2e7d32') +
+        '</div>' +
+        (v.esnaf_bekleyen > 0
+          ? '<div style="background:#fff3e0;border-radius:10px;padding:12px;text-align:center"><span style="font-weight:700;color:#e65100">⚠️ ' + v.esnaf_bekleyen + ' esnaf onay bekliyor!</span><button onclick="adminVerileriYukle(oturumAl().sifre,\'esnaflar\')" style="display:block;margin:8px auto 0;background:#e65100;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:.8rem;font-weight:700;cursor:pointer">Esnafları Gör</button></div>'
+          : '');
+    }).catch(function() { icerik.innerHTML = '<div class="hata">Bağlanamadı.</div>'; });
+
+  } else if (sekme === 'esnaflar') {
     Promise.all([
       fetch(API_URL + '/api/admin/bekleyenler?key=' + key).then(function(r) { return r.json(); }),
       fetch(API_URL + '/api/admin/aktifler?key='    + key).then(function(r) { return r.json(); })
@@ -3159,7 +3186,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (e.target === this) adminModalKapat();
   });
   document.getElementById('admin-cikis').addEventListener('click', function() {
-    adminAktifSekme = 'esnaflar';
+    adminAktifSekme = 'ozet';
     cikisYap();
   });
   document.querySelectorAll('.admin-sekme').forEach(function(btn) {

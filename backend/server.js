@@ -279,6 +279,33 @@ app.post('/api/esnaf-kayit', upload.fields([{name:'vergi_levhasi',maxCount:1},{n
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
+app.get('/api/admin/ozet', async function(req, res) {
+  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  try {
+    var [esnafOnay, esnafAktif, kuryeOnay, kuryeToplam, musteriSayi, siparisBugun, siparisAy, siparisTopTutar] = await Promise.all([
+      pool.query("SELECT COUNT(*) FROM esnaflar WHERE onaylandi=false"),
+      pool.query("SELECT COUNT(*) FROM esnaflar WHERE onaylandi=true"),
+      pool.query("SELECT COUNT(*) FROM kuryeler WHERE onaylandi=false"),
+      pool.query("SELECT COUNT(*) FROM kuryeler WHERE onaylandi=true"),
+      pool.query("SELECT COUNT(*) FROM kullanicilar WHERE tip='musteri'"),
+      pool.query("SELECT COUNT(*) FROM siparisler WHERE durum != 'iptal' AND tarih >= CURRENT_DATE"),
+      pool.query("SELECT COUNT(*), COALESCE(SUM(genel_toplam),0) AS tutar FROM siparisler WHERE durum != 'iptal' AND tarih >= date_trunc('month', NOW())"),
+      pool.query("SELECT COALESCE(SUM(genel_toplam),0) AS tutar FROM siparisler WHERE durum != 'iptal'")
+    ]);
+    res.json({ basari: true, veri: {
+      esnaf_bekleyen: parseInt(esnafOnay.rows[0].count),
+      esnaf_aktif: parseInt(esnafAktif.rows[0].count),
+      kurye_bekleyen: parseInt(kuryeOnay.rows[0].count),
+      kurye_aktif: parseInt(kuryeToplam.rows[0].count),
+      musteri: parseInt(musteriSayi.rows[0].count),
+      siparis_bugun: parseInt(siparisBugun.rows[0].count),
+      siparis_ay: parseInt(siparisAy.rows[0].count),
+      ciro_ay: parseFloat(siparisAy.rows[0].tutar),
+      ciro_toplam: parseFloat(siparisTopTutar.rows[0].tutar)
+    }});
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
 app.get('/api/admin/bekleyenler', async function(req, res) {
   if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
   try {
