@@ -735,7 +735,7 @@ function favorilerSayfasiGoster() {
     listesi.innerHTML = '<div class="yukleniyor">Henuz favori esnaf eklemediniz.</div>';
     return;
   }
-  listesi.innerHTML = '<div class="yukleniyor">Yukleniyor...</div>';
+  listesi.innerHTML = '<div class="yukleniyor"></div>';
   var params = new URLSearchParams();
   if (durum.lat) { params.append('lat', durum.lat); params.append('lng', durum.lng); }
   fetch(API_URL + '/api/esnaflar?' + params.toString())
@@ -1279,7 +1279,7 @@ function esnaflarYukle() {
     return;
   }
 
-  listesi.innerHTML = '<div class="yukleniyor">Yukleniyor...</div>';
+  listesi.innerHTML = '<div class="yukleniyor"></div>';
 
   var params = new URLSearchParams();
   if (durum.lat)      { params.append('lat', durum.lat); params.append('lng', durum.lng); }
@@ -1407,8 +1407,8 @@ function esnafDetay(id) {
   fetch(API_URL + '/api/esnaflar/' + id + '/goruntuleme', { method: 'PUT' }).catch(function(){});
   durum.sepet = [];
   durum.secilenEsnaf = null;
-  document.getElementById('detay-adi').textContent = 'Yukleniyor...';
-  document.getElementById('tab-menu').innerHTML = '<div class="yukleniyor">Yukleniyor...</div>';
+  document.getElementById('detay-adi').textContent = '';
+  document.getElementById('tab-menu').innerHTML = '<div class="yukleniyor"></div>';
   sepetGuncelle();
 
   var params = durum.lat ? '?lat=' + durum.lat + '&lng=' + durum.lng : '';
@@ -2007,7 +2007,7 @@ function adminSekmeGuncelle(aktif) {
 
 function adminVerileriYukle(key, sekme) {
   var icerik = document.getElementById('admin-icerik');
-  icerik.innerHTML = '<div class="yukleniyor">Yukleniyor...</div>';
+  icerik.innerHTML = '<div class="yukleniyor"></div>';
 
   if (sekme === 'esnaflar') {
     Promise.all([
@@ -2510,7 +2510,7 @@ function panelYukle() {
   var esnafId = durum.panelEsnafId;
   if (!esnafId) return;
   var con = document.getElementById('panel-siparisler');
-  con.innerHTML = '<div class="yukleniyor">Yukleniyor...</div>';
+  con.innerHTML = '<div class="yukleniyor"></div>';
   fetch(API_URL + '/api/siparisler?esnaf_id=' + esnafId)
     .then(function(r) { return r.json(); })
     .then(function(data) {

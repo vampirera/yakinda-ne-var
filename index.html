@@ -126,6 +126,8 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
 .nav-item.active{color:#ff6b35}
 .nav-icon{font-size:1.2rem}
 .yukleniyor{text-align:center;padding:30px;color:#aaa;font-size:.88rem}
+.yukleniyor::before{content:'';display:block;width:32px;height:32px;margin:0 auto 10px;border:3px solid #f0f0f0;border-top-color:#ff6b35;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .hata{text-align:center;padding:30px;color:#e53935;font-size:.88rem}
 .s-title{font-weight:800;font-size:.85rem;color:#888;text-transform:uppercase;letter-spacing:.05em;margin:10px 0 7px;display:flex;justify-content:space-between;align-items:center}
 .add-btn-small{background:#ff6b35;color:#fff;border:none;border-radius:18px;padding:4px 10px;font-size:.73rem;font-weight:700;cursor:pointer}
@@ -217,7 +219,7 @@ firebase.initializeApp({
     <div class="mesafe-filtre-row" id="mesafe-filtre-row"></div>
     <div class="content">
       <div class="section-title">🔥 Yakin Esnaflar</div>
-      <div class="esnaf-grid" id="esnaf-listesi"><div class="yukleniyor">Yukleniyor...</div></div>
+      <div class="esnaf-grid" id="esnaf-listesi"><div class="yukleniyor"></div></div>
     </div>
     <div class="bottom-nav" id="ana-nav"></div>
   </div>
@@ -502,7 +504,7 @@ firebase.initializeApp({
         <button class="admin-sekme" data-sekme="siparisler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.7rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444">📦 Siparişler</button>
       </div>
     </div>
-    <div style="padding:16px" id="admin-icerik"><div class="yukleniyor">Yukleniyor...</div></div>
+    <div style="padding:16px" id="admin-icerik"><div class="yukleniyor"></div></div>
   </div>
 
   <!-- ADMİN MODAL -->
@@ -611,7 +613,7 @@ firebase.initializeApp({
         <span>📦 Siparisler</span>
         <button class="add-btn-small" onclick="panelYukle()">Yenile</button>
       </div>
-      <div id="panel-siparisler"><div class="yukleniyor">Yukleniyor...</div></div>
+      <div id="panel-siparisler"><div class="yukleniyor"></div></div>
       <div class="s-title" style="margin-top:16px">
         <span>🛍️ Urunlerim</span>
         <button class="add-btn-small" id="urun-ekle-btn">+ Ekle</button>
@@ -808,7 +810,7 @@ firebase.initializeApp({
       </div>
     </div>
     <div class="content" id="siparislerim-icerik">
-      <div class="yukleniyor">Yukleniyor...</div>
+      <div class="yukleniyor"></div>
     </div>
     <div class="bottom-nav" id="siparislerim-nav"></div>
   </div>
