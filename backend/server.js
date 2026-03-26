@@ -554,6 +554,35 @@ app.post('/api/kurye-kabul', async function(req, res) {
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
+// Kuryenin üstlendiği aktif siparişleri listele
+app.get('/api/kurye-siparislerim', async function(req, res) {
+  try {
+    var telefon = req.query.telefon;
+    if (!telefon) return res.status(400).json({ basari: false, mesaj: 'Telefon gerekli' });
+    var kuryeRes = await pool.query('SELECT id, ilce FROM kuryeler WHERE telefon=$1 AND onaylandi=true', [telefon]);
+    if (!kuryeRes.rows.length) return res.json({ basari: false, mesaj: 'Onaylı kurye bulunamadı' });
+    var kurye = kuryeRes.rows[0];
+    var aktif = await pool.query(
+      "SELECT s.*, e.ad as esnaf_adi, e.adres as esnaf_adres, e.telefon as esnaf_telefon FROM siparisler s LEFT JOIN esnaflar e ON e.id=s.esnaf_id WHERE s.kurye_id=$1 AND s.durum NOT IN ('teslim_edildi','iptal') ORDER BY s.tarih DESC",
+      [kurye.id]
+    );
+    res.json({ basari: true, veri: aktif.rows, kurye_ilce: kurye.ilce });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Kuryenin bölgesindeki henüz alınmamış siparişler
+app.get('/api/kurye-bekleyen', async function(req, res) {
+  try {
+    var ilce = req.query.ilce;
+    if (!ilce) return res.json({ basari: true, veri: [] });
+    var result = await pool.query(
+      "SELECT s.*, e.ad as esnaf_adi, e.ilce as esnaf_ilce, e.adres as esnaf_adres FROM siparisler s LEFT JOIN esnaflar e ON e.id=s.esnaf_id WHERE s.teslimat_turu='kurye' AND s.kurye_id IS NULL AND s.durum='bekliyor' AND LOWER(e.ilce)=LOWER($1) ORDER BY s.tarih DESC",
+      [ilce]
+    );
+    res.json({ basari: true, veri: result.rows });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
 app.get('/api/siparis-detay/:id', async function(req, res) {
   try {
     var result = await pool.query(

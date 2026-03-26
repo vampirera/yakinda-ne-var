@@ -159,10 +159,16 @@ function profilSayfasiGoster() {
       onayEl.style.background = '#e8f5e9';
       onayEl.style.color      = '#2e7d32';
       onayEl.textContent      = '✅ Hesabınız onaylı — aktif olarak teslimat yapabilirsiniz.';
+      document.getElementById('kurye-bekleyen-wrap').style.display = '';
+      document.getElementById('kurye-aktif-wrap').style.display = '';
+      kuryeAktifSiparisleriYukle();
+      kuryeBekleyenleriYukle();
     } else {
       onayEl.style.background = '#fff8e1';
       onayEl.style.color      = '#f57f17';
       onayEl.textContent      = '⏳ Başvurunuz inceleniyor. Onaylandığında bildirim alacaksınız.';
+      document.getElementById('kurye-bekleyen-wrap').style.display = 'none';
+      document.getElementById('kurye-aktif-wrap').style.display = 'none';
     }
   } else {
     musteriEl.style.display = 'block';
@@ -2887,6 +2893,102 @@ function panelRandevuIptal(randevuId) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ durum: 'iptal' })
   }).then(function() { randevulariYukle(); });
+}
+
+// =============================================================
+// KURYE PANELİ
+// =============================================================
+
+function kuryeAktifSiparisleriYukle() {
+  var oturum = oturumYukle();
+  if (!oturum || oturum.tip !== 'kurye') return;
+  var con = document.getElementById('kurye-aktif-liste');
+  fetch(API_URL + '/api/kurye-siparislerim?telefon=' + encodeURIComponent(oturum.telefon))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.basari || !data.veri.length) {
+        con.innerHTML = '<div style="color:#aaa;font-size:.82rem">Aktif sipariş yok.</div>';
+        return;
+      }
+      var durumMetin = { bekliyor: 'Bekliyor', hazirlaniyor: 'Hazırlanıyor', kurye_atandi: 'Atandı', yolda: 'Yolda', teslim_edildi: 'Teslim Edildi', iptal: 'İptal' };
+      var durumRenk  = { bekliyor: '#e65100', hazirlaniyor: '#1565c0', kurye_atandi: '#6a1b9a', yolda: '#0277bd', teslim_edildi: '#2e7d32', iptal: '#c62828' };
+      con.innerHTML = data.veri.map(function(s) {
+        var urunler = Array.isArray(s.urunler) ? s.urunler.map(function(u) { return u.ad + ' x' + u.adet; }).join(', ') : '';
+        return '<div style="border:1.5px solid #f0f0f0;border-radius:10px;padding:10px;margin-bottom:8px">' +
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">' +
+            '<div>' +
+              '<div style="font-weight:700;font-size:.84rem">' + (s.esnaf_adi || '') + '</div>' +
+              '<div style="font-size:.72rem;color:#888">' + (s.esnaf_adres || '') + '</div>' +
+              '<div style="font-size:.72rem;color:#888;margin-top:2px">Müşteri: ' + (s.musteri_telefon || '') + '</div>' +
+              '<div style="font-size:.72rem;color:#666;margin-top:2px">' + urunler + '</div>' +
+            '</div>' +
+            '<span style="font-size:.7rem;font-weight:700;color:' + (durumRenk[s.durum] || '#888') + ';white-space:nowrap;margin-left:6px">' + (durumMetin[s.durum] || s.durum) + '</span>' +
+          '</div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:center">' +
+            '<span style="font-weight:800;font-size:.9rem;color:#ff6b35">₺' + parseFloat(s.genel_toplam || 0).toFixed(2) + '</span>' +
+            (s.durum !== 'teslim_edildi' && s.durum !== 'iptal'
+              ? '<button onclick="kuryeTeslimEt(' + s.id + ')" style="background:#e8f5e9;color:#2e7d32;border:none;border-radius:8px;padding:6px 12px;font-size:.75rem;font-weight:700;cursor:pointer">Teslim Ettim</button>'
+              : '') +
+          '</div>' +
+        '</div>';
+      }).join('');
+    });
+}
+
+function kuryeBekleyenleriYukle() {
+  var oturum = oturumYukle();
+  if (!oturum || oturum.tip !== 'kurye') return;
+  var ilce = oturum.ilce || '';
+  var con = document.getElementById('kurye-bekleyen-liste');
+  fetch(API_URL + '/api/kurye-bekleyen?ilce=' + encodeURIComponent(ilce))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.basari || !data.veri.length) {
+        con.innerHTML = '<div style="color:#aaa;font-size:.82rem">Bölgenizde bekleyen sipariş yok.</div>';
+        return;
+      }
+      con.innerHTML = data.veri.map(function(s) {
+        var urunler = Array.isArray(s.urunler) ? s.urunler.map(function(u) { return u.ad + ' x' + u.adet; }).join(', ') : '';
+        return '<div style="border:1.5px solid #ffe0b2;border-radius:10px;padding:10px;margin-bottom:8px;background:#fffde7">' +
+          '<div style="font-weight:700;font-size:.84rem;margin-bottom:4px">' + (s.esnaf_adi || '') + ' · ' + (s.esnaf_ilce || '') + '</div>' +
+          '<div style="font-size:.72rem;color:#888;margin-bottom:4px">' + urunler + '</div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:center">' +
+            '<span style="font-weight:800;font-size:.9rem;color:#ff6b35">₺' + parseFloat(s.genel_toplam || 0).toFixed(2) + '</span>' +
+            '<button onclick="kuryeSiparisKabul(' + s.id + ')" style="background:#ff6b35;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:.75rem;font-weight:700;cursor:pointer">Kabul Et</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    });
+}
+
+function kuryeSiparisKabul(siparisId) {
+  var oturum = oturumYukle();
+  if (!oturum) return;
+  fetch(API_URL + '/api/kurye-kabul', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kurye_telefon: oturum.telefon, siparis_id: siparisId })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.basari) {
+        kuryeBekleyenleriYukle();
+        kuryeAktifSiparisleriYukle();
+      } else {
+        alert(data.mesaj || 'Sipariş alınamadı.');
+      }
+    });
+}
+
+function kuryeTeslimEt(siparisId) {
+  if (!confirm('Siparişi teslim ettiğinizi onaylıyor musunuz?')) return;
+  fetch(API_URL + '/api/siparisler/' + siparisId + '/durum', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ durum: 'teslim_edildi' })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function() { kuryeAktifSiparisleriYukle(); });
 }
 
 // =============================================================

@@ -765,6 +765,25 @@ firebase.initializeApp({
           <input type="text" id="kurye-profil-arac" class="form-input" readonly style="background:#f5f5f5;color:#888">
           <div id="kurye-onay-durumu" style="margin-top:10px;padding:10px;border-radius:10px;text-align:center;font-weight:700;font-size:.85rem"></div>
         </div>
+
+        <!-- Bölgedeki bekleyen siparişler -->
+        <div id="kurye-bekleyen-wrap" style="display:none;background:#fff;border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-weight:800;font-size:.82rem;color:#e65100;letter-spacing:.5px">🆕 BÖLGEMDEKİ SİPARİŞLER</div>
+            <button onclick="kuryeBekleyenleriYukle()" style="background:#fff3e0;color:#e65100;border:none;border-radius:8px;padding:4px 10px;font-size:.72rem;font-weight:700;cursor:pointer">↻ Yenile</button>
+          </div>
+          <div id="kurye-bekleyen-liste"><div style="color:#aaa;font-size:.82rem">Bölgenizde bekleyen sipariş yok.</div></div>
+        </div>
+
+        <!-- Aktif siparişlerim -->
+        <div id="kurye-aktif-wrap" style="display:none;background:#fff;border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-weight:800;font-size:.82rem;color:#1a1a2e;letter-spacing:.5px">🛵 AKTİF SİPARİŞLERİM</div>
+            <button onclick="kuryeAktifSiparisleriYukle()" style="background:#f5f5f5;color:#666;border:none;border-radius:8px;padding:4px 10px;font-size:.72rem;font-weight:700;cursor:pointer">↻ Yenile</button>
+          </div>
+          <div id="kurye-aktif-liste"><div style="color:#aaa;font-size:.82rem">Aktif sipariş yok.</div></div>
+        </div>
+
         <button id="profil-kurye-cikis" style="width:100%;background:#fff;color:#c62828;border:2px solid #ffcdd2;border-radius:14px;padding:12px;font-weight:700;font-size:.9rem;cursor:pointer;margin-bottom:16px">Hesaptan Çık</button>
       </div>
     </div>
