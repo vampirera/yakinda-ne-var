@@ -87,6 +87,7 @@ var durum = {
   kayitLng: null,
   anaHaritaTamEkran: false,
   anaMarkers: [],
+  anaClusterGroup: null,
   kamuMarkersAna: [],
   profilHarita: null,
   profilHaritaMarker: null
@@ -1166,20 +1167,61 @@ function markerlariTemizle(liste) {
   liste.length = 0;
 }
 
+var _kategoriRenk = { yemek: '#ff6b35', urun: '#1565c0', hizmet: '#6a1b9a', saglik: '#c62828', egitim: '#2e7d32' };
+var _kategoriIkon = { yemek: '🍽️', urun: '🛍️', hizmet: '🔧', saglik: '🏥', egitim: '🎓' };
+
+function _esnafIkon(kategori, acik) {
+  var renk = _kategoriRenk[kategori] || '#555';
+  var ikon = _kategoriIkon[kategori] || '🏪';
+  var opasite = (acik === false) ? '0.5' : '1';
+  return L.divIcon({
+    className: '',
+    html: '<div style="width:32px;height:32px;background:' + renk + ';border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);opacity:' + opasite + ';display:flex;align-items:center;justify-content:center">' +
+            '<span style="transform:rotate(45deg);font-size:14px;line-height:1">' + ikon + '</span>' +
+          '</div>',
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32]
+  });
+}
+
 function haritaMarkerlariGuncelle(esnaflar) {
   markerlariTemizle(durum.anaMarkers);
+  if (durum.anaClusterGroup) {
+    durum.anaHarita.removeLayer(durum.anaClusterGroup);
+  }
+  if (!durum.anaHarita) return;
+
+  var useCluster = typeof L.markerClusterGroup === 'function';
+  var group = useCluster
+    ? L.markerClusterGroup({ maxClusterRadius: 50, showCoverageOnHover: false, zoomToBoundsOnClick: true })
+    : null;
 
   esnaflar.forEach(function(e) {
     if (!e.lat || !e.lng) return;
     var lat = parseFloat(e.lat), lng = parseFloat(e.lng);
-    var popup = '<b>' + e.ad + '</b>' + (e.mesafe_text ? '<br>' + e.mesafe_text : '');
-
-    if (durum.anaHarita) {
-      var m = L.marker([lat, lng]).addTo(durum.anaHarita).bindPopup(popup);
-      m.on('click', function() { esnafDetay(e.id); });
+    var fiyatStr = (e.urunler && e.urunler.length)
+      ? '₺' + Math.min.apply(null, e.urunler.map(function(u) { return u.fiyat || 0; })) + '\'den başlayan'
+      : '';
+    var popup = '<div style="min-width:140px">' +
+      '<b style="font-size:.9rem">' + e.ad + '</b>' +
+      (e.mesafe_text ? '<br><span style="color:#888;font-size:.75rem">📍 ' + e.mesafe_text + '</span>' : '') +
+      (fiyatStr ? '<br><span style="color:#ff6b35;font-size:.75rem">' + fiyatStr + '</span>' : '') +
+      '<br><button onclick="esnafDetay(' + e.id + ')" style="margin-top:6px;background:#ff6b35;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:.75rem;cursor:pointer;width:100%">Detayı Gör</button>' +
+      '</div>';
+    var m = L.marker([lat, lng], { icon: _esnafIkon(e.kategori, e.acik) }).bindPopup(popup);
+    if (useCluster) {
+      group.addLayer(m);
+    } else {
+      m.addTo(durum.anaHarita);
       durum.anaMarkers.push(m);
     }
   });
+
+  if (useCluster) {
+    durum.anaHarita.addLayer(group);
+    durum.anaClusterGroup = group;
+  }
 }
 
 // =============================================================
