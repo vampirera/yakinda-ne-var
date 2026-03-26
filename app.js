@@ -20,6 +20,21 @@ if ('serviceWorker' in navigator) {
 
 var API_URL = 'https://yakinda-ne-var-backend-production.up.railway.app';
 
+function bildirim(mesaj, tip) {
+  tip = tip || 'bilgi';
+  var container = document.getElementById('bildirim-toast');
+  if (!container) return;
+  var el = document.createElement('div');
+  el.className = 'bildirim-item ' + tip;
+  el.textContent = mesaj;
+  container.appendChild(el);
+  requestAnimationFrame(function() { el.classList.add('goster'); });
+  setTimeout(function() {
+    el.classList.remove('goster');
+    setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 350);
+  }, 3000);
+}
+
 var VAPID_KEY = 'BMShtgCFEigjmfHuq6ijOmO2vVBhTkACupg9FXi8k7W88ute3JuwbGnAuuJ4-WzZaBVYK2IIFu_9B5TYDAlFNWI';
 
 function bildirimIzniAl() {
@@ -289,7 +304,7 @@ function odemeToggle() {
 function profilFormuBaslat() {
   document.getElementById('profil-kaydet').addEventListener('click', function() {
     var isim = document.getElementById('profil-isim').value.trim();
-    if (!isim) { alert('Ad Soyad zorunludur.'); return; }
+    if (!isim) { bildirim('Ad Soyad zorunludur.', 'uyari'); return; }
     var mevcutProfil = profilYukle() || {};
 
     // Eğer adres alanında yazı varsa ve "+ Ekle" butonuna basılmamışsa otomatik ekle
@@ -314,14 +329,14 @@ function profilFormuBaslat() {
     profilKaydet(kaydedilecek);
     profilBackendSync(kaydedilecek);
     document.getElementById('profil-hosgeldin').textContent = 'Merhaba, ' + isim + '!';
-    alert('Profil kaydedildi!');
+    bildirim('Profil kaydedildi!', 'basari');
     sayfaGoster('ana');
   });
 
   document.getElementById('adres-ekle-btn').addEventListener('click', function() {
     var adres  = document.getElementById('yeni-adres-input').value.trim();
     var baslik = document.getElementById('yeni-adres-baslik').value.trim() || 'Adres';
-    if (!adres) { alert('Adres boş olamaz.'); return; }
+    if (!adres) { bildirim('Adres boş olamaz.', 'uyari'); return; }
     var lat = document.getElementById('profil-lat').value;
     var lng = document.getElementById('profil-lng').value;
     var profil = profilYukle() || {};
@@ -345,7 +360,7 @@ function profilFormuBaslat() {
 
   document.getElementById('profil-konum-al').addEventListener('click', function() {
     var btn = document.getElementById('profil-konum-al');
-    if (!navigator.geolocation) { alert('Konum desteklenmiyor.'); return; }
+    if (!navigator.geolocation) { bildirim('Konum desteklenmiyor.', 'uyari'); return; }
     btn.textContent = '📍 Konum aliniyor...';
     btn.disabled = true;
     navigator.geolocation.getCurrentPosition(function(pos) {
@@ -388,7 +403,7 @@ function profilFormuBaslat() {
       btn.textContent = '✅ Konum Alındı';
       btn.disabled = false;
     }, function() {
-      alert('Konum alınamadı. Lütfen izin verin.');
+      bildirim('Konum alınamadı. Lütfen izin verin.', 'uyari');
       btn.textContent = '📍 Konum Al';
       btn.disabled = false;
     });
@@ -534,10 +549,10 @@ function siparisIptal(id) {
       if (data.basari) {
         siparislerListele();
       } else {
-        alert(data.mesaj);
+        bildirim(data.mesaj, 'hata');
       }
     })
-    .catch(function() { alert('Bağlantı hatası.'); });
+    .catch(function() { bildirim('Bağlantı hatası.', 'hata'); });
 }
 
 function siparisGecmisKart(s) {
@@ -676,9 +691,9 @@ function musteriRandevuIptal(randevuId) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.basari) siparislerListele();
-      else alert(data.mesaj || 'İptal edilemedi.');
+      else bildirim(data.mesaj || 'İptal edilemedi.', 'hata');
     })
-    .catch(function() { alert('Bağlantı hatası.'); });
+    .catch(function() { bildirim('Bağlantı hatası.', 'hata'); });
 }
 
 // =============================================================
@@ -1582,8 +1597,8 @@ function detRandevuOlustur() {
   var tarih = document.getElementById('det-randevu-tarih').value;
   var hizmetId = document.getElementById('det-randevu-hizmet').value || null;
 
-  if (!ad || !tel) { alert('Ad ve telefon zorunlu.'); return; }
-  if (!_detSecilenSlot) { alert('Lütfen bir saat seçin.'); return; }
+  if (!ad || !tel) { bildirim('Ad ve telefon zorunlu.', 'uyari'); return; }
+  if (!_detSecilenSlot) { bildirim('Lütfen bir saat seçin.', 'uyari'); return; }
 
   fetch(API_URL + '/api/randevu', {
     method: 'POST',
@@ -1601,9 +1616,9 @@ function detRandevuOlustur() {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.bekleme) {
-        alert('Bu saat dolmuş. Bekleme listesine eklendiniz!\nSlot açıldığında WhatsApp ile bildirim alacaksınız.');
+        bildirim('Bu saat dolmuş. Bekleme listesine eklendiniz! Slot açıldığında WhatsApp ile bildirim alacaksınız.', 'uyari');
       } else if (data.basari) {
-        alert('🎉 Randevunuz oluşturuldu!\n📅 ' + tarih + ' · ' + _detSecilenSlot + '\n📱 WhatsApp onayı gönderildi.');
+        bildirim('Randevunuz oluşturuldu! ' + tarih + ' · ' + _detSecilenSlot + ' — WhatsApp onayı gönderildi.', 'basari');
         document.getElementById('det-randevu-ad').value = '';
         document.getElementById('det-randevu-tel').value = '';
         document.getElementById('det-randevu-not').value = '';
@@ -1612,10 +1627,10 @@ function detRandevuOlustur() {
         // Anında slot grid'ini güncelle (başka müşteri aynı saati seçemesin)
         detSlotlarYukle();
       } else {
-        alert('Hata: ' + (data.mesaj || 'Bilinmeyen hata.'));
+        bildirim('Hata: ' + (data.mesaj || 'Bilinmeyen hata.'), 'hata');
       }
     })
-    .catch(function() { alert('Bağlantı hatası.'); });
+    .catch(function() { bildirim('Bağlantı hatası.', 'hata'); });
 }
 
 function menuGoster(urunler) {
@@ -1692,7 +1707,7 @@ function siparisVer() {
   if (!durum.sepet.length || !durum.secilenEsnaf) return;
   var profil = profilYukle();
   if (!profil || !profil.telefon) {
-    alert('Siparis vermek icin once profilinize telefon numarasi ekleyin.');
+    bildirim('Sipariş vermek için önce profilinize telefon numarası ekleyin.', 'uyari');
     profilSayfasiGoster();
     return;
   }
@@ -1727,9 +1742,9 @@ function siparisVer() {
         durum.sepet = [];
         sepetGuncelle();
         siparislerimSayfasiAc(data.veri.id);
-      } else { alert('Hata: ' + data.mesaj); }
+      } else { bildirim('Hata: ' + data.mesaj, 'hata'); }
     })
-    .catch(function() { alert('Siparis gonderilemedi.'); });
+    .catch(function() { bildirim('Sipariş gönderilemedi.', 'hata'); });
 }
 
 // =============================================================
@@ -1741,7 +1756,7 @@ function yorumGonder() {
   var kullanici = document.getElementById('yorum-kullanici').value.trim();
   var yorum     = document.getElementById('yorum-metin').value.trim();
   if (!kullanici || !yorum || !durum.secilenPuan) {
-    alert('Lutfen tum alanlari doldurun ve puan verin.'); return;
+    bildirim('Lütfen tüm alanları doldurun ve puan verin.', 'uyari'); return;
   }
   fetch(API_URL + '/api/esnaflar/' + durum.secilenEsnaf.id + '/yorumlar', {
     method: 'POST',
@@ -1751,14 +1766,14 @@ function yorumGonder() {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.basari) {
-        alert('Yorumunuz eklendi!');
+        bildirim('Yorumunuz eklendi!', 'basari');
         document.getElementById('yorum-kullanici').value = '';
         document.getElementById('yorum-metin').value = '';
         fcSil('esnaflar:');
         esnafDetay(durum.secilenEsnaf.id);
-      } else { alert('Hata: ' + data.mesaj); }
+      } else { bildirim('Hata: ' + data.mesaj, 'hata'); }
     })
-    .catch(function() { alert('Yorum gonderilemedi.'); });
+    .catch(function() { bildirim('Yorum gönderilemedi.', 'hata'); });
 }
 
 // =============================================================
@@ -1793,7 +1808,7 @@ function kayitFormuBaslat() {
   var konumAlBtn = document.getElementById('konum-al-kayit');
   if (konumAlBtn) {
     konumAlBtn.addEventListener('click', function() {
-      if (!navigator.geolocation) { alert('Konum desteklenmiyor.'); return; }
+      if (!navigator.geolocation) { bildirim('Konum desteklenmiyor.', 'uyari'); return; }
       navigator.geolocation.getCurrentPosition(function(pos) {
         durum.kayitLat = pos.coords.latitude;
         durum.kayitLng = pos.coords.longitude;
@@ -2204,12 +2219,12 @@ function adminEsnafKaydet(id, key) {
     telefon:  document.getElementById('esnaf-edit-telefon').value.trim(),
     adres:    document.getElementById('esnaf-edit-adres').value.trim()
   };
-  if (!body.ad || !body.telefon) { alert('Ad ve telefon zorunlu.'); return; }
+  if (!body.ad || !body.telefon) { bildirim('Ad ve telefon zorunlu.', 'uyari'); return; }
   fetch(API_URL + '/api/admin/esnaf/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   .then(function(r) { return r.json(); })
   .then(function(res) {
     if (res.basari) { adminModalKapat(); adminGoster('esnaflar'); }
-    else alert(res.mesaj);
+    else bildirim(res.mesaj, 'hata');
   });
 }
 
@@ -2280,7 +2295,7 @@ function adminMusteriSil(id, key) {
   .then(function(r) { return r.json(); })
   .then(function(res) {
     if (res.basari) { adminModalKapat(); adminGoster('musteriler'); }
-    else alert(res.mesaj);
+    else bildirim(res.mesaj, 'hata');
   });
 }
 
@@ -2336,7 +2351,7 @@ function adminSiparisGuncelle(id, key) {
   }).then(function(r) { return r.json(); })
   .then(function(res) {
     if (res.basari) { adminModalKapat(); adminGoster('siparisler'); }
-    else alert(res.mesaj);
+    else bildirim(res.mesaj, 'hata');
   });
 }
 
@@ -2346,10 +2361,10 @@ function kuryeIslem(tip, id, key) {
   if (tip === 'onayla') istek = fetch(API_URL + '/api/admin/kurye-onayla/' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) });
   else if (tip === 'sil') istek = fetch(API_URL + '/api/admin/kurye-sil/' + id + '?key=' + key, { method: 'DELETE' });
   istek.then(function(r) { return r.json(); }).then(function(data) {
-    if (!data.basari) { alert('Hata: ' + data.mesaj); return; }
+    if (!data.basari) { bildirim('Hata: ' + data.mesaj, 'hata'); return; }
     adminModalKapat();
     adminGoster('kuryeler');
-  }).catch(function() { alert('Bağlantı hatası.'); });
+  }).catch(function() { bildirim('Bağlantı hatası.', 'hata'); });
 }
 
 function adminIslem(tip, id, key) {
@@ -2364,11 +2379,11 @@ function adminIslem(tip, id, key) {
   else if (tip === 'sil')    istek = fetch(API_URL + '/api/admin/sil/'    + id + '?key=' + key, { method: 'DELETE' });
 
   istek.then(function(r) { return r.json(); }).then(function(data) {
-    if (!data.basari) { alert('Hata: ' + data.mesaj); return; }
+    if (!data.basari) { bildirim('Hata: ' + data.mesaj, 'hata'); return; }
     adminModalKapat();
     fcSil('esnaflar'); // frontend önbelleği temizle
     adminGoster('esnaflar');
-  }).catch(function() { alert('Bağlantı hatası.'); });
+  }).catch(function() { bildirim('Bağlantı hatası.', 'hata'); });
 }
 
 // =============================================================
@@ -2403,7 +2418,7 @@ function girisYap(telefon, sifre, btn, callback) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (btn) { btn.disabled = false; btn.textContent = orijinalMetin; }
-      if (!data.basari) { alert(data.mesaj); return; }
+      if (!data.basari) { bildirim(data.mesaj, 'hata'); return; }
       data.veri.sifre = sifre; oturumKaydet(data.veri);
       oturumaGoreNavGuncelle();
       bildirimIzniAl();
@@ -2420,7 +2435,7 @@ function girisYap(telefon, sifre, btn, callback) {
     })
     .catch(function() {
       if (btn) { btn.disabled = false; btn.textContent = orijinalMetin; }
-      alert('Bağlantı hatası.');
+      bildirim('Bağlantı hatası.', 'hata');
     });
 }
 
@@ -2445,7 +2460,7 @@ function panelEsnafAl() {
 function panelGirisYap() {
   var telefon = document.getElementById('panel-giris-telefon').value.trim();
   var sifre   = document.getElementById('panel-giris-sifre').value.trim();
-  if (!telefon || !sifre) { alert('Telefon ve şifre zorunlu.'); return; }
+  if (!telefon || !sifre) { bildirim('Telefon ve şifre zorunlu.', 'uyari'); return; }
   var btn = document.getElementById('panel-giris-btn');
   girisYap(telefon, sifre, btn, function(kullanici) {
     if (kullanici.tip === 'admin') {
@@ -2619,14 +2634,14 @@ function panelProfilFormYukle(esnafId) {
 
 function panelProfilKaydet() {
   var esnafId = durum.panelEsnafId;
-  if (!esnafId) { alert('Esnaf ID bulunamadi.'); return; }
+  if (!esnafId) { bildirim('Esnaf ID bulunamadı.', 'uyari'); return; }
   var ad       = document.getElementById('panel-profil-ad').value.trim();
   var telefon  = document.getElementById('panel-profil-telefon').value.trim();
   var adres    = document.getElementById('panel-profil-adres').value.trim();
   var kategori = document.getElementById('panel-profil-kategori').value;
   var instagram_url   = document.getElementById('panel-profil-instagram').value.trim();
   var google_maps_url = document.getElementById('panel-profil-gmaps').value.trim();
-  if (!ad || !telefon) { alert('Ad ve telefon zorunludur.'); return; }
+  if (!ad || !telefon) { bildirim('Ad ve telefon zorunludur.', 'uyari'); return; }
   fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/profil', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -2634,9 +2649,9 @@ function panelProfilKaydet() {
   })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      alert(data.mesaj || (data.basari ? 'Profil kaydedildi.' : 'Hata olustu.'));
+      bildirim(data.mesaj || (data.basari ? 'Profil kaydedildi.' : 'Hata oluştu.'), data.basari ? 'basari' : 'hata');
     })
-    .catch(function() { alert('Baglanamadi.'); });
+    .catch(function() { bildirim('Bağlanamadı.', 'hata'); });
 }
 
 function calismaSaatleriYukle(esnafId) {
@@ -2667,7 +2682,7 @@ function saatKapaliToggle(gun) {
 
 function calismaSaatleriKaydet() {
   var esnafId = durum.panelEsnafId;
-  if (!esnafId) { alert('Once Esnaf ID girin.'); return; }
+  if (!esnafId) { bildirim('Önce Esnaf ID girin.', 'uyari'); return; }
   var saatler = {};
   GUNLER.forEach(function(gun) {
     saatler[gun] = {
@@ -2683,9 +2698,9 @@ function calismaSaatleriKaydet() {
   })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      alert(data.mesaj || (data.basari ? 'Kaydedildi.' : 'Hata.'));
+      bildirim(data.mesaj || (data.basari ? 'Kaydedildi.' : 'Hata.'), data.basari ? 'basari' : 'hata');
     })
-    .catch(function() { alert('Baglanamadi.'); });
+    .catch(function() { bildirim('Bağlanamadı.', 'hata'); });
 }
 
 function kampanyalariYukle(esnafId) {
@@ -2712,12 +2727,12 @@ function kampanyalariYukle(esnafId) {
 
 function kampanyaEkle() {
   var esnafId = durum.panelEsnafId;
-  if (!esnafId) { alert('Once Esnaf ID yukleyin.'); return; }
+  if (!esnafId) { bildirim('Önce Esnaf ID yükleyin.', 'uyari'); return; }
   var baslik = document.getElementById('kamp-baslik').value.trim();
   var aciklama = document.getElementById('kamp-aciklama').value.trim();
   var oran = document.getElementById('kamp-oran').value;
   var bitis = document.getElementById('kamp-bitis').value;
-  if (!baslik) { alert('Baslik zorunlu.'); return; }
+  if (!baslik) { bildirim('Başlık zorunlu.', 'uyari'); return; }
   fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/kampanya', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -2725,14 +2740,14 @@ function kampanyaEkle() {
   })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (!data.basari) { alert(data.mesaj); return; }
+      if (!data.basari) { bildirim(data.mesaj, 'hata'); return; }
       document.getElementById('kamp-baslik').value = '';
       document.getElementById('kamp-aciklama').value = '';
       document.getElementById('kamp-oran').value = '';
       document.getElementById('kamp-bitis').value = '';
       kampanyalariYukle(esnafId);
     })
-    .catch(function() { alert('Baglanamadi.'); });
+    .catch(function() { bildirim('Bağlanamadı.', 'hata'); });
 }
 
 function kampanyaSil(esnafId, kampanyaId) {
@@ -2741,7 +2756,7 @@ function kampanyaSil(esnafId, kampanyaId) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.basari) kampanyalariYukle(esnafId);
-      else alert(data.mesaj);
+      else bildirim(data.mesaj, 'hata');
     });
 }
 
@@ -2795,7 +2810,7 @@ function randevuAyarKaydet() {
     body: JSON.stringify({ randevu_modu: modu, slot_suresi: sure })
   })
     .then(function(r) { return r.json(); })
-    .then(function(data) { alert(data.mesaj || (data.basari ? 'Kaydedildi.' : 'Hata.')); });
+    .then(function(data) { bildirim(data.mesaj || (data.basari ? 'Kaydedildi.' : 'Hata.'), data.basari ? 'basari' : 'hata'); });
 }
 
 function hizmetleriYukle(esnafId) {
@@ -2821,7 +2836,7 @@ function hizmetEkle() {
   var esnafId = durum.panelEsnafId;
   if (!esnafId) return;
   var ad = document.getElementById('hiz-ad').value.trim();
-  if (!ad) { alert('Hizmet adı zorunlu.'); return; }
+  if (!ad) { bildirim('Hizmet adı zorunlu.', 'uyari'); return; }
   var sure = parseInt(document.getElementById('hiz-sure').value) || 30;
   var fiyat = parseFloat(document.getElementById('hiz-fiyat').value) || 0;
   fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/hizmet', {
@@ -2831,7 +2846,7 @@ function hizmetEkle() {
   })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (!data.basari) { alert(data.mesaj); return; }
+      if (!data.basari) { bildirim(data.mesaj, 'hata'); return; }
       document.getElementById('hiz-ad').value = '';
       document.getElementById('hiz-sure').value = '30';
       document.getElementById('hiz-fiyat').value = '';
@@ -2843,7 +2858,7 @@ function hizmetSil(esnafId, hizmetId) {
   if (!confirm('Hizmet silinecek. Emin misiniz?')) return;
   fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/hizmet/' + hizmetId, { method: 'DELETE' })
     .then(function(r) { return r.json(); })
-    .then(function(data) { if (data.basari) hizmetleriYukle(esnafId); else alert(data.mesaj); });
+    .then(function(data) { if (data.basari) hizmetleriYukle(esnafId); else bildirim(data.mesaj, 'hata'); });
 }
 
 function randevulariYukle() {
@@ -2975,7 +2990,7 @@ function kuryeSiparisKabul(siparisId) {
         kuryeBekleyenleriYukle();
         kuryeAktifSiparisleriYukle();
       } else {
-        alert(data.mesaj || 'Sipariş alınamadı.');
+        bildirim(data.mesaj || 'Sipariş alınamadı.', 'hata');
       }
     });
 }
@@ -3073,7 +3088,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if (secimGirisBtn) secimGirisBtn.addEventListener('click', function() {
     var tel  = document.getElementById('kayit-secim-telefon').value.trim();
     var sif  = document.getElementById('kayit-secim-sifre').value.trim();
-    if (!tel || !sif) { alert('Telefon ve şifre zorunlu.'); return; }
+    if (!tel || !sif) { bildirim('Telefon ve şifre zorunlu.', 'uyari'); return; }
     girisYap(tel, sif, secimGirisBtn, function(k) {
       if (k.tip === 'admin') { adminGoster(); } else { sayfaGoster('ana'); }
     });
