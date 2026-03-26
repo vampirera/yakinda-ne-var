@@ -2521,28 +2521,44 @@ function panelYukle() {
       document.getElementById('panel-toplam').textContent = '₺' + Math.round(toplam);
 
       if (!siparisler.length) { con.innerHTML = '<div class="yukleniyor">Henuz siparis yok.</div>'; return; }
-      con.innerHTML = siparisler.slice(0, 20).map(function(s) {
+      var durumMetin = { bekliyor: 'Bekliyor', hazirlaniyor: 'Hazırlanıyor', kurye_atandi: 'Kurye Atandı', yolda: 'Yolda', teslim_edildi: 'Teslim Edildi', tamamlandi: 'Tamamlandı', iptal: 'İptal' };
+      var durumRenk  = { bekliyor: '#e65100', hazirlaniyor: '#1565c0', kurye_atandi: '#6a1b9a', yolda: '#0277bd', teslim_edildi: '#2e7d32', tamamlandi: '#388e3c', iptal: '#c62828' };
+      con.innerHTML = siparisler.slice(0, 30).map(function(s) {
         var urunler = Array.isArray(s.urunler) ? s.urunler :
           (typeof s.urunler === 'string' ? JSON.parse(s.urunler) : []);
         var urunText = urunler.map(function(u) { return u.ad + ' x' + u.adet; }).join(', ');
+        var sonDurum = s.durum === 'tamamlandi' || s.durum === 'teslim_edildi' || s.durum === 'iptal';
+        var sonrakiButon = '';
+        if (!sonDurum) {
+          if (s.durum === 'bekliyor') {
+            sonrakiButon = '<button class="btn-accept" style="background:#1565c0" onclick="panelSiparisDurum(' + s.id + ',\'hazirlaniyor\')">Hazırlanıyor</button>';
+          } else if (s.durum === 'hazirlaniyor') {
+            if (s.teslimat_turu === 'kurye') {
+              sonrakiButon = '<button class="btn-accept" style="background:#0277bd" onclick="panelSiparisDurum(' + s.id + ',\'yolda\')">Yola Çıktı</button>';
+            } else {
+              sonrakiButon = '<button class="btn-accept" onclick="panelSiparisDurum(' + s.id + ',\'tamamlandi\')">Tamamlandı</button>';
+            }
+          } else if (s.durum === 'yolda' || s.durum === 'kurye_atandi') {
+            sonrakiButon = '<button class="btn-accept" onclick="panelSiparisDurum(' + s.id + ',\'tamamlandi\')">Tamamlandı</button>';
+          }
+        }
         return '<div class="order-card">' +
           '<div class="order-header">' +
             '<span class="order-id">#' + s.id + '</span>' +
-            '<span class="order-badge ' + (s.durum === 'tamamlandi' ? 'badge-done' : 'badge-new') + '">' + s.durum + '</span>' +
+            '<span class="order-badge" style="background:' + (durumRenk[s.durum] || '#888') + ';color:#fff;border-radius:6px;padding:2px 7px;font-size:.68rem;font-weight:700">' + (durumMetin[s.durum] || s.durum) + '</span>' +
           '</div>' +
           '<div class="order-items">' + urunText +
-            '<br><small>' + (s.teslimat_turu || '') + (s.adres ? ' — ' + s.adres : '') + '</small>' +
+            '<br><small>' + (s.teslimat_turu === 'kurye' ? '🛵 Kurye' : '🚶 Gel-Al') + (s.adres ? ' — ' + s.adres : '') + '</small>' +
           '</div>' +
           '<div class="order-footer">' +
             '<span class="order-price">₺' + (parseFloat(s.genel_toplam) || 0) + '</span>' +
-            (s.durum !== 'tamamlandi'
-              ? '<button class="btn-accept" onclick="siparisKabul(' + s.id + ')">Tamamlandi</button>'
-              : '') +
+            sonrakiButon +
           '</div></div>';
       }).join('');
     })
     .catch(function() { con.innerHTML = '<div class="hata">Baglanamadi.</div>'; });
 
+  panelUrunleriYukle(esnafId);
   calismaSaatleriYukle(esnafId);
   kampanyalariYukle(esnafId);
   panelIstatistikYukle();
@@ -2703,6 +2719,77 @@ function calismaSaatleriKaydet() {
     .catch(function() { bildirim('Bağlanamadı.', 'hata'); });
 }
 
+// Ürün Yönetimi
+function panelUrunleriYukle(esnafId) {
+  var con = document.getElementById('panel-urunler');
+  con.innerHTML = '<div class="yukleniyor"></div>';
+  fetch(API_URL + '/api/esnaflar/' + esnafId)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.basari) { con.innerHTML = '<div class="hata">Yüklenemedi.</div>'; return; }
+      var urunler = data.veri.urunler || [];
+      if (!urunler.length) { con.innerHTML = '<div style="color:#aaa;font-size:.82rem;padding:6px 0">Henüz ürün eklenmemiş.</div>'; return; }
+      con.innerHTML = urunler.map(function(u) {
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0">' +
+          '<div style="flex:1">' +
+            '<div style="font-size:.84rem;font-weight:700">' + u.ad + '</div>' +
+            (u.aciklama ? '<div style="font-size:.72rem;color:#888">' + u.aciklama + '</div>' : '') +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+            '<span style="font-weight:800;color:#ff6b35;font-size:.88rem">₺' + parseFloat(u.fiyat || 0).toFixed(2) + '</span>' +
+            '<button onclick="urunSil(' + esnafId + ',' + u.id + ')" style="background:#ffebee;color:#c62828;border:none;border-radius:6px;padding:4px 8px;font-size:.72rem;cursor:pointer">Sil</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    });
+}
+
+function urunFormAc() {
+  document.getElementById('urun-ekle-form').style.display = '';
+  document.getElementById('urun-ekle-btn').style.display = 'none';
+  document.getElementById('urun-ad').focus();
+}
+
+function urunFormKapat() {
+  document.getElementById('urun-ekle-form').style.display = 'none';
+  document.getElementById('urun-ekle-btn').style.display = '';
+  document.getElementById('urun-ad').value = '';
+  document.getElementById('urun-fiyat').value = '';
+  document.getElementById('urun-aciklama').value = '';
+}
+
+function urunEkle() {
+  var esnafId = durum.panelEsnafId;
+  if (!esnafId) return;
+  var ad = document.getElementById('urun-ad').value.trim();
+  var fiyat = document.getElementById('urun-fiyat').value;
+  var aciklama = document.getElementById('urun-aciklama').value.trim();
+  if (!ad) { bildirim('Ürün adı zorunlu.', 'uyari'); return; }
+  fetch(API_URL + '/api/esnaflar/' + esnafId + '/urunler', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ad: ad, fiyat: fiyat, aciklama: aciklama })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.basari) { bildirim(data.mesaj, 'hata'); return; }
+      bildirim('Ürün eklendi!', 'basari');
+      urunFormKapat();
+      panelUrunleriYukle(esnafId);
+    })
+    .catch(function() { bildirim('Bağlanamadı.', 'hata'); });
+}
+
+function urunSil(esnafId, urunId) {
+  if (!confirm('Ürün silinecek. Emin misiniz?')) return;
+  fetch(API_URL + '/api/esnaflar/' + esnafId + '/urunler/' + urunId, { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.basari) { bildirim('Ürün silindi.', 'basari'); panelUrunleriYukle(esnafId); }
+      else bildirim(data.mesaj, 'hata');
+    });
+}
+
 function kampanyalariYukle(esnafId) {
   fetch(API_URL + '/api/esnaflar/' + esnafId)
     .then(function(r) { return r.json(); })
@@ -2761,11 +2848,17 @@ function kampanyaSil(esnafId, kampanyaId) {
 }
 
 function siparisKabul(id) {
+  panelSiparisDurum(id, 'tamamlandi');
+}
+
+function panelSiparisDurum(id, yeniDurum) {
   fetch(API_URL + '/api/siparisler/' + id + '/durum', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ durum: 'tamamlandi' })
-  }).then(function() { panelYukle(); });
+    body: JSON.stringify({ durum: yeniDurum })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function() { panelYukle(); });
 }
 
 // =============================================================
@@ -3079,6 +3172,7 @@ document.addEventListener('DOMContentLoaded', function() {
       adminVerileriYukle(key, adminAktifSekme);
     });
   });
+  document.getElementById('urun-ekle-btn').addEventListener('click', urunFormAc);
   document.getElementById('siparislerim-geri').addEventListener('click', function() { sayfaGoster('ana'); });
   document.getElementById('kayit-geri').addEventListener('click', function() { sayfaGoster('kayit-secim'); });
   document.getElementById('kurye-kayit-gonder').addEventListener('click', kuryeKayitGonder);

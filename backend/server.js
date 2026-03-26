@@ -435,8 +435,33 @@ app.delete('/api/admin/musteri/:id', async function(req, res) {
 
 app.post('/api/esnaflar/:id/urunler', async function(req, res) {
   try {
-    var result = await pool.query('INSERT INTO urunler (esnaf_id,ad,fiyat,aciklama) VALUES ($1,$2,$3,$4) RETURNING *', [req.params.id, req.body.ad, parseFloat(req.body.fiyat), req.body.aciklama||'']);
+    var { ad, fiyat, aciklama } = req.body;
+    if (!ad) return res.status(400).json({ basari: false, mesaj: 'Ürün adı zorunlu' });
+    var result = await pool.query('INSERT INTO urunler (esnaf_id,ad,fiyat,aciklama) VALUES ($1,$2,$3,$4) RETURNING *', [req.params.id, ad, parseFloat(fiyat) || 0, aciklama || '']);
+    cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, veri: result.rows[0] });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+app.put('/api/esnaflar/:id/urunler/:urun_id', async function(req, res) {
+  try {
+    var { ad, fiyat, aciklama } = req.body;
+    if (!ad) return res.status(400).json({ basari: false, mesaj: 'Ürün adı zorunlu' });
+    var result = await pool.query(
+      'UPDATE urunler SET ad=$1, fiyat=$2, aciklama=$3 WHERE id=$4 AND esnaf_id=$5 RETURNING *',
+      [ad, parseFloat(fiyat) || 0, aciklama || '', req.params.urun_id, req.params.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ basari: false, mesaj: 'Ürün bulunamadı' });
+    cacheSil('esnaf_detay:' + req.params.id);
+    res.json({ basari: true, veri: result.rows[0] });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+app.delete('/api/esnaflar/:id/urunler/:urun_id', async function(req, res) {
+  try {
+    await pool.query('DELETE FROM urunler WHERE id=$1 AND esnaf_id=$2', [req.params.urun_id, req.params.id]);
+    cacheSil('esnaf_detay:' + req.params.id);
+    res.json({ basari: true, mesaj: 'Ürün silindi' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
