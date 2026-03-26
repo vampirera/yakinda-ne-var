@@ -630,7 +630,31 @@ app.get('/api/siparisler', async function(req, res) {
 
 app.put('/api/siparisler/:id/durum', async function(req, res) {
   try {
-    await pool.query('UPDATE siparisler SET durum=$1 WHERE id=$2', [req.body.durum, req.params.id]);
+    var yeniDurum = req.body.durum;
+    var sipRes = await pool.query(
+      'SELECT s.*, k.ad as kurye_ad, k.telefon as kurye_tel FROM siparisler s LEFT JOIN kuryeler k ON k.id=s.kurye_id WHERE s.id=$1',
+      [req.params.id]
+    );
+    if (!sipRes.rows.length) return res.status(404).json({ basari: false, mesaj: 'Siparis bulunamadi' });
+    var s = sipRes.rows[0];
+
+    await pool.query('UPDATE siparisler SET durum=$1 WHERE id=$2', [yeniDurum, req.params.id]);
+
+    // Müşteri ve esnafa durum bildirimi
+    var musteriNo = (s.musteri_telefon || '').replace(/\D/g, '');
+    if (musteriNo.startsWith('0')) musteriNo = '90' + musteriNo.slice(1);
+
+    var durumMesajlari = {
+      hazirlaniyor: '🍳 Siparişiniz hazırlanıyor! ' + s.esnaf_adi + ' siparişinizi hazırlıyor.',
+      yolda: '🛵 Siparişiniz yolda! ' + (s.kurye_ad ? s.kurye_ad + ' siparişinizi getiriyor.' : 'Kurye yola çıktı.'),
+      teslim_edildi: '✅ Siparişiniz teslim edildi! Afiyet olsun. ' + s.esnaf_adi,
+      iptal: '❌ Siparişiniz iptal edildi. Detaylar için iletişime geçin.'
+    };
+
+    if (musteriNo && durumMesajlari[yeniDurum]) {
+      whatsappGonder('+' + musteriNo, durumMesajlari[yeniDurum]).catch(function() {});
+    }
+
     res.json({ basari: true, mesaj: 'Durum guncellendi' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
