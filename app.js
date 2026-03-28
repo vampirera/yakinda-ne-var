@@ -1382,6 +1382,39 @@ function esnafKartlariOlustur(liste) {
   }).join('');
 }
 
+function oneCikanlariYukle() {
+  fetch(API_URL + '/api/one-cikanlar')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var wrap = document.getElementById('one-cikanlar-wrap');
+      if (!wrap) return;
+      if (!data.basari || !data.veri || !data.veri.length) { wrap.style.display = 'none'; return; }
+      var html = '<div style="font-size:.75rem;font-weight:800;color:#6a1b9a;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">⭐ Bu Hafta Öne Çıkanlar</div>' +
+        '<div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none">' +
+        data.veri.map(function(e) {
+          var fotoStyle = e.kapak_foto
+            ? 'background:url(' + e.kapak_foto + ') center/cover no-repeat;'
+            : 'background:linear-gradient(135deg,#6a1b9a,#ab47bc);';
+          return '<div onclick="esnafDetay(' + e.id + ')" style="min-width:130px;border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.12);cursor:pointer;flex-shrink:0">' +
+            '<div style="height:80px;' + fotoStyle + 'position:relative">' +
+              (e.one_cikan_etiket ? '<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.7));padding:4px 6px;font-size:.6rem;color:#fff;font-weight:700">' + e.one_cikan_etiket + '</div>' : '') +
+            '</div>' +
+            '<div style="padding:7px 8px;background:#fff">' +
+              '<div style="font-size:.78rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + e.ad + '</div>' +
+              '<div style="font-size:.68rem;color:#888">' + e.kategori + '</div>' +
+              '<div style="font-size:.68rem;color:#ff6b35;font-weight:700">⭐ ' + (parseFloat(e.puan)||0).toFixed(1) + '</div>' +
+            '</div>' +
+          '</div>';
+        }).join('') +
+        '</div>';
+      wrap.innerHTML = html;
+      wrap.style.display = '';
+    }).catch(function() {
+      var wrap = document.getElementById('one-cikanlar-wrap');
+      if (wrap) wrap.style.display = 'none';
+    });
+}
+
 function esnaflarGoster(liste) {
   var listesi = document.getElementById('esnaf-listesi');
   if (!liste || !liste.length) {
@@ -2271,12 +2304,18 @@ function adminEsnafDetay(id, key) {
       : '<div style="color:#aaa;font-size:.8rem">Ürün yok</div>';
 
     var html = '<h3 style="margin:0 30px 12px 0;font-size:1rem">🏪 Esnaf Detayı</h3>' +
-      '<div style="display:flex;gap:8px;margin-bottom:12px">' +
+      '<div style="display:flex;gap:8px;margin-bottom:8px">' +
         (e.onaylandi
           ? '<button onclick="adminIslem(\'pasif\',' + e.id + ',\'' + key + '\')" style="flex:1;background:#fff3e0;color:#e65100;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">Yayından Al</button>'
           : '<button onclick="adminIslem(\'onayla\',' + e.id + ',\'' + key + '\')" style="flex:1;background:#e8f5e9;color:#2e7d32;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">Onayla</button>'
         ) +
         '<button onclick="adminIslem(\'reddet\',' + e.id + ',\'' + key + '\')" style="flex:1;background:#ffebee;color:#c62828;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">Reddet/Sil</button>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;margin-bottom:12px">' +
+        (e.one_cikan
+          ? '<button onclick="adminOneCikanKaldir(' + e.id + ',\'' + key + '\')" style="flex:1;background:#e8f5e9;color:#2e7d32;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">⭐ Öne Çıkıyor — Kaldır</button>'
+          : '<button onclick="adminOneCikarModal(' + e.id + ',\'' + key + '\')" style="flex:1;background:#f3e5f5;color:#6a1b9a;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">⭐ Öne Çıkar</button>'
+        ) +
       '</div>' +
       '<div style="background:#f9f9f9;border-radius:10px;padding:12px;margin-bottom:12px">' +
         '<div style="font-size:.75rem;color:#888;margin-bottom:8px">BİLGİLER — tıklayarak düzenle</div>' +
@@ -2309,6 +2348,32 @@ function adminEsnafKaydet(id, key) {
   .then(function(res) {
     if (res.basari) { adminModalKapat(); adminGoster('esnaflar'); }
     else bildirim(res.mesaj, 'hata');
+  });
+}
+
+function adminOneCikarModal(esnafId, key) {
+  var etiket = prompt('Bu esnaf için öne çıkarma etiketi (örn: "Bu Haftanın Favorisi"):');
+  if (etiket === null) return; // iptal
+  fetch(API_URL + '/api/admin/esnaf/' + esnafId + '/one-cikan', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: key, aktif: true, etiket: etiket.trim() || null })
+  }).then(function(r) { return r.json(); })
+  .then(function(res) {
+    bildirim(res.mesaj, res.basari ? 'basari' : 'hata');
+    if (res.basari) { adminModalKapat(); adminGoster('esnaflar'); }
+  });
+}
+
+function adminOneCikanKaldir(esnafId, key) {
+  fetch(API_URL + '/api/admin/esnaf/' + esnafId + '/one-cikan', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: key, aktif: false })
+  }).then(function(r) { return r.json(); })
+  .then(function(res) {
+    bildirim(res.mesaj, res.basari ? 'basari' : 'hata');
+    if (res.basari) { adminModalKapat(); adminGoster('esnaflar'); }
   });
 }
 
@@ -3341,6 +3406,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Konum al → esnafları yükle
   konumAl();
+
+  // Öne çıkan esnafları yükle
+  oneCikanlariYukle();
 
   // Buton event'leri
   document.getElementById('sepet-btn').addEventListener('click', siparisVer);

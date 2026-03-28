@@ -112,6 +112,8 @@ async function tablolarOlustur() {
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS randevu_modu BOOLEAN DEFAULT false`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS slot_suresi INTEGER DEFAULT 30`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS indirimli_saatler JSONB DEFAULT '{}'`);
+  await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS one_cikan BOOLEAN DEFAULT false`);
+  await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS one_cikan_etiket TEXT`);
   await pool.query(`CREATE TABLE IF NOT EXISTS hizmetler (
     id SERIAL PRIMARY KEY,
     esnaf_id INTEGER REFERENCES esnaflar(id) ON DELETE CASCADE,
@@ -452,6 +454,34 @@ app.put('/api/admin/esnaf/:id', async function(req, res) {
     cacheSil('esnaf_detay:' + req.params.id);
     cacheSil('esnaflar:');
     res.json({ basari: true, mesaj: 'Esnaf guncellendi.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Admin: esnafı öne çıkar / geri al
+app.put('/api/admin/esnaf/:id/one-cikan', async function(req, res) {
+  if (req.body.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+  try {
+    var { aktif, etiket } = req.body;
+    await pool.query('UPDATE esnaflar SET one_cikan=$1, one_cikan_etiket=$2 WHERE id=$3', [!!aktif, etiket || null, req.params.id]);
+    cacheSil('esnaf_detay:' + req.params.id);
+    cacheSil('esnaflar:');
+    res.json({ basari: true, mesaj: aktif ? 'Esnaf one cikanlara eklendi.' : 'Kaldirildi.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Herkese açık: öne çıkan esnaflar
+app.get('/api/one-cikanlar', async function(req, res) {
+  try {
+    var r = await pool.query(`
+      SELECT e.id, e.ad, e.kategori, e.ilce, e.puan, e.yorum_sayisi, e.acik, e.one_cikan_etiket,
+        (SELECT COUNT(*) FROM siparisler s WHERE s.esnaf_id=e.id AND s.durum!='iptal' AND s.tarih >= date_trunc('month',NOW())) as ay_siparis_sayisi,
+        (SELECT fotograf_url FROM urunler u WHERE u.esnaf_id=e.id LIMIT 1) as kapak_foto
+      FROM esnaflar e
+      WHERE e.onaylandi=true AND e.one_cikan=true
+      ORDER BY e.puan DESC, ay_siparis_sayisi DESC
+      LIMIT 10
+    `);
+    res.json({ basari: true, veri: r.rows });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
