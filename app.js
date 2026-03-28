@@ -1617,11 +1617,12 @@ function detSlotlarYukle() {
       }
       grid.innerHTML = data.veri.map(function(s) {
         var style = s.musait
-          ? 'background:#fff;border:1.5px solid #e0e0e0;border-radius:10px;padding:10px 6px;font-size:.82rem;font-weight:700;cursor:pointer;text-align:center'
-          : 'background:#f5f5f5;border:1.5px solid #eee;border-radius:10px;padding:10px 6px;font-size:.82rem;color:#ccc;text-decoration:line-through;text-align:center';
+          ? 'background:#fff;border:1.5px solid #e0e0e0;border-radius:10px;padding:8px 6px;font-size:.82rem;font-weight:700;cursor:pointer;text-align:center;position:relative'
+          : 'background:#f5f5f5;border:1.5px solid #eee;border-radius:10px;padding:8px 6px;font-size:.82rem;color:#ccc;text-decoration:line-through;text-align:center;position:relative';
+        var indirimBadge = (s.musait && s.indirim) ? '<div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:#ff6b35;color:#fff;font-size:.6rem;font-weight:800;border-radius:4px;padding:1px 5px;white-space:nowrap">%' + s.indirim + ' İndirim</div>' : '';
         return '<button style="' + style + '" ' +
           (s.musait ? 'onclick="detSlotSec(this,\'' + s.saat + '\')"' : 'disabled') + '>' +
-          s.saat + '</button>';
+          indirimBadge + s.saat + '</button>';
       }).join('');
     }).catch(function() {
       document.getElementById('det-slot-bolum').style.display = '';
@@ -3008,7 +3009,54 @@ function panelSiparisDurum(id, yeniDurum) {
 // RANDEVU SİSTEMİ — ESNAF PANELİ
 // =============================================================
 
+// Global indirimli saatler state
+var _indirimliSaatler = {};
+
+function _indirimSaatleriniGoster() {
+  var liste = document.getElementById('indirimli-saatler-liste');
+  if (!liste) return;
+  var anahtarlar = Object.keys(_indirimliSaatler).sort(function(a, b) { return parseInt(a) - parseInt(b); });
+  if (!anahtarlar.length) {
+    liste.innerHTML = '<span style="font-size:.7rem;color:#aaa">Henüz indirim saati eklenmedi</span>';
+    return;
+  }
+  liste.innerHTML = anahtarlar.map(function(s) {
+    return '<div style="display:flex;align-items:center;gap:4px;background:#fff;border:1px solid #ffd5c2;border-radius:6px;padding:3px 8px">' +
+      '<span style="font-size:.75rem;font-weight:700">' + s + ':00</span>' +
+      '<span style="font-size:.72rem;color:#ff6b35;font-weight:800">%' + _indirimliSaatler[s] + '</span>' +
+      '<button onclick="indirimSaatSil(\'' + s + '\')" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:.8rem;padding:0 2px;line-height:1">✕</button>' +
+    '</div>';
+  }).join('');
+}
+
+function indirimSaatEkle() {
+  var saat = document.getElementById('indirim-saat').value;
+  var oran = parseInt(document.getElementById('indirim-oran').value);
+  if (!saat) { bildirim('Saat seçin.', 'uyari'); return; }
+  if (!oran || oran < 5 || oran > 50) { bildirim('İndirim %5 ile %50 arasında olmalı.', 'uyari'); return; }
+  _indirimliSaatler[saat] = oran;
+  document.getElementById('indirim-oran').value = '';
+  document.getElementById('indirim-saat').value = '';
+  _indirimSaatleriniGoster();
+}
+
+function indirimSaatSil(saat) {
+  delete _indirimliSaatler[saat];
+  _indirimSaatleriniGoster();
+}
+
 function randevuAyarlariniYukle(esnafId) {
+  // Saat seçeneklerini doldur (7-23)
+  var saatSel = document.getElementById('indirim-saat');
+  if (saatSel && saatSel.options.length <= 1) {
+    for (var s = 7; s <= 22; s++) {
+      var opt = document.createElement('option');
+      opt.value = String(s);
+      opt.textContent = (s < 10 ? '0' : '') + s + ':00';
+      saatSel.appendChild(opt);
+    }
+  }
+
   fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/randevu-ayar')
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -3024,6 +3072,8 @@ function randevuAyarlariniYukle(esnafId) {
       }
       var slotEl = document.getElementById('randevu-slot-suresi');
       if (slotEl) slotEl.value = v.slot_suresi || 30;
+      _indirimliSaatler = v.indirimli_saatler || {};
+      _indirimSaatleriniGoster();
     });
 }
 
@@ -3043,7 +3093,7 @@ function randevuAyarKaydet() {
   fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/randevu-ayar', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ randevu_modu: modu, slot_suresi: sure })
+    body: JSON.stringify({ randevu_modu: modu, slot_suresi: sure, indirimli_saatler: _indirimliSaatler })
   })
     .then(function(r) { return r.json(); })
     .then(function(data) { bildirim(data.mesaj || (data.basari ? 'Kaydedildi.' : 'Hata.'), data.basari ? 'basari' : 'hata'); });

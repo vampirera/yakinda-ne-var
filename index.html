@@ -670,11 +670,24 @@ firebase.initializeApp({
             </span>
           </label>
         </div>
-        <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
           <label style="font-size:.78rem;color:#666;white-space:nowrap">Slot süresi (dk):</label>
           <input type="number" id="randevu-slot-suresi" class="form-input" min="15" max="240" step="15" value="30" style="width:80px;margin-bottom:0">
-          <button class="btn-p" onclick="randevuAyarKaydet()" style="padding:8px 12px;font-size:.78rem">Kaydet</button>
         </div>
+        <!-- Off-peak indirim saatleri -->
+        <div style="background:#fff8f5;border:1px solid #ffd5c2;border-radius:10px;padding:10px;margin-bottom:10px">
+          <div style="font-size:.78rem;font-weight:700;color:#ff6b35;margin-bottom:6px">🏷️ Saatlik İndirim (Off-Peak)</div>
+          <div style="font-size:.7rem;color:#888;margin-bottom:8px">Az tercih edilen saatlere indirim ekleyerek doluluk oranını artırın</div>
+          <div id="indirimli-saatler-liste" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="indirim-saat" class="form-input" style="width:70px;margin:0;padding:6px 4px">
+              <option value="">Saat</option>
+            </select>
+            <input type="number" id="indirim-oran" class="form-input" placeholder="%" min="5" max="50" step="5" style="width:60px;margin:0">
+            <button class="btn-p" onclick="indirimSaatEkle()" style="padding:6px 10px;font-size:.75rem">+ Ekle</button>
+          </div>
+        </div>
+        <button class="btn-p" onclick="randevuAyarKaydet()" style="width:100%;padding:9px;font-size:.82rem">Kaydet</button>
       </div>
 
       <!-- Hizmetler -->

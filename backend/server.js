@@ -111,6 +111,7 @@ async function tablolarOlustur() {
   // ── RANDEVU SİSTEMİ ────────────────────────────────────────────
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS randevu_modu BOOLEAN DEFAULT false`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS slot_suresi INTEGER DEFAULT 30`);
+  await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS indirimli_saatler JSONB DEFAULT '{}'`);
   await pool.query(`CREATE TABLE IF NOT EXISTS hizmetler (
     id SERIAL PRIMARY KEY,
     esnaf_id INTEGER REFERENCES esnaflar(id) ON DELETE CASCADE,
@@ -1056,19 +1057,19 @@ app.put('/api/esnaf-panel/:id/calisma-saatleri', async function(req, res) {
 app.get('/api/esnaf-panel/:id/randevu-ayar', async function(req, res) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
-    var r = await pool.query('SELECT randevu_modu, slot_suresi, calisma_saatleri FROM esnaflar WHERE id=$1', [req.params.id]);
+    var r = await pool.query('SELECT randevu_modu, slot_suresi, calisma_saatleri, indirimli_saatler FROM esnaflar WHERE id=$1', [req.params.id]);
     res.json({ basari: true, veri: r.rows[0] });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
-// Randevu ayarları güncelle (modu aç/kapat, slot süresi)
+// Randevu ayarları güncelle (modu aç/kapat, slot süresi, indirimli saatler)
 app.put('/api/esnaf-panel/:id/randevu-ayar', async function(req, res) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
-    var { randevu_modu, slot_suresi } = req.body;
+    var { randevu_modu, slot_suresi, indirimli_saatler } = req.body;
     await pool.query(
-      'UPDATE esnaflar SET randevu_modu=$1, slot_suresi=$2 WHERE id=$3',
-      [!!randevu_modu, parseInt(slot_suresi) || 30, req.params.id]
+      'UPDATE esnaflar SET randevu_modu=$1, slot_suresi=$2, indirimli_saatler=$3 WHERE id=$4',
+      [!!randevu_modu, parseInt(slot_suresi) || 30, JSON.stringify(indirimli_saatler || {}), req.params.id]
     );
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Randevu ayarlari guncellendi.' });
@@ -1134,13 +1135,14 @@ app.get('/api/esnaf/:id/musait-slotlar', async function(req, res) {
     var { tarih, hizmet_id } = req.query;
     if (!tarih) return res.status(400).json({ basari: false, mesaj: 'tarih gerekli.' });
 
-    var esnaf = await pool.query('SELECT randevu_modu, slot_suresi, calisma_saatleri FROM esnaflar WHERE id=$1', [req.params.id]);
+    var esnaf = await pool.query('SELECT randevu_modu, slot_suresi, calisma_saatleri, indirimli_saatler FROM esnaflar WHERE id=$1', [req.params.id]);
     if (!esnaf.rows[0] || !esnaf.rows[0].randevu_modu) {
       return res.json({ basari: false, mesaj: 'Bu esnafta randevu sistemi aktif degil.' });
     }
 
     var slotSuresi = esnaf.rows[0].slot_suresi || 30;
     var calismaSaatleri = esnaf.rows[0].calisma_saatleri;
+    var indirimliSaatler = esnaf.rows[0].indirimli_saatler || {};
 
     // Hizmet varsa kendi süresini kullan
     if (hizmet_id) {
@@ -1193,7 +1195,9 @@ app.get('/api/esnaf/:id/musait-slotlar', async function(req, res) {
       });
 
       var saat = String(Math.floor(dk / 60)).padStart(2, '0') + ':' + String(dk % 60).padStart(2, '0');
-      slotlar.push({ saat: saat, musait: musait });
+      var saat_no = String(Math.floor(dk / 60));
+      var indirim = indirimliSaatler[saat_no] ? parseInt(indirimliSaatler[saat_no]) : 0;
+      slotlar.push({ saat: saat, musait: musait, indirim: indirim });
     }
 
     res.json({ basari: true, veri: slotlar });
@@ -1381,8 +1385,51 @@ app.put('/api/esnaf-panel/:id/randevu/:randevu_id/durum', async function(req, re
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
-tablolarOlustur().then(function() {
-  app.listen(3000, function() { console.log('API calisiyor: http://localhost:3000'); });
+// Randevu hatırlatma scheduler — her 10 dakikada bir çalışır
+async function randevuHatirlatmaCalistir() {
+  try {
+    // 1 saat sonraki randevuları bul (±10 dk pencere)
+    var r = await pool.query(`
+      SELECT rn.*, e.ad as esnaf_adi, e.telefon as esnaf_telefon
+      FROM randevular rn
+      JOIN esnaflar e ON e.id = rn.esnaf_id
+      WHERE rn.durum IN ('bekliyor','onaylandi')
+        AND rn.hatirlatma_gonderildi IS NOT TRUE
+        AND (rn.tarih + rn.saat::time) BETWEEN NOW() + INTERVAL '50 minutes' AND NOW() + INTERVAL '70 minutes'
+    `);
+    for (var randevu of r.rows) {
+      var tarihStr = new Date(randevu.tarih).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+      // Müşteriye hatırlatma
+      if (randevu.musteri_telefon) {
+        await whatsappGonder(randevu.musteri_telefon,
+          `⏰ Randevu Hatırlatması!\n\n📅 Tarih: ${tarihStr}\n🕐 Saat: ${randevu.saat}\n🏪 İşletme: ${randevu.esnaf_adi}\n\nRandevunuz 1 saat içinde! Görüşürüz 🙌`
+        ).catch(function() {});
+      }
+      // Esnafa hatırlatma
+      if (randevu.esnaf_telefon) {
+        await whatsappGonder(randevu.esnaf_telefon,
+          `📋 1 Saat Sonra Randevu!\n\n👤 Müşteri: ${randevu.musteri_ad}\n📅 ${tarihStr} - ${randevu.saat}\n💼 Hizmet: ${randevu.hizmet_id ? 'ID:' + randevu.hizmet_id : 'Genel'}`
+        ).catch(function() {});
+      }
+      // Tekrar gönderilmemesi için işaretle
+      await pool.query('UPDATE randevular SET hatirlatma_gonderildi=true WHERE id=$1', [randevu.id]);
+      console.log('Randevu hatirlatmasi gonderildi: randevu#' + randevu.id);
+    }
+  } catch (err) {
+    console.error('Randevu hatirlatma hatasi:', err.message);
+  }
+}
+
+tablolarOlustur().then(async function() {
+  // hatirlatma_gonderildi kolonu ekle (varsa hata vermez)
+  await pool.query('ALTER TABLE randevular ADD COLUMN IF NOT EXISTS hatirlatma_gonderildi BOOLEAN DEFAULT false').catch(function() {});
+  app.listen(3000, function() {
+    console.log('API calisiyor: http://localhost:3000');
+    // Randevu hatırlatıcıyı başlat (10 dk aralıkla)
+    setInterval(randevuHatirlatmaCalistir, 10 * 60 * 1000);
+    // Sunucu açılışında bir kez hemen çalıştır
+    randevuHatirlatmaCalistir();
+  });
 }).catch(function(err) {
   console.error('Veritabani hatasi:', err);
   process.exit(1);
