@@ -202,7 +202,10 @@ app.get('/api/esnaflar', async function(req, res) {
       return res.json({ basari: true, veri: esnaflar, _cache: true });
     }
 
-    var query = `SELECT e.*, json_agg(DISTINCT jsonb_build_object('id',u.id,'ad',u.ad,'fiyat',u.fiyat,'aciklama',u.aciklama,'fotograf_url',u.fotograf_url)) FILTER (WHERE u.id IS NOT NULL) as urunler FROM esnaflar e LEFT JOIN urunler u ON e.id=u.esnaf_id WHERE e.onaylandi=true`;
+    var query = `SELECT e.*,
+      (SELECT COUNT(*) FROM siparisler s WHERE s.esnaf_id=e.id AND s.durum != 'iptal' AND s.tarih >= date_trunc('month', NOW())) as ay_siparis_sayisi,
+      json_agg(DISTINCT jsonb_build_object('id',u.id,'ad',u.ad,'fiyat',u.fiyat,'aciklama',u.aciklama,'fotograf_url',u.fotograf_url)) FILTER (WHERE u.id IS NOT NULL) as urunler
+      FROM esnaflar e LEFT JOIN urunler u ON e.id=u.esnaf_id WHERE e.onaylandi=true`;
     var params = [], pi = 1;
     if (ilce) { query += ' AND LOWER(e.ilce)=$'+pi; params.push(ilce.toLowerCase()); pi++; }
     if (kategori) { query += ' AND e.kategori=$'+pi; params.push(kategori); pi++; }
@@ -944,21 +947,19 @@ app.get('/api/esnaf-panel/:id/istatistik', async function(req, res) {
   try {
     var id = req.params.id;
 
-    var haftaRes = await pool.query(
-      "SELECT COUNT(*) AS sayi, COALESCE(SUM(genel_toplam),0) AS tutar FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal' AND tarih >= date_trunc('week', NOW())",
-      [id]
-    );
-    var ayRes = await pool.query(
-      "SELECT COUNT(*) AS sayi, COALESCE(SUM(genel_toplam),0) AS tutar FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal' AND tarih >= date_trunc('month', NOW())",
-      [id]
-    );
-    var toplamRes = await pool.query(
-      "SELECT COUNT(*) AS sayi, COALESCE(SUM(genel_toplam),0) AS tutar FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal'",
-      [id]
-    );
-    var goruntulemeRes = await pool.query('SELECT COALESCE(goruntuleme_sayisi,0) AS goruntuleme FROM esnaflar WHERE id=$1', [id]);
+    var [haftaRes, ayRes, toplamRes, goruntulemeRes, saatlikRes, yediGunRes, teslimatRes, tekrarRes, tumSiparisler] = await Promise.all([
+      pool.query("SELECT COUNT(*) AS sayi, COALESCE(SUM(genel_toplam),0) AS tutar FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal' AND tarih >= date_trunc('week', NOW())", [id]),
+      pool.query("SELECT COUNT(*) AS sayi, COALESCE(SUM(genel_toplam),0) AS tutar, COALESCE(AVG(genel_toplam),0) AS ort FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal' AND tarih >= date_trunc('month', NOW())", [id]),
+      pool.query("SELECT COUNT(*) AS sayi, COALESCE(SUM(genel_toplam),0) AS tutar FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal'", [id]),
+      pool.query("SELECT COALESCE(goruntuleme_sayisi,0) AS goruntuleme FROM esnaflar WHERE id=$1", [id]),
+      pool.query("SELECT EXTRACT(HOUR FROM tarih) AS saat, COUNT(*) AS sayi FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal' AND tarih >= NOW() - INTERVAL '30 days' GROUP BY saat ORDER BY saat", [id]),
+      pool.query("SELECT DATE(tarih) AS gun, COUNT(*) AS sayi, COALESCE(SUM(genel_toplam),0) AS tutar FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal' AND tarih >= NOW() - INTERVAL '7 days' GROUP BY gun ORDER BY gun", [id]),
+      pool.query("SELECT teslimat_turu, COUNT(*) AS sayi FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal' GROUP BY teslimat_turu", [id]),
+      pool.query("SELECT COUNT(*) AS tekrar FROM (SELECT musteri_telefon FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal' AND musteri_telefon IS NOT NULL GROUP BY musteri_telefon HAVING COUNT(*) > 1) t", [id]),
+      pool.query("SELECT urunler FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal'", [id])
+    ]);
 
-    var tumSiparisler = await pool.query("SELECT urunler FROM siparisler WHERE esnaf_id=$1 AND durum != 'iptal'", [id]);
+    // En çok satanlar
     var urunSayilari = {};
     tumSiparisler.rows.forEach(function(s) {
       var urunler = Array.isArray(s.urunler) ? s.urunler : (typeof s.urunler === 'string' ? JSON.parse(s.urunler || '[]') : []);
@@ -970,16 +971,37 @@ app.get('/api/esnaf-panel/:id/istatistik', async function(req, res) {
     var enCokSatanlar = Object.keys(urunSayilari)
       .map(function(ad) { return { ad: ad, adet: urunSayilari[ad] }; })
       .sort(function(a, b) { return b.adet - a.adet; })
-      .slice(0, 3);
+      .slice(0, 5);
+
+    // Saatlik dağılım — 0-23 her saat için
+    var saatlik = Array.from({ length: 24 }, function(_, i) { return { saat: i, sayi: 0 }; });
+    saatlikRes.rows.forEach(function(r) { saatlik[parseInt(r.saat)].sayi = parseInt(r.sayi); });
+
+    // Son 7 gün — boş günleri de doldur
+    var yediGun = [];
+    for (var i = 6; i >= 0; i--) {
+      var d = new Date(); d.setDate(d.getDate() - i);
+      var key = d.toISOString().slice(0, 10);
+      var bulunan = yediGunRes.rows.find(function(r) { return r.gun && r.gun.toISOString().slice(0, 10) === key; });
+      yediGun.push({ gun: key, sayi: bulunan ? parseInt(bulunan.sayi) : 0, tutar: bulunan ? parseFloat(bulunan.tutar) : 0 });
+    }
+
+    // Teslimat türü
+    var teslimat = {};
+    teslimatRes.rows.forEach(function(r) { teslimat[r.teslimat_turu] = parseInt(r.sayi); });
 
     res.json({
       basari: true,
       veri: {
         hafta:  { sayi: parseInt(haftaRes.rows[0].sayi), tutar: parseFloat(haftaRes.rows[0].tutar) },
-        ay:     { sayi: parseInt(ayRes.rows[0].sayi),    tutar: parseFloat(ayRes.rows[0].tutar) },
+        ay:     { sayi: parseInt(ayRes.rows[0].sayi), tutar: parseFloat(ayRes.rows[0].tutar), ort_tutar: Math.round(parseFloat(ayRes.rows[0].ort)) },
         toplam: { sayi: parseInt(toplamRes.rows[0].sayi), tutar: parseFloat(toplamRes.rows[0].tutar) },
         goruntuleme: parseInt(goruntulemeRes.rows[0]?.goruntuleme || 0),
-        en_cok_satanlar: enCokSatanlar
+        en_cok_satanlar: enCokSatanlar,
+        saatlik_dagilim: saatlik,
+        yedi_gun: yediGun,
+        teslimat_dagilim: teslimat,
+        tekrar_musteri: parseInt(tekrarRes.rows[0]?.tekrar || 0)
       }
     });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }

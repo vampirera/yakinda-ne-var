@@ -1369,6 +1369,9 @@ function esnafKartlariOlustur(liste) {
           '<div class="esnaf-tags">' +
             acikDurumHtml(e) +
             '<span class="tag">' + (e.kategori || '') + '</span>' +
+            (parseInt(e.ay_siparis_sayisi) > 0
+              ? '<span class="tag" style="background:#fff3e0;color:#e65100;font-weight:700">🔥 Bu ay ' + e.ay_siparis_sayisi + ' sipariş</span>'
+              : '') +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -1493,6 +1496,17 @@ function detayDoldur(e) {
     '<div class="ulasim-btn active"><div class="u-icon">🚶</div><div class="u-sure">~10dk</div><div class="u-label">Yuruyus</div></div>' +
     '<div class="ulasim-btn"><div class="u-icon">🚗</div><div class="u-sure">~3dk</div><div class="u-label">Arac</div></div>' +
     '<button class="yol-btn" onclick="yolTarifi()">🗺 Yol Tarifi</button>';
+
+  // Sosyal kanıt bar
+  var kanit = [];
+  if (parseInt(e.ay_siparis_sayisi) > 0) kanit.push('<span style="font-size:.75rem;color:#e65100;font-weight:700">🔥 Bu ay ' + e.ay_siparis_sayisi + ' sipariş</span>');
+  if (parseInt(e.goruntuleme_sayisi) > 0) kanit.push('<span style="font-size:.75rem;color:#888">👁 ' + e.goruntuleme_sayisi + ' görüntüleme</span>');
+  if (parseInt(e.yorum_sayisi) > 0)       kanit.push('<span style="font-size:.75rem;color:#888">💬 ' + e.yorum_sayisi + ' yorum</span>');
+  var kanitEl = document.getElementById('detay-sosyal-kanit');
+  if (kanitEl) {
+    if (kanit.length) { kanitEl.innerHTML = kanit.join('<span style="color:#eee">·</span>'); kanitEl.style.display = 'flex'; }
+    else              { kanitEl.style.display = 'none'; }
+  }
 
   var sosyal = [];
   if (e.instagram_url) {
@@ -2645,37 +2659,97 @@ function panelIstatistikYukle() {
     .then(function(data) {
       if (!data.basari) return;
       var v = data.veri;
-      document.getElementById('stat-hafta-sayi').textContent  = v.hafta.sayi;
-      document.getElementById('stat-hafta-tutar').textContent = '₺' + Math.round(v.hafta.tutar);
-      document.getElementById('stat-ay-sayi').textContent     = v.ay.sayi;
-      document.getElementById('stat-ay-tutar').textContent    = '₺' + Math.round(v.ay.tutar);
-      document.getElementById('stat-toplam-sayi').textContent = v.toplam.sayi;
-      document.getElementById('stat-toplam-tutar').textContent= '₺' + Math.round(v.toplam.tutar);
-      document.getElementById('panel-goruntuleme').textContent = v.goruntuleme;
+
+      // Özet sayılar
+      document.getElementById('stat-hafta-sayi').textContent   = v.hafta.sayi;
+      document.getElementById('stat-hafta-tutar').textContent  = '₺' + Math.round(v.hafta.tutar);
+      document.getElementById('stat-ay-sayi').textContent      = v.ay.sayi;
+      document.getElementById('stat-ay-tutar').textContent     = '₺' + Math.round(v.ay.tutar);
+      document.getElementById('stat-toplam-sayi').textContent  = v.toplam.sayi;
+      document.getElementById('stat-toplam-tutar').textContent = '₺' + Math.round(v.toplam.tutar);
+      document.getElementById('panel-goruntuleme').textContent  = v.goruntuleme;
 
       var enCok = document.getElementById('stat-en-cok');
-      if (!v.en_cok_satanlar.length) {
-        enCok.style.display = 'none';
-        return;
-      }
       enCok.style.display = '';
-      enCok.innerHTML = '<div style="font-size:.72rem;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">En Çok Satan Ürünler</div>' +
-        v.en_cok_satanlar.map(function(u, i) {
-          var madalya = ['🥇','🥈','🥉'][i] || '';
-          var maxAdet = v.en_cok_satanlar[0].adet || 1;
-          var yuzde = Math.round((u.adet / maxAdet) * 100);
-          return '<div style="margin-bottom:8px">' +
-            '<div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:3px">' +
-              '<span>' + madalya + ' ' + u.ad + '</span>' +
-              '<span style="font-weight:800;color:#ff6b35">' + u.adet + ' adet</span>' +
-            '</div>' +
-            '<div style="background:#f0f0f0;border-radius:6px;height:5px">' +
-              '<div style="background:#ff6b35;height:5px;border-radius:6px;width:' + yuzde + '%;transition:width .5s"></div>' +
-            '</div>' +
-          '</div>';
-        }).join('');
+
+      // ── En çok satanlar ──────────────────────────────────
+      var enCokHtml = '';
+      if (v.en_cok_satanlar.length) {
+        enCokHtml += '<div style="font-size:.72rem;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">En Çok Satan Ürünler</div>' +
+          v.en_cok_satanlar.map(function(u, i) {
+            var madalya = ['🥇','🥈','🥉','4.','5.'][i] || '';
+            var maxAdet = v.en_cok_satanlar[0].adet || 1;
+            var yuzde = Math.round((u.adet / maxAdet) * 100);
+            return '<div style="margin-bottom:8px">' +
+              '<div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:3px">' +
+                '<span>' + madalya + ' ' + u.ad + '</span>' +
+                '<span style="font-weight:800;color:#ff6b35">' + u.adet + ' adet</span>' +
+              '</div>' +
+              '<div style="background:#f0f0f0;border-radius:6px;height:5px">' +
+                '<div style="background:#ff6b35;height:5px;border-radius:6px;width:' + yuzde + '%;transition:width .5s"></div>' +
+              '</div>' +
+            '</div>';
+          }).join('');
+      }
+
+      // ── Ek istatistikler: ort tutar, tekrar müşteri, teslimat ──
+      var kurye = v.teslimat_dagilim['kurye'] || 0;
+      var gelal = v.teslimat_dagilim['gel-al'] || 0;
+      var topTeslimat = kurye + gelal || 1;
+      enCokHtml += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">' +
+        _statMiniKart('💰', 'Ort. Sipariş', '₺' + (v.ay.ort_tutar || 0), '#ff6b35') +
+        _statMiniKart('🔄', 'Sadık Müşteri', v.tekrar_musteri + ' kişi', '#2e7d32') +
+        _statMiniKart('🛵', 'Kurye', Math.round(kurye/topTeslimat*100) + '%', '#6a1b9a') +
+        _statMiniKart('🚶', 'Gel-Al', Math.round(gelal/topTeslimat*100) + '%', '#1565c0') +
+      '</div>';
+
+      // ── Son 7 gün mini bar chart ──────────────────────────
+      if (v.yedi_gun && v.yedi_gun.length) {
+        var maxSayi = Math.max.apply(null, v.yedi_gun.map(function(g) { return g.sayi; })) || 1;
+        enCokHtml += '<div style="margin-top:14px">' +
+          '<div style="font-size:.72rem;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Son 7 Gün</div>' +
+          '<div style="display:flex;align-items:flex-end;gap:4px;height:60px">' +
+          v.yedi_gun.map(function(g) {
+            var yuzde = Math.max(4, Math.round((g.sayi / maxSayi) * 100));
+            var gun = new Date(g.gun).toLocaleDateString('tr-TR', { weekday: 'short' });
+            return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">' +
+              '<div style="font-size:.6rem;color:#888;font-weight:700">' + (g.sayi || '') + '</div>' +
+              '<div style="width:100%;background:' + (g.sayi ? '#ff6b35' : '#f0f0f0') + ';border-radius:4px 4px 0 0;height:' + yuzde + '%;min-height:4px;transition:height .5s"></div>' +
+              '<div style="font-size:.6rem;color:#aaa">' + gun + '</div>' +
+            '</div>';
+          }).join('') +
+          '</div></div>';
+      }
+
+      // ── Saatlik yoğunluk (sadece aktif saatler) ────────────
+      var aktifSaatler = (v.saatlik_dagilim || []).filter(function(s) { return s.sayi > 0; });
+      if (aktifSaatler.length) {
+        var maxSaatSayi = Math.max.apply(null, aktifSaatler.map(function(s) { return s.sayi; })) || 1;
+        var zirve = aktifSaatler.reduce(function(a, b) { return a.sayi >= b.sayi ? a : b; });
+        enCokHtml += '<div style="margin-top:14px">' +
+          '<div style="font-size:.72rem;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Zirve Saatler <span style="font-weight:400;color:#ff6b35">(en yoğun: ' + zirve.saat + ':00)</span></div>' +
+          '<div style="display:flex;align-items:flex-end;gap:2px;height:40px;overflow-x:auto">' +
+          (v.saatlik_dagilim || []).filter(function(s) { return s.saat >= 7 && s.saat <= 23; }).map(function(s) {
+            var yuzde = Math.max(4, Math.round((s.sayi / maxSaatSayi) * 100));
+            return '<div style="flex:1;min-width:10px;display:flex;flex-direction:column;align-items:center;gap:2px">' +
+              '<div style="width:100%;background:' + (s.sayi ? '#1565c0' : '#f0f0f0') + ';border-radius:2px 2px 0 0;height:' + yuzde + '%;min-height:2px"></div>' +
+              '<div style="font-size:.52rem;color:#bbb">' + s.saat + '</div>' +
+            '</div>';
+          }).join('') +
+          '</div></div>';
+      }
+
+      enCok.innerHTML = enCokHtml;
     })
     .catch(function() {});
+}
+
+function _statMiniKart(ikon, baslik, deger, renk) {
+  return '<div style="background:#f9f9f9;border-radius:10px;padding:10px;border-left:3px solid ' + renk + '">' +
+    '<div style="font-size:1rem;margin-bottom:2px">' + ikon + '</div>' +
+    '<div style="font-size:.68rem;color:#888;font-weight:600">' + baslik + '</div>' +
+    '<div style="font-size:.95rem;font-weight:800;color:#1a1a2e">' + deger + '</div>' +
+  '</div>';
 }
 
 function panelProfilFormYukle(esnafId) {
