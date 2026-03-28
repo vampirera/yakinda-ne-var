@@ -179,6 +179,7 @@ function profilSayfasiGoster() {
       document.getElementById('kurye-aktif-wrap').style.display = '';
       kuryeAktifSiparisleriYukle();
       kuryeBekleyenleriYukle();
+      kuryeKonumPaylasimiBaslat(telefon);
     } else {
       onayEl.style.background = '#fff8e1';
       onayEl.style.color      = '#f57f17';
@@ -497,14 +498,20 @@ function aktifSiparisKart(s) {
 
   var kuryeHtml = '';
   if (s.durum === 'yolda' && s.kurye_ad) {
-    kuryeHtml = '<div style="background:#f3e8ff;border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;gap:10px">' +
-      '<span style="font-size:1.6rem">🛵</span>' +
-      '<div>' +
-        '<div style="font-size:.78rem;color:#7b3fa0;font-weight:700">Kuryeniz yolda!</div>' +
-        '<div style="font-size:.82rem;font-weight:800">' + s.kurye_ad + '</div>' +
-        (s.kurye_arac ? '<div style="font-size:.72rem;color:#888">' + s.kurye_arac + '</div>' : '') +
-        (s.kurye_telefon ? '<a href="tel:' + s.kurye_telefon + '" style="font-size:.75rem;color:#9c27b0;font-weight:700;text-decoration:none">📞 ' + s.kurye_telefon + '</a>' : '') +
+    var konumBilgisi = (s.kurye_lat && s.kurye_lng)
+      ? '<button onclick="kuryeTakipHaritaGoster(' + s.id + ',' + s.kurye_lat + ',' + s.kurye_lng + ')" style="margin-top:6px;width:100%;background:#9c27b0;color:#fff;border:none;border-radius:8px;padding:7px;font-size:.75rem;font-weight:700;cursor:pointer">📍 Kuryeyi Haritada Gör</button>'
+      : '';
+    kuryeHtml = '<div style="background:#f3e8ff;border-radius:10px;padding:10px 12px;margin-bottom:12px">' +
+      '<div style="display:flex;align-items:center;gap:10px">' +
+        '<span style="font-size:1.6rem">🛵</span>' +
+        '<div>' +
+          '<div style="font-size:.78rem;color:#7b3fa0;font-weight:700">Kuryeniz yolda!</div>' +
+          '<div style="font-size:.82rem;font-weight:800">' + s.kurye_ad + '</div>' +
+          (s.kurye_arac ? '<div style="font-size:.72rem;color:#888">' + s.kurye_arac + '</div>' : '') +
+          (s.kurye_telefon ? '<a href="tel:' + s.kurye_telefon + '" style="font-size:.75rem;color:#9c27b0;font-weight:700;text-decoration:none">📞 ' + s.kurye_telefon + '</a>' : '') +
+        '</div>' +
       '</div>' +
+      konumBilgisi +
     '</div>';
   }
 
@@ -535,6 +542,50 @@ function aktifSiparisKart(s) {
     '</div>' +
     iptalBtn +
   '</div>';
+}
+
+// Kurye takip haritası modal
+var _kuryeTakipHarita = null;
+var _kuryeTakipMarker = null;
+var _kuryeTakipInterval = null;
+
+function kuryeTakipHaritaGoster(siparisId, lat, lng) {
+  var modal = document.getElementById('kurye-takip-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+
+  setTimeout(function() {
+    if (!_kuryeTakipHarita) {
+      _kuryeTakipHarita = L.map('kurye-takip-harita', { zoomControl: true, attributionControl: false });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(_kuryeTakipHarita);
+    }
+    _kuryeTakipHarita.setView([lat, lng], 15);
+    _kuryeTakipHarita.invalidateSize();
+
+    if (_kuryeTakipMarker) _kuryeTakipHarita.removeLayer(_kuryeTakipMarker);
+    _kuryeTakipMarker = L.marker([lat, lng], {
+      icon: L.divIcon({ className: '', html: '<div style="font-size:2rem">🛵</div>', iconAnchor: [16, 16] })
+    }).addTo(_kuryeTakipHarita).bindPopup('Kuryeniz burada').openPopup();
+
+    // Her 15 saniyede konumu güncelle
+    if (_kuryeTakipInterval) clearInterval(_kuryeTakipInterval);
+    _kuryeTakipInterval = setInterval(function() {
+      fetch(API_URL + '/api/siparis/' + siparisId + '/kurye-konum')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.basari || !_kuryeTakipHarita) return;
+          var v = data.veri;
+          var newLatLng = [parseFloat(v.lat), parseFloat(v.lng)];
+          if (_kuryeTakipMarker) _kuryeTakipMarker.setLatLng(newLatLng);
+          _kuryeTakipHarita.panTo(newLatLng);
+        }).catch(function() {});
+    }, 15000);
+  }, 100);
+}
+
+function kuryeTakipKapat() {
+  document.getElementById('kurye-takip-modal').style.display = 'none';
+  if (_kuryeTakipInterval) { clearInterval(_kuryeTakipInterval); _kuryeTakipInterval = null; }
 }
 
 function siparisIptal(id) {
@@ -3264,6 +3315,24 @@ function panelRandevuIptal(randevuId) {
 // =============================================================
 // KURYE PANELİ
 // =============================================================
+
+// Kurye konum paylaşımı — 30 sn aralıkla konum gönderir
+var _kuryeKonumInterval = null;
+function kuryeKonumPaylasimiBaslat(telefon) {
+  if (_kuryeKonumInterval) return; // zaten çalışıyor
+  function konumGonder() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      fetch(API_URL + '/api/kurye-konum', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefon: telefon, lat: pos.coords.latitude, lng: pos.coords.longitude })
+      }).catch(function() {});
+    }, function() {}, { enableHighAccuracy: true, maximumAge: 20000 });
+  }
+  konumGonder(); // hemen bir kez
+  _kuryeKonumInterval = setInterval(konumGonder, 30000);
+}
 
 function kuryeAktifSiparisleriYukle() {
   var oturum = oturumYukle();

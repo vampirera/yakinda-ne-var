@@ -114,6 +114,10 @@ async function tablolarOlustur() {
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS indirimli_saatler JSONB DEFAULT '{}'`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS one_cikan BOOLEAN DEFAULT false`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS one_cikan_etiket TEXT`);
+  // ── KURYE KONUM TAKİBİ ─────────────────────────────────────────
+  await pool.query(`ALTER TABLE kuryeler ADD COLUMN IF NOT EXISTS lat DECIMAL(10,6)`);
+  await pool.query(`ALTER TABLE kuryeler ADD COLUMN IF NOT EXISTS lng DECIMAL(10,6)`);
+  await pool.query(`ALTER TABLE kuryeler ADD COLUMN IF NOT EXISTS konum_guncelleme TIMESTAMP`);
   await pool.query(`CREATE TABLE IF NOT EXISTS hizmetler (
     id SERIAL PRIMARY KEY,
     esnaf_id INTEGER REFERENCES esnaflar(id) ON DELETE CASCADE,
@@ -669,10 +673,35 @@ app.get('/api/kurye-bekleyen', async function(req, res) {
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
+// Kurye: konumunu güncelle
+app.put('/api/kurye-konum', async function(req, res) {
+  try {
+    var { telefon, lat, lng } = req.body;
+    if (!telefon || lat == null || lng == null) return res.status(400).json({ basari: false, mesaj: 'Eksik bilgi.' });
+    await pool.query(
+      'UPDATE kuryeler SET lat=$1, lng=$2, konum_guncelleme=NOW() WHERE telefon=$3',
+      [parseFloat(lat), parseFloat(lng), telefon]
+    );
+    res.json({ basari: true });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Sipariş: atanan kuryenin konumunu al
+app.get('/api/siparis/:id/kurye-konum', async function(req, res) {
+  try {
+    var r = await pool.query(
+      'SELECT k.lat, k.lng, k.ad AS kurye_ad, k.konum_guncelleme FROM siparisler s JOIN kuryeler k ON k.id=s.kurye_id WHERE s.id=$1',
+      [req.params.id]
+    );
+    if (!r.rows.length || r.rows[0].lat == null) return res.json({ basari: false, mesaj: 'Kurye konumu yok.' });
+    res.json({ basari: true, veri: r.rows[0] });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
 app.get('/api/siparis-detay/:id', async function(req, res) {
   try {
     var result = await pool.query(
-      'SELECT s.*, k.ad AS kurye_ad, k.telefon AS kurye_telefon, k.arac_tipi AS kurye_arac ' +
+      'SELECT s.*, k.ad AS kurye_ad, k.telefon AS kurye_telefon, k.arac_tipi AS kurye_arac, k.lat AS kurye_lat, k.lng AS kurye_lng ' +
       'FROM siparisler s LEFT JOIN kuryeler k ON k.id=s.kurye_id WHERE s.id=$1',
       [req.params.id]
     );
