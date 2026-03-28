@@ -151,6 +151,32 @@ async function tablolarOlustur() {
     olusturma TIMESTAMP DEFAULT NOW()
   )`);
 
+  // ── HİZMET TEKLİF SİSTEMİ ──────────────────────────────────────
+  await pool.query(`CREATE TABLE IF NOT EXISTS is_ilanlari (
+    id SERIAL PRIMARY KEY,
+    musteri_telefon VARCHAR(20) NOT NULL,
+    musteri_ad VARCHAR(100),
+    baslik VARCHAR(255) NOT NULL,
+    aciklama TEXT,
+    kategori VARCHAR(50),
+    ilce VARCHAR(100),
+    butce_min DECIMAL(10,2),
+    butce_max DECIMAL(10,2),
+    tarih_tercih DATE,
+    durum VARCHAR(20) DEFAULT 'acik',
+    olusturma TIMESTAMP DEFAULT NOW()
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS teklifler (
+    id SERIAL PRIMARY KEY,
+    ilan_id INTEGER REFERENCES is_ilanlari(id) ON DELETE CASCADE,
+    esnaf_id INTEGER REFERENCES esnaflar(id) ON DELETE CASCADE,
+    fiyat DECIMAL(10,2),
+    aciklama TEXT,
+    sure_gun INTEGER DEFAULT 1,
+    durum VARCHAR(20) DEFAULT 'bekliyor',
+    olusturma TIMESTAMP DEFAULT NOW()
+  )`);
+
   var sayac = await pool.query('SELECT COUNT(*) FROM esnaflar');
   if (parseInt(sayac.rows[0].count) === 0) {
     var e1 = await pool.query(`INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,email,vergi_no,lat,lng,puan,yorum_sayisi,acik,onayli,onaylandi) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`, ['Usta Kebapci','yemek','Marmaris','Ataturk Cad. No:1','05001234567','usta@kebapci.com','1234567890',36.8550,28.2753,4.8,124,true,true,true]);
@@ -1441,6 +1467,103 @@ app.put('/api/esnaf-panel/:id/randevu/:randevu_id/durum', async function(req, re
     }
 
     res.json({ basari: true, mesaj: 'Durum guncellendi.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// ── HİZMET TEKLİF SİSTEMİ ────────────────────────────────────────────
+
+// İlan oluştur
+app.post('/api/is-ilani', async function(req, res) {
+  try {
+    var { musteri_telefon, musteri_ad, baslik, aciklama, kategori, ilce, butce_min, butce_max, tarih_tercih } = req.body;
+    if (!musteri_telefon || !baslik) return res.status(400).json({ basari: false, mesaj: 'Telefon ve başlık zorunlu.' });
+    var r = await pool.query(
+      'INSERT INTO is_ilanlari (musteri_telefon,musteri_ad,baslik,aciklama,kategori,ilce,butce_min,butce_max,tarih_tercih) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
+      [musteri_telefon, musteri_ad||'Anonim', baslik, aciklama||null, kategori||null, ilce||null,
+       butce_min ? parseFloat(butce_min) : null, butce_max ? parseFloat(butce_max) : null,
+       tarih_tercih || null]
+    );
+    res.json({ basari: true, veri: r.rows[0], mesaj: 'İlan oluşturuldu.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// İlanları listele (esnaf filtresiyle)
+app.get('/api/is-ilanlari', async function(req, res) {
+  try {
+    var { kategori, ilce } = req.query;
+    var where = ["i.durum='acik'"];
+    var params = [];
+    if (kategori) { params.push(kategori); where.push('i.kategori=$' + params.length); }
+    if (ilce) { params.push(ilce); where.push('LOWER(i.ilce)=LOWER($' + params.length + ')'); }
+    var sql = `SELECT i.*, (SELECT COUNT(*) FROM teklifler t WHERE t.ilan_id=i.id) AS teklif_sayisi
+               FROM is_ilanlari i WHERE ${where.join(' AND ')} ORDER BY i.olusturma DESC LIMIT 50`;
+    var r = await pool.query(sql, params);
+    res.json({ basari: true, veri: r.rows });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Müşterinin ilanları
+app.get('/api/ilanlarim', async function(req, res) {
+  try {
+    var { telefon } = req.query;
+    if (!telefon) return res.json({ basari: true, veri: [] });
+    var r = await pool.query(
+      `SELECT i.*, (SELECT COUNT(*) FROM teklifler t WHERE t.ilan_id=i.id) AS teklif_sayisi,
+        (SELECT json_agg(json_build_object('id',t.id,'esnaf_id',t.esnaf_id,'esnaf_ad',e.ad,'fiyat',t.fiyat,'aciklama',t.aciklama,'sure_gun',t.sure_gun,'durum',t.durum,'olusturma',t.olusturma))
+         FROM teklifler t JOIN esnaflar e ON e.id=t.esnaf_id WHERE t.ilan_id=i.id ORDER BY t.fiyat ASC) AS teklifler
+       FROM is_ilanlari i WHERE i.musteri_telefon=$1 ORDER BY i.olusturma DESC`,
+      [telefon]
+    );
+    res.json({ basari: true, veri: r.rows });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Teklif ver
+app.post('/api/is-ilani/:id/teklif', async function(req, res) {
+  try {
+    var { esnaf_id, fiyat, aciklama, sure_gun } = req.body;
+    if (!esnaf_id || !fiyat) return res.status(400).json({ basari: false, mesaj: 'Esnaf ID ve fiyat zorunlu.' });
+    // Aynı esnaf 2 kez teklif veremesin
+    var mevcut = await pool.query('SELECT id FROM teklifler WHERE ilan_id=$1 AND esnaf_id=$2', [req.params.id, esnaf_id]);
+    if (mevcut.rows.length) return res.status(400).json({ basari: false, mesaj: 'Bu ilana zaten teklif verdiniz.' });
+    var r = await pool.query(
+      'INSERT INTO teklifler (ilan_id,esnaf_id,fiyat,aciklama,sure_gun) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [req.params.id, esnaf_id, parseFloat(fiyat), aciklama||null, parseInt(sure_gun)||1]
+    );
+    // Müşteriye WhatsApp bildirimi
+    var ilan = await pool.query('SELECT musteri_telefon, baslik FROM is_ilanlari WHERE id=$1', [req.params.id]);
+    var esnaf = await pool.query('SELECT ad FROM esnaflar WHERE id=$1', [esnaf_id]);
+    if (ilan.rows[0] && esnaf.rows[0]) {
+      whatsappGonder(ilan.rows[0].musteri_telefon,
+        `🎯 İlanınıza Yeni Teklif!\n\n📋 İlan: ${ilan.rows[0].baslik}\n🏪 Teklif veren: ${esnaf.rows[0].ad}\n💰 Fiyat: ₺${fiyat}\n\nTeklifi görmek için uygulamayı açın.`
+      ).catch(function() {});
+    }
+    res.json({ basari: true, veri: r.rows[0], mesaj: 'Teklif gönderildi.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Teklifi kabul et / reddet
+app.put('/api/teklif/:id/durum', async function(req, res) {
+  try {
+    var { durum, musteri_telefon } = req.body;
+    if (!['kabul', 'reddedildi'].includes(durum)) return res.status(400).json({ basari: false, mesaj: 'Geçersiz durum.' });
+    var t = await pool.query(
+      'UPDATE teklifler SET durum=$1 WHERE id=$2 RETURNING *, (SELECT musteri_telefon FROM is_ilanlari WHERE id=teklifler.ilan_id) as musteri_tel',
+      [durum, req.params.id]
+    );
+    if (!t.rows.length) return res.status(404).json({ basari: false, mesaj: 'Teklif bulunamadı.' });
+    if (durum === 'kabul') {
+      // İlanı kapat
+      await pool.query('UPDATE is_ilanlari SET durum=$1 WHERE id=$2', ['kapali', t.rows[0].ilan_id]);
+      // Esnafa bildir
+      var esnaf = await pool.query('SELECT ad, telefon FROM esnaflar WHERE id=$1', [t.rows[0].esnaf_id]);
+      if (esnaf.rows[0] && esnaf.rows[0].telefon) {
+        whatsappGonder(esnaf.rows[0].telefon,
+          `✅ Teklifiniz Kabul Edildi!\n\n🎉 Müşteri teklifinizi kabul etti. Lütfen iletişime geçin.`
+        ).catch(function() {});
+      }
+    }
+    res.json({ basari: true, mesaj: durum === 'kabul' ? 'Teklif kabul edildi.' : 'Teklif reddedildi.' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
