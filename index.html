@@ -16,7 +16,10 @@
 <link rel="dns-prefetch" href="//b.tile.openstreetmap.org">
 <link rel="dns-prefetch" href="//c.tile.openstreetmap.org">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" defer></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:'Segoe UI',sans-serif;overscroll-behavior:none}
@@ -126,6 +129,8 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
 .nav-item.active{color:#ff6b35}
 .nav-icon{font-size:1.2rem}
 .yukleniyor{text-align:center;padding:30px;color:#aaa;font-size:.88rem}
+.yukleniyor::before{content:'';display:block;width:32px;height:32px;margin:0 auto 10px;border:3px solid #f0f0f0;border-top-color:#ff6b35;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .hata{text-align:center;padding:30px;color:#e53935;font-size:.88rem}
 .s-title{font-weight:800;font-size:.85rem;color:#888;text-transform:uppercase;letter-spacing:.05em;margin:10px 0 7px;display:flex;justify-content:space-between;align-items:center}
 .add-btn-small{background:#ff6b35;color:#fff;border:none;border-radius:18px;padding:4px 10px;font-size:.73rem;font-weight:700;cursor:pointer}
@@ -159,6 +164,13 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
 .mesafe-filtre-row::-webkit-scrollbar{display:none}
 .mesafe-btn{background:#f5f5f5;border:2px solid #eee;border-radius:20px;padding:4px 11px;font-size:.72rem;font-weight:600;color:#666;cursor:pointer;white-space:nowrap;flex-shrink:0;min-height:32px}
 .mesafe-btn.active{background:#ff6b35;border-color:#ff6b35;color:#fff}
+#bildirim-toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;width:90%;max-width:360px}
+.bildirim-item{padding:12px 16px;border-radius:12px;font-size:.84rem;font-weight:600;color:#fff;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.18);opacity:0;transform:translateY(20px);transition:opacity .3s,transform .3s;pointer-events:none;width:100%;box-sizing:border-box}
+.bildirim-item.goster{opacity:1;transform:translateY(0)}
+.bildirim-item.basari{background:#2e7d32}
+.bildirim-item.hata{background:#c62828}
+.bildirim-item.bilgi{background:#1565c0}
+.bildirim-item.uyari{background:#e65100}
 </style>
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
@@ -177,6 +189,7 @@ firebase.initializeApp({
 </script>
 </head>
 <body>
+<div id="bildirim-toast"></div>
 <div class="lightbox-overlay" id="lightbox" onclick="lightboxKapat()">
   <button class="lightbox-kapat" onclick="lightboxKapat()">✕</button>
   <img class="lightbox-img" id="lightbox-img" src="" alt="" onclick="event.stopPropagation()">
@@ -208,8 +221,9 @@ firebase.initializeApp({
     <div id="ana-harita"></div>
     <div class="mesafe-filtre-row" id="mesafe-filtre-row"></div>
     <div class="content">
+      <div id="one-cikanlar-wrap" style="display:none;padding:0 0 12px 0"></div>
       <div class="section-title">🔥 Yakin Esnaflar</div>
-      <div class="esnaf-grid" id="esnaf-listesi"><div class="yukleniyor">Yukleniyor...</div></div>
+      <div class="esnaf-grid" id="esnaf-listesi"><div class="yukleniyor"></div></div>
     </div>
     <div class="bottom-nav" id="ana-nav"></div>
   </div>
@@ -234,6 +248,7 @@ firebase.initializeApp({
         <button class="btn-p secili" id="btn-kurye">🛵 Siparis Ver</button>
         <button class="btn-s" id="btn-gelal">🚶 Gel-Al</button>
       </div>
+      <div id="detay-sosyal-kanit" style="display:none;background:#fff8f5;border-radius:10px;padding:8px 12px;margin-top:8px;display:flex;gap:12px;flex-wrap:wrap"></div>
       <div id="detay-sosyal" style="display:flex;gap:8px;margin-top:10px"></div>
     </div>
     <div id="detay-harita"></div>
@@ -487,14 +502,15 @@ firebase.initializeApp({
         <div style="font-weight:800;font-size:1rem">Admin Panel</div>
         <button id="admin-cikis" style="background:#ffebee;color:#c62828;border:none;border-radius:8px;padding:5px 10px;font-size:.75rem;font-weight:700;cursor:pointer">Çıkış</button>
       </div>
-      <div style="display:flex;gap:5px;padding:8px 0 4px">
-        <button class="admin-sekme aktif-sekme" data-sekme="esnaflar" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.7rem;font-weight:700;cursor:pointer;background:#1a1a2e;color:#fff">🏪 Esnaflar</button>
-        <button class="admin-sekme" data-sekme="kuryeler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.7rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444">🛵 Kuryeler</button>
-        <button class="admin-sekme" data-sekme="musteriler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.7rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444">👤 Müşteriler</button>
-        <button class="admin-sekme" data-sekme="siparisler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.7rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444">📦 Siparişler</button>
+      <div style="display:flex;gap:4px;padding:8px 0 4px;overflow-x:auto">
+        <button class="admin-sekme" data-sekme="ozet" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.68rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444;white-space:nowrap;min-width:52px">📊 Özet</button>
+        <button class="admin-sekme aktif-sekme" data-sekme="esnaflar" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.68rem;font-weight:700;cursor:pointer;background:#1a1a2e;color:#fff;white-space:nowrap;min-width:52px">🏪 Esnaflar</button>
+        <button class="admin-sekme" data-sekme="kuryeler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.68rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444;white-space:nowrap;min-width:52px">🛵 Kuryeler</button>
+        <button class="admin-sekme" data-sekme="musteriler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.68rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444;white-space:nowrap;min-width:52px">👤 Müşteriler</button>
+        <button class="admin-sekme" data-sekme="siparisler" style="flex:1;border:none;border-radius:8px;padding:7px 2px;font-size:.68rem;font-weight:700;cursor:pointer;background:#f0f0f0;color:#444;white-space:nowrap;min-width:52px">📦 Siparişler</button>
       </div>
     </div>
-    <div style="padding:16px" id="admin-icerik"><div class="yukleniyor">Yukleniyor...</div></div>
+    <div style="padding:16px" id="admin-icerik"><div class="yukleniyor"></div></div>
   </div>
 
   <!-- ADMİN MODAL -->
@@ -502,6 +518,18 @@ firebase.initializeApp({
     <div style="background:#fff;max-width:430px;margin:0 auto;border-radius:16px;padding:20px;position:relative;min-height:120px">
       <button id="admin-modal-kapat" style="position:absolute;top:12px;right:12px;background:#f0f0f0;border:none;border-radius:50%;width:32px;height:32px;font-size:1.1rem;cursor:pointer;line-height:32px">✕</button>
       <div id="admin-modal-icerik"></div>
+    </div>
+  </div>
+
+  <!-- KURYE TAKİP MODAL -->
+  <div id="kurye-takip-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;padding:12px">
+    <div style="background:#fff;width:100%;max-width:430px;border-radius:16px;overflow:hidden;position:relative">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #f0f0f0">
+        <span style="font-weight:800;font-size:.92rem">🛵 Kurye Takibi</span>
+        <button onclick="kuryeTakipKapat()" style="background:#f5f5f5;border:none;border-radius:50%;width:30px;height:30px;font-size:1rem;cursor:pointer">✕</button>
+      </div>
+      <div id="kurye-takip-harita" style="height:300px;width:100%"></div>
+      <div style="padding:12px;font-size:.75rem;color:#888;text-align:center">Konum her 15 saniyede güncellenir</div>
     </div>
   </div>
 
@@ -603,10 +631,21 @@ firebase.initializeApp({
         <span>📦 Siparisler</span>
         <button class="add-btn-small" onclick="panelYukle()">Yenile</button>
       </div>
-      <div id="panel-siparisler"><div class="yukleniyor">Yukleniyor...</div></div>
+      <div id="panel-siparisler"><div class="yukleniyor"></div></div>
       <div class="s-title" style="margin-top:16px">
-        <span>🛍️ Urunlerim</span>
+        <span>🛍️ Ürünlerim</span>
         <button class="add-btn-small" id="urun-ekle-btn">+ Ekle</button>
+      </div>
+      <div id="urun-ekle-form" style="display:none;background:#f9f9f9;border-radius:12px;padding:12px;margin-bottom:10px">
+        <input type="text" id="urun-ad" class="form-input" placeholder="Ürün adı *" style="margin-bottom:8px">
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <input type="number" id="urun-fiyat" class="form-input" placeholder="Fiyat (₺)" min="0" step="0.01" style="flex:1;margin-bottom:0">
+          <input type="text" id="urun-aciklama" class="form-input" placeholder="Açıklama" style="flex:2;margin-bottom:0">
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-p" onclick="urunEkle()" style="flex:1;padding:9px">Kaydet</button>
+          <button onclick="urunFormKapat()" style="flex:1;padding:9px;background:#f5f5f5;color:#666;border:1.5px solid #e0e0e0;border-radius:10px;font-size:.85rem;cursor:pointer">İptal</button>
+        </div>
       </div>
       <div id="panel-urunler"></div>
       <div class="s-title" style="margin-top:16px"><span>🕐 Calisma Saatleri</span></div>
@@ -644,11 +683,24 @@ firebase.initializeApp({
             </span>
           </label>
         </div>
-        <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
           <label style="font-size:.78rem;color:#666;white-space:nowrap">Slot süresi (dk):</label>
           <input type="number" id="randevu-slot-suresi" class="form-input" min="15" max="240" step="15" value="30" style="width:80px;margin-bottom:0">
-          <button class="btn-p" onclick="randevuAyarKaydet()" style="padding:8px 12px;font-size:.78rem">Kaydet</button>
         </div>
+        <!-- Off-peak indirim saatleri -->
+        <div style="background:#fff8f5;border:1px solid #ffd5c2;border-radius:10px;padding:10px;margin-bottom:10px">
+          <div style="font-size:.78rem;font-weight:700;color:#ff6b35;margin-bottom:6px">🏷️ Saatlik İndirim (Off-Peak)</div>
+          <div style="font-size:.7rem;color:#888;margin-bottom:8px">Az tercih edilen saatlere indirim ekleyerek doluluk oranını artırın</div>
+          <div id="indirimli-saatler-liste" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="indirim-saat" class="form-input" style="width:70px;margin:0;padding:6px 4px">
+              <option value="">Saat</option>
+            </select>
+            <input type="number" id="indirim-oran" class="form-input" placeholder="%" min="5" max="50" step="5" style="width:60px;margin:0">
+            <button class="btn-p" onclick="indirimSaatEkle()" style="padding:6px 10px;font-size:.75rem">+ Ekle</button>
+          </div>
+        </div>
+        <button class="btn-p" onclick="randevuAyarKaydet()" style="width:100%;padding:9px;font-size:.82rem">Kaydet</button>
       </div>
 
       <!-- Hizmetler -->
@@ -672,6 +724,16 @@ firebase.initializeApp({
           <input type="date" id="randevu-tarih-filtre" class="form-input" style="width:140px;margin:0" oninput="randevulariYukle()">
         </div>
         <div id="panel-randevular-liste"><div style="color:#aaa;font-size:.82rem">Randevu yok.</div></div>
+      </div>
+
+      <!-- İş İlanları — Teklif Ver -->
+      <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.06)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-weight:700;font-size:.85rem">📋 Açık İş İlanları</div>
+          <button class="add-btn-small" onclick="panelIlanlarYukle()">Yenile</button>
+        </div>
+        <div style="font-size:.72rem;color:#888;margin-bottom:8px">Bölgenizdeki müşteri ilanlarına teklif verin</div>
+        <div id="panel-ilanlar-liste"><div style="color:#aaa;font-size:.82rem">İlan yükleniyor...</div></div>
       </div>
 
     </div>
@@ -765,6 +827,25 @@ firebase.initializeApp({
           <input type="text" id="kurye-profil-arac" class="form-input" readonly style="background:#f5f5f5;color:#888">
           <div id="kurye-onay-durumu" style="margin-top:10px;padding:10px;border-radius:10px;text-align:center;font-weight:700;font-size:.85rem"></div>
         </div>
+
+        <!-- Bölgedeki bekleyen siparişler -->
+        <div id="kurye-bekleyen-wrap" style="display:none;background:#fff;border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-weight:800;font-size:.82rem;color:#e65100;letter-spacing:.5px">🆕 BÖLGEMDEKİ SİPARİŞLER</div>
+            <button onclick="kuryeBekleyenleriYukle()" style="background:#fff3e0;color:#e65100;border:none;border-radius:8px;padding:4px 10px;font-size:.72rem;font-weight:700;cursor:pointer">↻ Yenile</button>
+          </div>
+          <div id="kurye-bekleyen-liste"><div style="color:#aaa;font-size:.82rem">Bölgenizde bekleyen sipariş yok.</div></div>
+        </div>
+
+        <!-- Aktif siparişlerim -->
+        <div id="kurye-aktif-wrap" style="display:none;background:#fff;border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-weight:800;font-size:.82rem;color:#1a1a2e;letter-spacing:.5px">🛵 AKTİF SİPARİŞLERİM</div>
+            <button onclick="kuryeAktifSiparisleriYukle()" style="background:#f5f5f5;color:#666;border:none;border-radius:8px;padding:4px 10px;font-size:.72rem;font-weight:700;cursor:pointer">↻ Yenile</button>
+          </div>
+          <div id="kurye-aktif-liste"><div style="color:#aaa;font-size:.82rem">Aktif sipariş yok.</div></div>
+        </div>
+
         <button id="profil-kurye-cikis" style="width:100%;background:#fff;color:#c62828;border:2px solid #ffcdd2;border-radius:14px;padding:12px;font-weight:700;font-size:.9rem;cursor:pointer;margin-bottom:16px">Hesaptan Çık</button>
       </div>
     </div>
@@ -780,9 +861,14 @@ firebase.initializeApp({
         <button onclick="siparislerListele()" style="background:#f5f5f5;color:#666;border:none;border-radius:8px;padding:5px 10px;font-size:.78rem;cursor:pointer">↻ Yenile</button>
       </div>
     </div>
-    <div class="content" id="siparislerim-icerik">
-      <div class="yukleniyor">Yukleniyor...</div>
+    <div style="display:flex;gap:6px;padding:8px 16px 0;background:#fff">
+      <button onclick="siparislerSekmeSec('siparisler')" id="sekme-btn-siparisler" style="flex:1;padding:8px;border:none;border-radius:10px;background:#1a1a2e;color:#fff;font-size:.78rem;font-weight:700;cursor:pointer">Siparişlerim</button>
+      <button onclick="siparislerSekmeSec('ilanlar')" id="sekme-btn-ilanlar" style="flex:1;padding:8px;border:none;border-radius:10px;background:#f0f0f0;color:#555;font-size:.78rem;font-weight:700;cursor:pointer">İş İlanlarım</button>
     </div>
+    <div class="content" id="siparislerim-icerik">
+      <div class="yukleniyor"></div>
+    </div>
+    <div class="content" id="ilanlarim-icerik" style="display:none"></div>
     <div class="bottom-nav" id="siparislerim-nav"></div>
   </div>
 
