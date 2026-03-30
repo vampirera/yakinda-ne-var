@@ -1,5 +1,5 @@
-var CACHE_ADI = 'yakinda-ne-var-v5';
-// HTML ve JS her zaman ağdan alınır — Leaflet ve ikonlar cache-first
+var CACHE_ADI = 'yakinda-ne-var-v6';
+// Sadece Leaflet cache-first, HTML/JS her zaman ağdan
 var CACHE_STATIK = [
   '/yakinda-ne-var/manifest.json',
   '/yakinda-ne-var/icon-192.png',
@@ -27,15 +27,15 @@ self.addEventListener('activate', function(event) {
           return caches.delete(anahtar);
         })
       );
+    }).then(function() {
+      return self.clients.claim();
     })
   );
-  // Tüm istemcilere yeni SW'nin devreye girdiğini bildir
   self.clients.matchAll({ type: 'window' }).then(function(clients) {
     clients.forEach(function(client) {
       client.postMessage({ tip: 'GUNCELLEME_VAR' });
     });
   });
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', function(event) {
@@ -44,30 +44,28 @@ self.addEventListener('fetch', function(event) {
 
   var url = event.request.url;
 
-  // HTML ve JS: her zaman ağdan al, başarısızsa cache'den sun
-  var networkFirst = url.includes('/yakinda-ne-var/app.js') ||
-    url.includes('/yakinda-ne-var/index.html') ||
-    url.endsWith('/yakinda-ne-var/') ||
-    url.endsWith('/yakinda-ne-var');
+  // Navigate istekleri ve HTML/JS: her zaman ağdan al
+  var networkFirst =
+    event.request.mode === 'navigate' ||
+    url.includes('/yakinda-ne-var/app.js') ||
+    url.includes('/yakinda-ne-var/index.html');
 
   if (networkFirst) {
     event.respondWith(
-      fetch(event.request).then(function(networkResponse) {
+      fetch(event.request, { cache: 'no-cache' }).then(function(networkResponse) {
         if (networkResponse.status === 200) {
           var klon = networkResponse.clone();
           caches.open(CACHE_ADI).then(function(cache) { cache.put(event.request, klon); });
         }
         return networkResponse;
       }).catch(function() {
-        return caches.match(event.request).then(function(cached) {
-          return cached || caches.match('/yakinda-ne-var/index.html');
-        });
+        return caches.match('/yakinda-ne-var/index.html');
       })
     );
     return;
   }
 
-  // Diğer statik dosyalar: cache-first
+  // Leaflet vb. statik dosyalar: cache-first
   event.respondWith(
     caches.match(event.request).then(function(cachedResponse) {
       if (cachedResponse) return cachedResponse;
@@ -77,10 +75,6 @@ self.addEventListener('fetch', function(event) {
           caches.open(CACHE_ADI).then(function(cache) { cache.put(event.request, klon); });
         }
         return networkResponse;
-      }).catch(function() {
-        if (event.request.mode === 'navigate') {
-          return caches.match('/yakinda-ne-var/index.html');
-        }
       });
     })
   );
