@@ -112,6 +112,7 @@ async function tablolarOlustur() {
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS randevu_modu BOOLEAN DEFAULT false`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS slot_suresi INTEGER DEFAULT 30`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS indirimli_saatler JSONB DEFAULT '{}'`);
+  await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS ilan_bildirimi BOOLEAN DEFAULT true`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS one_cikan BOOLEAN DEFAULT false`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS one_cikan_etiket TEXT`);
   // ── KURYE KONUM TAKİBİ ─────────────────────────────────────────
@@ -1023,6 +1024,16 @@ app.put('/api/esnaf-panel/:id/profil', async function(req, res) {
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
+// İlan bildirimi tercihini güncelle
+app.put('/api/esnaf-panel/:id/ilan-bildirimi', async function(req, res) {
+  try {
+    if (!await esnafDogrula(req.params.id, res)) return;
+    await pool.query('UPDATE esnaflar SET ilan_bildirimi=$1 WHERE id=$2', [!!req.body.aktif, req.params.id]);
+    cacheSil('esnaf_detay:' + req.params.id);
+    res.json({ basari: true, mesaj: req.body.aktif ? 'İlan bildirimleri açıldı.' : 'İlan bildirimleri kapatıldı.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
 app.put('/api/esnaflar/:id/goruntuleme', async function(req, res) {
   try {
     await pool.query('UPDATE esnaflar SET goruntuleme_sayisi = COALESCE(goruntuleme_sayisi,0) + 1 WHERE id=$1', [req.params.id]);
@@ -1503,7 +1514,7 @@ app.post('/api/is-ilani', async function(req, res) {
     try {
       var kategoriAd = { yemek: 'Yemek', urun: 'Ürün', hizmet: 'Hizmet' }[kategori] || kategori;
       var esRes = await pool.query(
-        'SELECT telefon FROM esnaflar WHERE onaylandi=true AND LOWER(kategori)=LOWER($1) LIMIT 15',
+        'SELECT telefon FROM esnaflar WHERE onaylandi=true AND LOWER(kategori)=LOWER($1) AND ilan_bildirimi=true LIMIT 15',
         [kategori]
       );
       for (var e of esRes.rows) {
