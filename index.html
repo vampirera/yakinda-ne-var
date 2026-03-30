@@ -225,7 +225,95 @@ firebase.initializeApp({
       <div class="section-title">🔥 Yakin Esnaflar</div>
       <div class="esnaf-grid" id="esnaf-listesi"><div class="yukleniyor"></div></div>
     </div>
+    <!-- İlan Ver FAB -->
+    <div style="padding:0 16px 10px">
+      <button onclick="ilanVerSayfasiGoster()" style="width:100%;background:linear-gradient(135deg,#ff6b35,#e64a19);color:#fff;border:none;border-radius:14px;padding:14px 16px;font-size:.88rem;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(255,107,53,.35);display:flex;align-items:center;justify-content:center;gap:8px">
+        <span style="font-size:1.2rem">📋</span>
+        <span>İlan Ver — Esnaflardan Teklif Al</span>
+      </button>
+    </div>
     <div class="bottom-nav" id="ana-nav"></div>
+  </div>
+
+  <!-- İLAN VER SAYFASI -->
+  <div class="sayfa" id="sayfa-ilan-ver" style="display:flex;flex-direction:column">
+    <div class="header">
+      <div class="header-top">
+        <button onclick="sayfaGoster('ana')" style="background:#f5f5f5;color:#222;width:34px;height:34px;border-radius:50%;border:none;font-size:1rem;cursor:pointer">←</button>
+        <div style="font-weight:800;font-size:1rem">📋 İlan Ver</div>
+        <div style="width:34px"></div>
+      </div>
+    </div>
+    <div class="content" style="overflow-y:auto">
+
+      <!-- Fotoğraf alanı -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:.75rem;font-weight:800;color:#1a1a2e;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Fotoğraf <span style="color:#999;font-weight:400;font-size:.7rem">(opsiyonel)</span></div>
+        <div onclick="ilanFotoSec()" id="ilan-foto-alan" style="border:2px dashed #e0e0e0;border-radius:16px;height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;background:#fafafa">
+          <div id="ilan-foto-placeholder" style="text-align:center">
+            <div style="font-size:2.5rem">📷</div>
+            <div style="font-size:.78rem;color:#aaa;margin-top:6px;font-weight:600">Fotoğraf Ekle</div>
+            <div style="font-size:.68rem;color:#ccc;margin-top:2px">Kamera veya galeriden seç</div>
+          </div>
+          <img id="ilan-foto-onizleme" style="display:none;width:100%;height:100%;object-fit:cover;position:absolute;inset:0" src="" alt="">
+          <div id="ilan-foto-yukluyor" style="display:none;position:absolute;inset:0;background:rgba(255,255,255,.85);align-items:center;justify-content:center;flex-direction:column;gap:8px">
+            <div class="yukleniyor"></div>
+            <div style="font-size:.72rem;color:#888">Yükleniyor...</div>
+          </div>
+        </div>
+        <input type="file" id="ilan-foto-input" accept="image/*" style="display:none" onchange="ilanFotoSecildi(this)">
+        <div id="ilan-foto-degistir" style="display:none;text-align:right;margin-top:4px">
+          <button onclick="ilanFotoSec()" style="background:none;border:none;color:#ff6b35;font-size:.72rem;font-weight:700;cursor:pointer">↻ Fotoğrafı Değiştir</button>
+        </div>
+      </div>
+
+      <!-- Kategori — ZORUNLU -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:.75rem;font-weight:800;color:#1a1a2e;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Kategori <span style="color:#ff4444">*</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <button id="kat-btn-yemek" onclick="ilanKategoriSec('yemek')" style="border:2px solid #e0e0e0;border-radius:12px;padding:14px 6px;background:#fff;cursor:pointer;text-align:center;transition:.2s">
+            <div style="font-size:1.8rem">🍔</div>
+            <div style="font-size:.73rem;font-weight:700;margin-top:5px;color:#555">Yemek</div>
+          </button>
+          <button id="kat-btn-urun" onclick="ilanKategoriSec('urun')" style="border:2px solid #e0e0e0;border-radius:12px;padding:14px 6px;background:#fff;cursor:pointer;text-align:center;transition:.2s">
+            <div style="font-size:1.8rem">📦</div>
+            <div style="font-size:.73rem;font-weight:700;margin-top:5px;color:#555">Ürün</div>
+          </button>
+          <button id="kat-btn-hizmet" onclick="ilanKategoriSec('hizmet')" style="border:2px solid #e0e0e0;border-radius:12px;padding:14px 6px;background:#fff;cursor:pointer;text-align:center;transition:.2s">
+            <div style="font-size:1.8rem">🔧</div>
+            <div style="font-size:.73rem;font-weight:700;margin-top:5px;color:#555">Hizmet</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Başlık -->
+      <div style="font-size:.75rem;font-weight:800;color:#1a1a2e;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Ne Arıyorsunuz? <span style="color:#ff4444">*</span></div>
+      <input id="ilan-pg-baslik" class="form-input" placeholder="örn: Adana kebap siparişi, Boyacı ustası...">
+
+      <!-- Açıklama -->
+      <div style="font-size:.75rem;font-weight:800;color:#1a1a2e;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Detaylar</div>
+      <textarea id="ilan-pg-aciklama" class="form-input" placeholder="Miktar, özellikler, teslimat beklentisi, adres ipuçları..." rows="4" style="resize:none"></textarea>
+
+      <!-- Bütçe -->
+      <div style="font-size:.75rem;font-weight:800;color:#1a1a2e;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Bütçe Aralığı <span style="color:#999;font-weight:400;font-size:.7rem">(opsiyonel)</span></div>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <input id="ilan-pg-butce-min" type="number" class="form-input" placeholder="Min ₺" style="flex:1;margin:0">
+        <input id="ilan-pg-butce-max" type="number" class="form-input" placeholder="Max ₺" style="flex:1;margin:0">
+      </div>
+
+      <!-- Bilgi -->
+      <div style="background:#fff8f5;border:1.5px solid #ffd5c2;border-radius:12px;padding:12px 14px;margin-bottom:20px">
+        <div style="font-size:.75rem;color:#e65100;font-weight:700;margin-bottom:4px">📲 Nasıl Çalışır?</div>
+        <div style="font-size:.72rem;color:#888;line-height:1.6">
+          İlanınız seçtiğiniz kategorideki esnaflarımıza WhatsApp ile iletilir. İlgilenen esnaflar yanıt verir. Siz de beğendiğiniz esnafla iletişime geçersiniz.
+        </div>
+      </div>
+
+      <!-- Gönder -->
+      <button onclick="ilanVerGonder()" id="ilan-ver-gonder-btn" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:14px;padding:16px;font-size:.92rem;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(255,107,53,.4);margin-bottom:20px">
+        🚀 İlanı Yayınla
+      </button>
+    </div>
   </div>
 
 
