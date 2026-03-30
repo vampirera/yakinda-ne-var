@@ -2847,6 +2847,8 @@ function oturumKaydet(kullanici) {
   localStorage.setItem('oturum', JSON.stringify(kullanici));
   durum.panelEsnafId = kullanici.esnaf_id || null;
   durum.oturumTip    = kullanici.tip;
+  // Giriş yapıldığında bildirim badge'ini hemen güncelle
+  bildirimSayisiGuncelle();
 }
 
 function oturumSil() {
@@ -3796,6 +3798,88 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') lightboxKapat();
 });
 
+// ─── BİLDİRİM SİSTEMİ ──────────────────────────────────────────────────────
+
+var _bildirimInterval = null;
+
+function bildirimSayisiGuncelle() {
+  var oturum = oturumAl();
+  if (!oturum || !oturum.telefon) return;
+  fetch(API_URL + '/api/bildirimler?telefon=' + encodeURIComponent(oturum.telefon))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var badge = document.getElementById('bildirim-badge');
+      if (!badge) return;
+      var sayi = data.okunmamis || 0;
+      if (sayi > 0) {
+        badge.style.display = 'inline-block';
+        badge.textContent = sayi > 9 ? '9+' : sayi;
+      } else {
+        badge.style.display = 'none';
+      }
+    })
+    .catch(function() {});
+}
+
+function bildirimKartHTML(b) {
+  var renkler = { ilan: '#ff6b35', teklif: '#4caf50', siparis: '#2196f3', bilgi: '#888' };
+  var renk = renkler[b.tip] || renkler.bilgi;
+  var tarih = new Date(b.olusturma);
+  var simdi = new Date();
+  var fark = Math.floor((simdi - tarih) / 60000);
+  var zamanStr = fark < 1 ? 'Az önce' : fark < 60 ? fark + ' dk önce' : fark < 1440 ? Math.floor(fark/60) + ' sa önce' : Math.floor(fark/1440) + ' gün önce';
+  var navonclick = '';
+  if (b.link_tip === 'ilan' && b.link_id) {
+    navonclick = 'bildirimCekmeciKapat();sayfaGoster(\'ilanlarim\');ilanlarimYukle();';
+  } else if (b.link_tip === 'siparis') {
+    navonce = 'bildirimCekmeciKapat();sayfaGoster(\'siparislerim\');siparislerimYukle();';
+  }
+  return '<div onclick="' + navonclick + '" style="background:#fafafa;border-left:3px solid ' + renk + ';border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:' + (navonclick ? 'pointer' : 'default') + '">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
+    '<div style="font-weight:700;font-size:.82rem;color:#222">' + (b.baslik || '') + '</div>' +
+    '<div style="font-size:.68rem;color:#aaa;white-space:nowrap;flex-shrink:0">' + zamanStr + '</div>' +
+    '</div>' +
+    (b.mesaj ? '<div style="font-size:.78rem;color:#555;margin-top:3px">' + b.mesaj + '</div>' : '') +
+    '</div>';
+}
+
+function bildirimCekmeciAc() {
+  var oturum = oturumAl();
+  var cekmece = document.getElementById('bildirim-cekmece');
+  var liste = document.getElementById('bildirim-liste');
+  cekmece.style.display = 'block';
+  if (!oturum || !oturum.telefon) {
+    liste.innerHTML = '<div style="text-align:center;padding:32px 16px;color:#bbb"><div style="font-size:2rem;margin-bottom:8px">🔔</div><div style="font-size:.85rem">Bildirimler için giriş yapmalısınız.</div></div>';
+    return;
+  }
+  liste.innerHTML = '<div style="text-align:center;padding:20px;color:#aaa;font-size:.85rem">Yükleniyor...</div>';
+
+  fetch(API_URL + '/api/bildirimler?telefon=' + encodeURIComponent(oturum.telefon))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var bildirimler = data.veri || [];
+      if (bildirimler.length === 0) {
+        liste.innerHTML = '<div style="text-align:center;padding:32px 16px;color:#bbb"><div style="font-size:2rem;margin-bottom:8px">🔔</div><div style="font-size:.85rem">Henüz bildirim yok</div></div>';
+      } else {
+        liste.innerHTML = bildirimler.map(bildirimKartHTML).join('');
+      }
+      // Hepsini okundu işaretle
+      fetch(API_URL + '/api/bildirimler/oku', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefon: oturum.telefon })
+      }).then(function() { bildirimSayisiGuncelle(); }).catch(function() {});
+    })
+    .catch(function() {
+      liste.innerHTML = '<div style="text-align:center;padding:20px;color:#e53935;font-size:.85rem">Bildirimler yüklenemedi.</div>';
+    });
+}
+
+function bildirimCekmeciKapat() {
+  var cekmece = document.getElementById('bildirim-cekmece');
+  if (cekmece) cekmece.style.display = 'none';
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   if (window.L) L.Icon.Default.imagePath = 'images/';
 
@@ -3898,4 +3982,8 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('konum-div').addEventListener('click', function() {
     if (++tikSayisi >= 5) { tikSayisi = 0; adminGoster(); }
   });
+
+  // Bildirim polling — her 30 saniyede badge güncelle
+  bildirimSayisiGuncelle();
+  _bildirimInterval = setInterval(bildirimSayisiGuncelle, 30000);
 });

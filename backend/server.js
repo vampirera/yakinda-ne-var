@@ -152,6 +152,20 @@ async function tablolarOlustur() {
     olusturma TIMESTAMP DEFAULT NOW()
   )`);
 
+  // ── UYGULAMA İÇİ BİLDİRİMLER ───────────────────────────────────
+  await pool.query(`CREATE TABLE IF NOT EXISTS bildirimler (
+    id SERIAL PRIMARY KEY,
+    alici_telefon VARCHAR(20) NOT NULL,
+    tip VARCHAR(30) DEFAULT 'bilgi',
+    baslik VARCHAR(255) NOT NULL,
+    mesaj TEXT,
+    link_tip VARCHAR(30),
+    link_id INTEGER,
+    okundu BOOLEAN DEFAULT false,
+    olusturma TIMESTAMP DEFAULT NOW()
+  )`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_bildirimler_alici ON bildirimler(alici_telefon, okundu)`);
+
   // ── HİZMET TEKLİF SİSTEMİ ──────────────────────────────────────
   await pool.query(`CREATE TABLE IF NOT EXISTS is_ilanlari (
     id SERIAL PRIMARY KEY,
@@ -197,6 +211,17 @@ async function tablolarOlustur() {
     console.log('Ornek veriler eklendi!');
   }
   console.log('Tablolar hazir!');
+}
+
+// In-app bildirim oluşturma yardımcısı
+async function bildirimOlustur(aliciTelefon, baslik, mesaj, tip, linkTip, linkId) {
+  if (!aliciTelefon) return;
+  try {
+    await pool.query(
+      'INSERT INTO bildirimler (alici_telefon, tip, baslik, mesaj, link_tip, link_id) VALUES ($1,$2,$3,$4,$5,$6)',
+      [aliciTelefon, tip || 'bilgi', baslik, mesaj || null, linkTip || null, linkId || null]
+    );
+  } catch(err) { console.log('[Bildirim] Olusturulamadi:', err.message); }
 }
 
 function mesafeHesapla(lat1, lng1, lat2, lng2) {
@@ -1024,6 +1049,40 @@ app.put('/api/esnaf-panel/:id/profil', async function(req, res) {
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
+// ── UYGULAMA İÇİ BİLDİRİM ENDPOINTLERİ ─────────────────────────
+
+// Kullanıcının bildirimlerini getir
+app.get('/api/bildirimler', async function(req, res) {
+  try {
+    var { telefon } = req.query;
+    if (!telefon) return res.json({ basari: true, veri: [], okunmamis: 0 });
+    var r = await pool.query(
+      'SELECT * FROM bildirimler WHERE alici_telefon=$1 ORDER BY okundu ASC, olusturma DESC LIMIT 50',
+      [telefon]
+    );
+    var okunmamis = r.rows.filter(function(b) { return !b.okundu; }).length;
+    res.json({ basari: true, veri: r.rows, okunmamis: okunmamis });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Tümünü okundu olarak işaretle
+app.put('/api/bildirimler/oku', async function(req, res) {
+  try {
+    var { telefon } = req.body;
+    if (!telefon) return res.status(400).json({ basari: false });
+    await pool.query('UPDATE bildirimler SET okundu=true WHERE alici_telefon=$1 AND okundu=false', [telefon]);
+    res.json({ basari: true });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Tekil bildirimi sil
+app.delete('/api/bildirim/:id', async function(req, res) {
+  try {
+    await pool.query('DELETE FROM bildirimler WHERE id=$1', [req.params.id]);
+    res.json({ basari: true });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
 // İlan bildirimi tercihini güncelle
 app.put('/api/esnaf-panel/:id/ilan-bildirimi', async function(req, res) {
   try {
@@ -1510,7 +1569,7 @@ app.post('/api/is-ilani', async function(req, res) {
        butce_min ? parseFloat(butce_min) : null, butce_max ? parseFloat(butce_max) : null,
        fotograf_url || null]
     );
-    // Aynı kategorideki onaylı esnafa WhatsApp bildirimi (max 15)
+    // Aynı kategorideki onaylı esnafa uygulama içi bildirim (max 15)
     try {
       var kategoriAd = { yemek: 'Yemek', urun: 'Ürün', hizmet: 'Hizmet' }[kategori] || kategori;
       var esRes = await pool.query(
@@ -1518,9 +1577,12 @@ app.post('/api/is-ilani', async function(req, res) {
         [kategori]
       );
       for (var e of esRes.rows) {
-        whatsappGonder(e.telefon,
-          `📋 Yeni ${kategoriAd} İlanı!\n\n📌 ${baslik}${aciklama ? '\n📝 ' + aciklama.slice(0,100) : ''}${butce_min ? '\n💰 Bütçe: ₺' + butce_min + (butce_max ? '-₺' + butce_max : '+') : ''}\n\nİlgileniyorsanız uygulamadan yanıt verin!`
-        ).catch(function() {});
+        await bildirimOlustur(
+          e.telefon,
+          '📋 Yeni ' + kategoriAd + ' İlanı',
+          baslik + (aciklama ? '\n' + aciklama.slice(0, 100) : '') + (butce_min ? '\n💰 ₺' + butce_min + (butce_max ? '–₺' + butce_max : '+') : ''),
+          'ilan', 'ilan', r.rows[0].id
+        );
       }
     } catch(notifErr) { console.log('Bildirim hatasi:', notifErr.message); }
     res.json({ basari: true, veri: r.rows[0], mesaj: 'İlan yayınlandı! ' + (kategoriAd || '') + ' kategorisindeki esnaflar bildirim aldı.' });
@@ -1573,13 +1635,16 @@ app.post('/api/is-ilani/:id/teklif', async function(req, res) {
       'INSERT INTO teklifler (ilan_id,esnaf_id,fiyat,aciklama) VALUES ($1,$2,$3,$4) RETURNING *',
       [req.params.id, esnaf_id, fiyat ? parseFloat(fiyat) : null, aciklama||null]
     );
-    // Müşteriye WhatsApp — esnaf adı ve telefonu ile
+    // Müşteriye in-app bildirim
     var ilan = await pool.query('SELECT musteri_telefon, baslik FROM is_ilanlari WHERE id=$1', [req.params.id]);
     var esnaf = await pool.query('SELECT ad, telefon FROM esnaflar WHERE id=$1', [esnaf_id]);
     if (ilan.rows[0] && esnaf.rows[0]) {
-      whatsappGonder(ilan.rows[0].musteri_telefon,
-        `🎯 İlanınıza Yanıt Geldi!\n\n📋 "${ilan.rows[0].baslik}"\n🏪 ${esnaf.rows[0].ad}${aciklama ? '\n💬 ' + aciklama : ''}${fiyat ? '\n💰 Fiyat: ₺' + fiyat : ''}\n\nUygulamayı açarak iletişim bilgilerine erişin.`
-      ).catch(function() {});
+      await bildirimOlustur(
+        ilan.rows[0].musteri_telefon,
+        '🎯 İlanınıza Yanıt Geldi',
+        esnaf.rows[0].ad + (aciklama ? ': ' + aciklama.slice(0, 100) : '') + (fiyat ? ' · ₺' + fiyat : ''),
+        'teklif', 'ilan', parseInt(req.params.id)
+      );
     }
     res.json({ basari: true, veri: r.rows[0], mesaj: 'Yanıtınız müşteriye iletildi!' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
