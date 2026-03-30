@@ -1,4 +1,4 @@
-var CACHE_ADI = 'yakinda-ne-var-v4';
+var CACHE_ADI = 'yakinda-ne-var-v5';
 // HTML ve JS her zaman ağdan alınır — Leaflet ve ikonlar cache-first
 var CACHE_STATIK = [
   '/yakinda-ne-var/manifest.json',
