@@ -436,6 +436,119 @@ function telefon() {
   return (oturum && oturum.telefon) || (profil && profil.telefon) || null;
 }
 
+// ── İLAN VER SAYFASI ─────────────────────────────────────────────
+
+var _ilanFotoUrl = null;
+var _ilanSecilenKategori = null;
+
+function ilanVerSayfasiGoster() {
+  var oturum = oturumAl();
+  if (!oturum) { bildirim('İlan vermek için giriş yapın.', 'uyari'); sayfaGoster('kayit-secim'); return; }
+  if (oturum.tip === 'esnaf' || oturum.tip === 'admin') { bildirim('Bu özellik müşteriler için.', 'uyari'); return; }
+  // Formu sıfırla
+  _ilanFotoUrl = null;
+  _ilanSecilenKategori = null;
+  var el;
+  ['ilan-pg-baslik','ilan-pg-aciklama','ilan-pg-butce-min','ilan-pg-butce-max'].forEach(function(id) {
+    el = document.getElementById(id); if (el) el.value = '';
+  });
+  el = document.getElementById('ilan-foto-onizleme');
+  if (el) { el.style.display = 'none'; el.src = ''; }
+  el = document.getElementById('ilan-foto-placeholder'); if (el) el.style.display = '';
+  el = document.getElementById('ilan-foto-degistir'); if (el) el.style.display = 'none';
+  el = document.getElementById('ilan-foto-yukluyor'); if (el) el.style.display = 'none';
+  ['yemek','urun','hizmet'].forEach(function(k) {
+    el = document.getElementById('kat-btn-' + k);
+    if (el) { el.style.borderColor = '#e0e0e0'; el.style.background = '#fff'; el.style.color = '#555'; }
+  });
+  el = document.getElementById('ilan-ver-gonder-btn');
+  if (el) { el.disabled = false; el.textContent = '🚀 İlanı Yayınla'; }
+  sayfaGoster('ilan-ver');
+}
+
+function ilanFotoSec() {
+  document.getElementById('ilan-foto-input').click();
+}
+
+function ilanFotoSecildi(input) {
+  var file = input.files[0];
+  if (!file) return;
+  // Anlık önizleme
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var oniz = document.getElementById('ilan-foto-onizleme');
+    var ph   = document.getElementById('ilan-foto-placeholder');
+    var deg  = document.getElementById('ilan-foto-degistir');
+    oniz.src = e.target.result;
+    oniz.style.display = 'block';
+    ph.style.display = 'none';
+    if (deg) deg.style.display = '';
+  };
+  reader.readAsDataURL(file);
+  // Cloudinary'e yükle
+  var yukluyor = document.getElementById('ilan-foto-yukluyor');
+  if (yukluyor) yukluyor.style.display = 'flex';
+  var fd = new FormData();
+  fd.append('foto', file);
+  fetch(API_URL + '/api/is-ilani/fotograf', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (yukluyor) yukluyor.style.display = 'none';
+      if (data.basari) { _ilanFotoUrl = data.url; bildirim('Fotoğraf yüklendi.', 'basari'); }
+      else { bildirim('Fotoğraf yüklenemedi: ' + data.mesaj, 'hata'); }
+    }).catch(function() {
+      if (yukluyor) yukluyor.style.display = 'none';
+      bildirim('Fotoğraf yüklenemedi.', 'hata');
+    });
+}
+
+function ilanKategoriSec(kategori) {
+  _ilanSecilenKategori = kategori;
+  ['yemek','urun','hizmet'].forEach(function(k) {
+    var btn = document.getElementById('kat-btn-' + k);
+    if (!btn) return;
+    var secili = k === kategori;
+    btn.style.borderColor = secili ? '#ff6b35' : '#e0e0e0';
+    btn.style.background  = secili ? '#fff8f5' : '#fff';
+    btn.style.color       = secili ? '#ff6b35' : '#555';
+  });
+}
+
+function ilanVerGonder() {
+  var oturum = oturumAl();
+  if (!oturum) { bildirim('Giriş yapmanız gerekiyor.', 'uyari'); return; }
+  if (!_ilanSecilenKategori) { bildirim('Kategori seçimi zorunludur.', 'uyari'); return; }
+  var baslik = document.getElementById('ilan-pg-baslik').value.trim();
+  if (!baslik) { bildirim('Ne aradığınızı yazın.', 'uyari'); return; }
+  var btn = document.getElementById('ilan-ver-gonder-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Gönderiliyor...'; }
+  fetch(API_URL + '/api/is-ilani', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      musteri_telefon: oturum.telefon,
+      musteri_ad: oturum.ad,
+      baslik: baslik,
+      aciklama: document.getElementById('ilan-pg-aciklama').value.trim() || null,
+      kategori: _ilanSecilenKategori,
+      butce_min: document.getElementById('ilan-pg-butce-min').value || null,
+      butce_max: document.getElementById('ilan-pg-butce-max').value || null,
+      fotograf_url: _ilanFotoUrl || null
+    })
+  }).then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (btn) { btn.disabled = false; btn.textContent = '🚀 İlanı Yayınla'; }
+    bildirim(data.mesaj || (data.basari ? 'İlan yayınlandı!' : 'Hata.'), data.basari ? 'basari' : 'hata');
+    if (data.basari) {
+      sayfaGoster('siparislerim');
+      setTimeout(function() { siparislerSekmeSec('ilanlar'); }, 200);
+    }
+  }).catch(function() {
+    if (btn) { btn.disabled = false; btn.textContent = '🚀 İlanı Yayınla'; }
+    bildirim('Bağlantı hatası.', 'hata');
+  });
+}
+
 // ── İŞ İLANLARI ─────────────────────────────────────────────────
 
 var _aktifSiparislerSekme = 'siparisler';
@@ -469,48 +582,76 @@ function ilanlarimYukle() {
       var ilanlar = data.basari ? data.veri : [];
       var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
         '<div style="font-size:.75rem;font-weight:800;color:#1a1a2e;text-transform:uppercase">İlanlarım (' + ilanlar.length + ')</div>' +
-        '<button onclick="yeniIlanModal()" style="background:#ff6b35;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:.76rem;font-weight:700;cursor:pointer">+ Yeni İlan</button>' +
+        '<button onclick="ilanVerSayfasiGoster()" style="background:#ff6b35;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:.76rem;font-weight:700;cursor:pointer">+ Yeni İlan</button>' +
       '</div>';
       if (!ilanlar.length) {
         html += '<div style="text-align:center;padding:40px;color:#aaa"><div style="font-size:2.5rem;margin-bottom:8px">📋</div>Henüz ilan oluşturmadınız.<br><small>Esnaflardan teklif almak için ilan açın!</small></div>';
       } else {
+        var katRenk = { yemek: '#e65100', urun: '#1565c0', hizmet: '#2e7d32' };
+        var katIkon = { yemek: '🍔', urun: '📦', hizmet: '🔧' };
         html += ilanlar.map(function(ilan) {
           var durumRenk = { acik: '#2e7d32', kapali: '#888', iptal: '#c62828' };
           var renk = durumRenk[ilan.durum] || '#888';
-          var teklifler = (ilan.teklifler || []).filter(Boolean);
-          var teklifHTML = teklifler.length
-            ? teklifler.map(function(t) {
-                return '<div style="background:#f9f9f9;border-radius:8px;padding:8px 10px;margin-top:6px;display:flex;justify-content:space-between;align-items:center">' +
-                  '<div>' +
-                    '<div style="font-size:.8rem;font-weight:700">' + (t.esnaf_ad || '') + '</div>' +
-                    '<div style="font-size:.72rem;color:#888">' + (t.aciklama ? t.aciklama.slice(0,60) : '') + '</div>' +
-                  '</div>' +
-                  '<div style="text-align:right">' +
-                    '<div style="font-size:.88rem;font-weight:800;color:#ff6b35">₺' + t.fiyat + '</div>' +
-                    (t.durum === 'bekliyor' && ilan.durum === 'acik'
-                      ? '<div style="display:flex;gap:4px;margin-top:4px">' +
-                          '<button onclick="teklifKabul(' + t.id + ')" style="background:#e8f5e9;color:#2e7d32;border:none;border-radius:6px;padding:3px 8px;font-size:.7rem;font-weight:700;cursor:pointer">Kabul</button>' +
-                          '<button onclick="teklifReddet(' + t.id + ')" style="background:#ffebee;color:#c62828;border:none;border-radius:6px;padding:3px 8px;font-size:.7rem;font-weight:700;cursor:pointer">Reddet</button>' +
-                        '</div>'
-                      : '<div style="font-size:.68rem;font-weight:700;color:' + (t.durum === 'kabul' ? '#2e7d32' : '#888') + '">' + t.durum + '</div>'
-                    ) +
-                  '</div>' +
+          var yanıtlar = (ilan.teklifler || []).filter(Boolean);
+
+          // Fotoğraf varsa göster
+          var fotoHTML = ilan.fotograf_url
+            ? '<div style="margin-bottom:10px;border-radius:10px;overflow:hidden;height:120px">' +
+                '<img src="' + ilan.fotograf_url + '" style="width:100%;height:100%;object-fit:cover">' +
+              '</div>'
+            : '';
+
+          var yanıtHTML = '';
+          if (yanıtlar.length) {
+            yanıtHTML = '<div style="font-size:.72rem;font-weight:800;color:#555;margin-top:10px;margin-bottom:6px;text-transform:uppercase">İlgilenen Esnaflar (' + yanıtlar.length + ')</div>';
+            yanıtHTML += yanıtlar.map(function(t) {
+              var kabul = t.durum === 'kabul';
+              var iletisimHTML = '';
+              if (kabul || t.durum === 'bekliyor') {
+                var waTel = t.esnaf_telefon ? t.esnaf_telefon.replace(/\D/g,'') : '';
+                if (waTel.startsWith('0')) waTel = '90' + waTel.slice(1);
+                iletisimHTML = '<div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap">' +
+                  (t.durum === 'bekliyor' && ilan.durum === 'acik'
+                    ? '<button onclick="teklifKabul(' + t.id + ')" style="background:#e8f5e9;color:#2e7d32;border:none;border-radius:7px;padding:5px 10px;font-size:.7rem;font-weight:700;cursor:pointer">✅ Seç</button>' +
+                      '<button onclick="teklifReddet(' + t.id + ')" style="background:#ffebee;color:#c62828;border:none;border-radius:7px;padding:5px 10px;font-size:.7rem;font-weight:700;cursor:pointer">✕ Geç</button>'
+                    : '') +
+                  (t.esnaf_telefon
+                    ? '<a href="tel:' + t.esnaf_telefon + '" style="background:#f5f5f5;color:#1a1a2e;text-decoration:none;border-radius:7px;padding:5px 10px;font-size:.7rem;font-weight:700">📞 Ara</a>' +
+                      '<a href="https://wa.me/' + waTel + '" target="_blank" style="background:#e8f5e9;color:#2e7d32;text-decoration:none;border-radius:7px;padding:5px 10px;font-size:.7rem;font-weight:700">💬 WhatsApp</a>'
+                    : '') +
                 '</div>';
-              }).join('')
-            : '<div style="font-size:.75rem;color:#aaa;margin-top:6px">Henüz teklif yok</div>';
-          return '<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.06);border-left:4px solid ' + renk + '">' +
-            '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
-              '<div style="flex:1">' +
-                '<div style="font-weight:800;font-size:.9rem">' + ilan.baslik + '</div>' +
-                '<div style="font-size:.73rem;color:#888;margin-top:2px">' +
-                  (ilan.kategori ? ilan.kategori + ' · ' : '') + (ilan.ilce || '') +
-                  (ilan.butce_min ? ' · ₺' + ilan.butce_min + (ilan.butce_max ? '–' + ilan.butce_max : '+') : '') +
+              }
+              return '<div style="background:' + (kabul ? '#f0fff4' : '#f9f9f9') + ';border:1px solid ' + (kabul ? '#a5d6a7' : '#eee') + ';border-radius:10px;padding:10px;margin-bottom:6px">' +
+                '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+                  '<div>' +
+                    '<div style="font-size:.82rem;font-weight:800">' + (t.esnaf_ad || '') + '</div>' +
+                    (t.aciklama ? '<div style="font-size:.72rem;color:#666;margin-top:2px">' + t.aciklama.slice(0,80) + '</div>' : '') +
+                  '</div>' +
+                  '<div style="text-align:right;flex-shrink:0;margin-left:8px">' +
+                    (t.fiyat ? '<div style="font-size:.9rem;font-weight:800;color:#ff6b35">₺' + t.fiyat + '</div>' : '') +
+                    '<div style="font-size:.65rem;font-weight:700;color:' + (kabul ? '#2e7d32' : '#888') + '">' + (kabul ? '✅ Seçildi' : 'Yanıt verdi') + '</div>' +
+                  '</div>' +
                 '</div>' +
+                iletisimHTML +
+              '</div>';
+            }).join('');
+          } else {
+            yanıtHTML = '<div style="font-size:.75rem;color:#aaa;margin-top:8px;padding:8px;background:#fafafa;border-radius:8px;text-align:center">Henüz yanıt gelmedi — esnaflar bildirim aldı</div>';
+          }
+
+          return '<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.07);border-top:4px solid ' + (katRenk[ilan.kategori] || renk) + '">' +
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
+              '<div style="flex:1">' +
+                '<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">' +
+                  '<span style="font-size:.9rem">' + (katIkon[ilan.kategori] || '📋') + '</span>' +
+                  '<span style="font-weight:800;font-size:.88rem">' + ilan.baslik + '</span>' +
+                '</div>' +
+                (ilan.butce_min ? '<div style="font-size:.7rem;color:#888">₺' + ilan.butce_min + (ilan.butce_max ? '–' + ilan.butce_max : '+') + '</div>' : '') +
               '</div>' +
-              '<span style="font-size:.68rem;font-weight:700;color:' + renk + ';padding:2px 8px;background:' + renk + '18;border-radius:8px">' + ilan.durum + '</span>' +
+              '<span style="font-size:.66rem;font-weight:700;color:' + renk + ';padding:3px 8px;background:' + renk + '18;border-radius:8px;white-space:nowrap;margin-left:8px">' + ilan.durum + '</span>' +
             '</div>' +
-            '<div style="font-size:.72rem;color:#888;margin-top:4px">📬 ' + ilan.teklif_sayisi + ' teklif</div>' +
-            teklifHTML +
+            fotoHTML +
+            yanıtHTML +
           '</div>';
         }).join('');
       }
@@ -518,51 +659,6 @@ function ilanlarimYukle() {
     }).catch(function() { con.innerHTML = '<div class="hata">Yüklenemedi.</div>'; });
 }
 
-function yeniIlanModal() {
-  var oturum = oturumAl();
-  var html = '<div style="padding:4px">' +
-    '<h3 style="font-size:.95rem;margin:0 0 14px">📋 Yeni İş İlanı</h3>' +
-    '<input id="ilan-baslik" class="form-input" placeholder="Başlık (örn: Boyacı arıyorum) *" style="margin-bottom:8px">' +
-    '<textarea id="ilan-aciklama" class="form-input" placeholder="Detaylar..." rows="3" style="resize:none;margin-bottom:8px"></textarea>' +
-    '<div style="display:flex;gap:6px;margin-bottom:8px">' +
-      '<input id="ilan-kategori" class="form-input" placeholder="Kategori" style="flex:1;margin:0">' +
-      '<input id="ilan-ilce" class="form-input" placeholder="İlçe" style="flex:1;margin:0" value="' + (oturum && oturum.ilce ? oturum.ilce : '') + '">' +
-    '</div>' +
-    '<div style="display:flex;gap:6px;margin-bottom:8px">' +
-      '<input id="ilan-butce-min" type="number" class="form-input" placeholder="Min bütçe ₺" style="flex:1;margin:0">' +
-      '<input id="ilan-butce-max" type="number" class="form-input" placeholder="Max bütçe ₺" style="flex:1;margin:0">' +
-    '</div>' +
-    '<input id="ilan-tarih" type="date" class="form-input" placeholder="Tercih edilen tarih" style="margin-bottom:12px">' +
-    '<button onclick="yeniIlanGonder()" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:12px;padding:12px;font-size:.88rem;font-weight:700;cursor:pointer">İlanı Yayınla</button>' +
-  '</div>';
-  adminModalAc(html);
-}
-
-function yeniIlanGonder() {
-  var oturum = oturumAl();
-  if (!oturum) return;
-  var baslik = document.getElementById('ilan-baslik').value.trim();
-  if (!baslik) { bildirim('Başlık zorunlu.', 'uyari'); return; }
-  fetch(API_URL + '/api/is-ilani', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      musteri_telefon: oturum.telefon,
-      musteri_ad: oturum.ad,
-      baslik: baslik,
-      aciklama: document.getElementById('ilan-aciklama').value.trim(),
-      kategori: document.getElementById('ilan-kategori').value.trim() || null,
-      ilce: document.getElementById('ilan-ilce').value.trim() || null,
-      butce_min: document.getElementById('ilan-butce-min').value || null,
-      butce_max: document.getElementById('ilan-butce-max').value || null,
-      tarih_tercih: document.getElementById('ilan-tarih').value || null
-    })
-  }).then(function(r) { return r.json(); })
-  .then(function(data) {
-    bildirim(data.mesaj || (data.basari ? 'İlan yayınlandı!' : 'Hata.'), data.basari ? 'basari' : 'hata');
-    if (data.basari) { adminModalKapat(); ilanlarimYukle(); }
-  });
-}
 
 function teklifKabul(teklifId) {
   var oturum = oturumAl();
@@ -575,13 +671,12 @@ function teklifKabul(teklifId) {
 }
 
 function teklifReddet(teklifId) {
-  var oturum = oturumAl();
   fetch(API_URL + '/api/teklif/' + teklifId + '/durum', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ durum: 'reddedildi', musteri_telefon: oturum ? oturum.telefon : '' })
+    body: JSON.stringify({ durum: 'reddedildi' })
   }).then(function(r) { return r.json(); })
-  .then(function(data) { bildirim(data.mesaj, data.basari ? 'hata' : 'hata'); if (data.basari) ilanlarimYukle(); });
+  .then(function(data) { bildirim(data.mesaj, data.basari ? 'bilgi' : 'hata'); if (data.basari) ilanlarimYukle(); });
 }
 
 function siparislerimSayfasiAc(siparisId) {
@@ -3320,26 +3415,30 @@ function panelIlanlarYukle() {
   if (!esnafId) return;
   var con = document.getElementById('panel-ilanlar-liste');
   if (!con) return;
-  // Esnaf bilgilerini al (ilçe için)
+  // Esnaf kategorisini al — aynı kategorideki ilanları göster
   fetch(API_URL + '/api/esnaflar/' + esnafId)
     .then(function(r) { return r.json(); })
     .then(function(esnafData) {
-      var ilce = esnafData.basari && esnafData.veri ? esnafData.veri.ilce : '';
-      var url = API_URL + '/api/is-ilanlari' + (ilce ? '?ilce=' + encodeURIComponent(ilce) : '');
+      var kategori = esnafData.basari && esnafData.veri ? esnafData.veri.kategori : '';
+      var url = API_URL + '/api/is-ilanlari' + (kategori ? '?kategori=' + encodeURIComponent(kategori) : '');
       return fetch(url).then(function(r) { return r.json(); });
     })
     .then(function(data) {
       var ilanlar = data.basari ? data.veri : [];
-      if (!ilanlar.length) { con.innerHTML = '<div style="color:#aaa;font-size:.82rem">Bölgenizde açık ilan yok.</div>'; return; }
+      if (!ilanlar.length) { con.innerHTML = '<div style="color:#aaa;font-size:.82rem;text-align:center;padding:10px">Kategorinizde açık ilan yok.</div>'; return; }
       con.innerHTML = ilanlar.map(function(ilan) {
-        return '<div style="border:1px solid #f0f0f0;border-radius:10px;padding:10px;margin-bottom:8px">' +
+        var fotoHTML = ilan.fotograf_url
+          ? '<div style="margin:6px 0;border-radius:8px;overflow:hidden;height:90px"><img src="' + ilan.fotograf_url + '" style="width:100%;height:100%;object-fit:cover"></div>'
+          : '';
+        return '<div style="border:1px solid #f0f0f0;border-radius:12px;padding:10px;margin-bottom:8px;background:#fff">' +
           '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">' +
             '<div style="font-weight:700;font-size:.82rem;flex:1;padding-right:8px">' + ilan.baslik + '</div>' +
-            '<span style="font-size:.68rem;color:#888;white-space:nowrap">📬 ' + ilan.teklif_sayisi + ' teklif</span>' +
+            '<span style="font-size:.66rem;color:#888;white-space:nowrap;background:#f5f5f5;padding:2px 6px;border-radius:6px">👥 ' + ilan.teklif_sayisi + '</span>' +
           '</div>' +
+          fotoHTML +
           (ilan.aciklama ? '<div style="font-size:.72rem;color:#666;margin-bottom:4px">' + ilan.aciklama.slice(0,80) + (ilan.aciklama.length > 80 ? '...' : '') + '</div>' : '') +
-          (ilan.butce_min ? '<div style="font-size:.72rem;color:#2e7d32;font-weight:700">₺' + ilan.butce_min + (ilan.butce_max ? '–' + ilan.butce_max : '+') + '</div>' : '') +
-          '<button onclick="panelTeklifModal(' + ilan.id + ',\'' + ilan.baslik.replace(/'/g, '') + '\')" style="width:100%;margin-top:8px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;padding:8px;font-size:.76rem;font-weight:700;cursor:pointer">Teklif Ver</button>' +
+          (ilan.butce_min ? '<div style="font-size:.72rem;color:#2e7d32;font-weight:700;margin-bottom:6px">₺' + ilan.butce_min + (ilan.butce_max ? '–₺' + ilan.butce_max : '+') + '</div>' : '') +
+          '<button onclick="panelTeklifModal(' + ilan.id + ',\'' + (ilan.baslik||'').replace(/'/g, '') + '\')" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:8px;padding:9px;font-size:.76rem;font-weight:700;cursor:pointer">🙋 İlgileniyorum</button>' +
         '</div>';
       }).join('');
     }).catch(function() { con.innerHTML = '<div class="hata">Yüklenemedi.</div>'; });
@@ -3347,15 +3446,17 @@ function panelIlanlarYukle() {
 
 function panelTeklifModal(ilanId, ilanBaslik) {
   var html = '<div style="padding:4px">' +
-    '<h3 style="font-size:.9rem;margin:0 0 4px">Teklif Ver</h3>' +
-    '<div style="font-size:.78rem;color:#888;margin-bottom:14px">' + ilanBaslik + '</div>' +
-    '<input id="teklif-fiyat" type="number" class="form-input" placeholder="Fiyat (₺) *" min="0" style="margin-bottom:8px">' +
-    '<textarea id="teklif-aciklama" class="form-input" placeholder="Açıklama, teslim süresi vs..." rows="3" style="resize:none;margin-bottom:8px"></textarea>' +
-    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">' +
-      '<label style="font-size:.78rem;color:#666;white-space:nowrap">Süre (gün):</label>' +
-      '<input id="teklif-sure" type="number" class="form-input" value="1" min="1" style="width:70px;margin:0">' +
+    '<h3 style="font-size:.9rem;margin:0 0 4px">🙋 İlgileniyorum</h3>' +
+    '<div style="font-size:.78rem;color:#888;margin-bottom:14px;line-height:1.5">' + ilanBaslik + '</div>' +
+    '<textarea id="teklif-aciklama" class="form-input" placeholder="Müşteriye mesajınız — kendinizi tanıtın, ne sunabileceğinizi yazın..." rows="4" style="resize:none;margin-bottom:8px"></textarea>' +
+    '<div style="display:flex;gap:8px;margin-bottom:14px">' +
+      '<div style="flex:1">' +
+        '<div style="font-size:.72rem;color:#888;margin-bottom:4px">Fiyat teklifi (opsiyonel)</div>' +
+        '<input id="teklif-fiyat" type="number" class="form-input" placeholder="₺" min="0" style="margin:0">' +
+      '</div>' +
     '</div>' +
-    '<button onclick="panelTeklifGonder(' + ilanId + ')" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:12px;padding:12px;font-size:.88rem;font-weight:700;cursor:pointer">Teklifi Gönder</button>' +
+    '<div style="background:#fff8f5;border-radius:10px;padding:10px;margin-bottom:14px;font-size:.72rem;color:#888">📲 Müşteri bildirim alacak ve sizinle iletişime geçebilecek.</div>' +
+    '<button onclick="panelTeklifGonder(' + ilanId + ')" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:12px;padding:13px;font-size:.88rem;font-weight:700;cursor:pointer">Yanıt Gönder</button>' +
   '</div>';
   adminModalAc(html);
 }
@@ -3363,20 +3464,20 @@ function panelTeklifModal(ilanId, ilanBaslik) {
 function panelTeklifGonder(ilanId) {
   var esnafId = durum.panelEsnafId;
   if (!esnafId) return;
-  var fiyat = parseFloat(document.getElementById('teklif-fiyat').value);
-  if (!fiyat || fiyat <= 0) { bildirim('Geçerli bir fiyat girin.', 'uyari'); return; }
+  var aciklama = document.getElementById('teklif-aciklama').value.trim();
+  if (!aciklama) { bildirim('Müşteriye bir mesaj yazın.', 'uyari'); return; }
+  var fiyat = document.getElementById('teklif-fiyat').value;
   fetch(API_URL + '/api/is-ilani/' + ilanId + '/teklif', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       esnaf_id: esnafId,
-      fiyat: fiyat,
-      aciklama: document.getElementById('teklif-aciklama').value.trim(),
-      sure_gun: parseInt(document.getElementById('teklif-sure').value) || 1
+      fiyat: fiyat ? parseFloat(fiyat) : null,
+      aciklama: aciklama
     })
   }).then(function(r) { return r.json(); })
   .then(function(data) {
-    bildirim(data.mesaj || (data.basari ? 'Teklif gönderildi!' : 'Hata.'), data.basari ? 'basari' : 'hata');
+    bildirim(data.mesaj || (data.basari ? 'Yanıt gönderildi!' : 'Hata.'), data.basari ? 'basari' : 'hata');
     if (data.basari) { adminModalKapat(); panelIlanlarYukle(); }
   });
 }
