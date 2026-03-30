@@ -580,10 +580,7 @@ function ilanlarimYukle() {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var ilanlar = data.basari ? data.veri : [];
-      var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
-        '<div style="font-size:.75rem;font-weight:800;color:#1a1a2e;text-transform:uppercase">İlanlarım (' + ilanlar.length + ')</div>' +
-        '<button onclick="ilanVerSayfasiGoster()" style="background:#ff6b35;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:.76rem;font-weight:700;cursor:pointer">+ Yeni İlan</button>' +
-      '</div>';
+      var html = '<div style="margin-bottom:12px;font-size:.75rem;font-weight:800;color:#1a1a2e;text-transform:uppercase">İlanlarım (' + ilanlar.length + ')</div>';
       if (!ilanlar.length) {
         html += '<div style="text-align:center;padding:40px;color:#aaa"><div style="font-size:2.5rem;margin-bottom:8px">📋</div>Henüz ilan oluşturmadınız.<br><small>Esnaflardan teklif almak için ilan açın!</small></div>';
       } else {
@@ -3830,7 +3827,7 @@ function bildirimKartHTML(b) {
   var zamanStr = fark < 1 ? 'Az önce' : fark < 60 ? fark + ' dk önce' : fark < 1440 ? Math.floor(fark/60) + ' sa önce' : Math.floor(fark/1440) + ' gün önce';
   var navonclick = '';
   if (b.link_tip === 'ilan' && b.link_id) {
-    navonclick = 'bildirimCekmeciKapat();sayfaGoster(\'ilanlarim\');ilanlarimYukle();';
+    navonclick = 'bildirimCekmeciKapat();sayfaGoster(\'siparislerim\');siparislerSekmeSec(\'ilanlar\');';
   } else if (b.link_tip === 'siparis') {
     navonce = 'bildirimCekmeciKapat();sayfaGoster(\'siparislerim\');siparislerimYukle();';
   }
