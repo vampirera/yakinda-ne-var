@@ -900,13 +900,18 @@ function musteriRandevuIptal(randevuId) {
 // FAVORİLER
 // =============================================================
 
+function _favoriKey() {
+  var oturum = oturumAl();
+  return 'favoriler:' + (oturum && oturum.telefon ? oturum.telefon : 'misafir');
+}
+
 function favorileriYukle() {
-  try { return JSON.parse(localStorage.getItem('favoriler') || '[]'); }
+  try { return JSON.parse(localStorage.getItem(_favoriKey()) || '[]'); }
   catch(e) { return []; }
 }
 
 function favorileriKaydet(favoriler) {
-  localStorage.setItem('favoriler', JSON.stringify(favoriler));
+  localStorage.setItem(_favoriKey(), JSON.stringify(favoriler));
 }
 
 function favoriMi(id) {
