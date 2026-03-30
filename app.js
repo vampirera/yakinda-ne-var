@@ -3137,6 +3137,15 @@ function panelProfilFormYukle(esnafId) {
       if (igEl)  igEl.value  = e.instagram_url || '';
       if (gmEl)  gmEl.value  = e.google_maps_url || '';
 
+      // İlan bildirimi toggle
+      var ilanToggle  = document.getElementById('ilan-bildirimi-toggle');
+      var ilanSlider  = document.getElementById('ilan-bildirimi-slider');
+      var ilanKnob    = document.getElementById('ilan-bildirimi-knob');
+      var aktif = e.ilan_bildirimi !== false; // varsayılan true
+      if (ilanToggle) ilanToggle.checked = aktif;
+      if (ilanSlider) ilanSlider.style.background = aktif ? '#ff6b35' : '#ccc';
+      if (ilanKnob)   ilanKnob.style.transform = aktif ? 'translateX(20px)' : 'translateX(0)';
+
       // Onay durumu banneri
       var bannerEl = document.getElementById('panel-onay-banner');
       if (bannerEl) {
@@ -3512,6 +3521,24 @@ function randevuAyarlariniYukle(esnafId) {
       _indirimliSaatler = v.indirimli_saatler || {};
       _indirimSaatleriniGoster();
     });
+}
+
+function ilanBildirimiToggle() {
+  var esnafId = durum.panelEsnafId;
+  if (!esnafId) return;
+  var toggle = document.getElementById('ilan-bildirimi-toggle');
+  var slider = document.getElementById('ilan-bildirimi-slider');
+  var knob   = document.getElementById('ilan-bildirimi-knob');
+  var aktif  = toggle.checked;
+  slider.style.background = aktif ? '#ff6b35' : '#ccc';
+  knob.style.transform    = aktif ? 'translateX(20px)' : 'translateX(0)';
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/ilan-bildirimi', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ aktif: aktif })
+  }).then(function(r) { return r.json(); })
+  .then(function(data) { bildirim(data.mesaj, data.basari ? 'basari' : 'hata'); })
+  .catch(function() { bildirim('Bağlantı hatası.', 'hata'); });
 }
 
 function randevuModuToggle() {
