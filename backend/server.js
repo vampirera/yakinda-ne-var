@@ -1661,6 +1661,37 @@ app.get('/api/ilanlarim', async function(req, res) {
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
+// İlan düzenle (sadece ilan sahibi müşteri yapabilir)
+app.put('/api/is-ilanlari/:id', async function(req, res) {
+  try {
+    var { musteri_telefon, baslik, aciklama, fotograf_url } = req.body;
+    if (!musteri_telefon) return res.status(400).json({ basari: false, mesaj: 'Telefon zorunlu.' });
+    var kontrol = await pool.query('SELECT id FROM is_ilanlari WHERE id=$1 AND musteri_telefon=$2', [req.params.id, musteri_telefon]);
+    if (!kontrol.rows.length) return res.status(403).json({ basari: false, mesaj: 'İlan bulunamadı veya yetkiniz yok.' });
+    var setClauses = [];
+    var params = [];
+    if (baslik !== undefined) { params.push(baslik); setClauses.push('baslik=$' + params.length); }
+    if (aciklama !== undefined) { params.push(aciklama); setClauses.push('aciklama=$' + params.length); }
+    if (fotograf_url !== undefined) { params.push(fotograf_url); setClauses.push('fotograf_url=$' + params.length); }
+    if (!setClauses.length) return res.status(400).json({ basari: false, mesaj: 'Güncellenecek alan yok.' });
+    params.push(req.params.id);
+    await pool.query('UPDATE is_ilanlari SET ' + setClauses.join(',') + ' WHERE id=$' + params.length, params);
+    res.json({ basari: true, mesaj: 'İlan güncellendi.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// İlanı yayından kaldır (pasif yap)
+app.put('/api/is-ilanlari/:id/kaldir', async function(req, res) {
+  try {
+    var { musteri_telefon } = req.body;
+    if (!musteri_telefon) return res.status(400).json({ basari: false, mesaj: 'Telefon zorunlu.' });
+    var kontrol = await pool.query('SELECT id FROM is_ilanlari WHERE id=$1 AND musteri_telefon=$2', [req.params.id, musteri_telefon]);
+    if (!kontrol.rows.length) return res.status(403).json({ basari: false, mesaj: 'İlan bulunamadı veya yetkiniz yok.' });
+    await pool.query("UPDATE is_ilanlari SET durum='kapali' WHERE id=$1", [req.params.id]);
+    res.json({ basari: true, mesaj: 'İlan yayından kaldırıldı.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
 // Esnaf ilgi bildir (fiyat opsiyonel)
 app.post('/api/is-ilani/:id/teklif', async function(req, res) {
   try {
