@@ -340,6 +340,8 @@ firebase.initializeApp({
       <div class="action-btns">
         <button class="btn-p secili" id="btn-kurye">🛵 Siparis Ver</button>
         <button class="btn-s" id="btn-gelal">🚶 Gel-Al</button>
+        <button class="btn-p" id="btn-randevu" style="display:none">📅 Randevu Oluştur</button>
+        <button class="btn-s" id="btn-soru-sor" style="display:none">💬 Soru Sor</button>
       </div>
       <div id="detay-sosyal-kanit" style="display:none;background:#fff8f5;border-radius:10px;padding:8px 12px;margin-top:8px;display:flex;gap:12px;flex-wrap:wrap"></div>
       <div id="detay-sosyal" style="display:flex;gap:8px;margin-top:10px"></div>
@@ -1007,6 +1009,20 @@ firebase.initializeApp({
   </div>
 
 </div>
+<!-- SORU SOR MODAL -->
+<div id="modal-soru" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:flex-end;justify-content:center">
+  <div style="background:#fff;border-radius:18px 18px 0 0;padding:20px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h3 style="font-size:1rem;font-weight:800;margin:0">💬 Soru Sor</h3>
+      <button onclick="soruModalKapat()" style="background:#f5f5f5;border:none;border-radius:50%;width:30px;height:30px;font-size:1rem;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <input type="text" id="soru-ad" placeholder="Adınız (opsiyonel)" style="width:100%;padding:10px;font-size:.88rem;border:1.5px solid #e0e0e0;border-radius:10px;margin-bottom:8px;box-sizing:border-box">
+    <input type="tel" id="soru-telefon" placeholder="Telefon / WhatsApp (opsiyonel)" style="width:100%;padding:10px;font-size:.88rem;border:1.5px solid #e0e0e0;border-radius:10px;margin-bottom:8px;box-sizing:border-box">
+    <textarea id="soru-metin" placeholder="Sorunuzu yazın... *" style="width:100%;padding:10px;font-size:.88rem;border:1.5px solid #e0e0e0;border-radius:10px;resize:none;height:90px;margin-bottom:12px;box-sizing:border-box"></textarea>
+    <button onclick="soruGonder()" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:12px;padding:14px;font-weight:700;font-size:.95rem;cursor:pointer">📨 Gönder</button>
+  </div>
+</div>
+
 <script src="app.js?v=20260331" defer></script>
 </body>
 </html>

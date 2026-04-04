@@ -1862,9 +1862,16 @@ function detayDoldur(e) {
     durum.detayHarita.invalidateSize();
   }, 100);
 
+  // Hizmet/ürün esnafı buton ayrımı
+  var isHizmet = e.kategori === 'hizmet';
+  document.getElementById('btn-kurye').style.display = isHizmet ? 'none' : '';
+  document.getElementById('btn-gelal').style.display = isHizmet ? 'none' : '';
+  document.getElementById('btn-randevu').style.display = isHizmet ? '' : 'none';
+  document.getElementById('btn-soru-sor').style.display = isHizmet ? '' : 'none';
+
   // Tablar
   var tablar = ['Menu', 'Yorumlar', 'Yorum Yaz'];
-  if (e.randevu_modu) tablar.push('📅 Randevu');
+  if (e.randevu_modu || isHizmet) tablar.push('📅 Randevu');
   document.getElementById('detay-tabs').innerHTML = tablar.map(function(t, i) {
     return '<div class="detay-tab' + (i === 0 ? ' active' : '') + '" onclick="tabSec(this,' + i + ')">' + t + '</div>';
   }).join('');
@@ -1878,8 +1885,8 @@ function detayDoldur(e) {
   document.getElementById('tab-yorum-ekle').style.display = 'none';
   document.getElementById('tab-randevu').style.display = 'none';
 
-  // Randevu modu aktifse hazırla
-  if (e.randevu_modu) {
+  // Randevu modu aktifse veya hizmet esnafıysa randevu formunu hazırla
+  if (e.randevu_modu || isHizmet) {
     var bugun = new Date().toISOString().split('T')[0];
     document.getElementById('det-randevu-tarih').min = bugun;
     document.getElementById('det-randevu-tarih').value = bugun;
@@ -2131,6 +2138,44 @@ function siparisVer() {
       } else { bildirim('Hata: ' + data.mesaj, 'hata'); }
     })
     .catch(function() { bildirim('Sipariş gönderilemedi.', 'hata'); });
+}
+
+// =============================================================
+// SORU SOR
+
+function soruModalAc() {
+  var modal = document.getElementById('modal-soru');
+  modal.style.display = 'flex';
+  var profil = profilYukle();
+  if (profil) {
+    if (profil.ad)  document.getElementById('soru-ad').value = profil.ad;
+    if (profil.telefon) document.getElementById('soru-telefon').value = profil.telefon;
+  }
+  document.getElementById('soru-metin').value = '';
+}
+
+function soruModalKapat() {
+  document.getElementById('modal-soru').style.display = 'none';
+}
+
+function soruGonder() {
+  if (!durum.secilenEsnaf) return;
+  var soru = document.getElementById('soru-metin').value.trim();
+  if (!soru) { bildirim('Lütfen sorunuzu yazın.', 'uyari'); return; }
+  var ad  = document.getElementById('soru-ad').value.trim();
+  var tel = document.getElementById('soru-telefon').value.trim();
+  fetch(API_URL + '/api/sorular', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ esnaf_id: durum.secilenEsnaf.id, musteri_ad: ad || null, musteri_telefon: tel || null, soru: soru })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.basari) { bildirim(data.mesaj || 'Gönderilemedi.', 'hata'); return; }
+      soruModalKapat();
+      bildirim('Sorunuz iletildi! Esnaf kısa sürede yanıtlayacak.', 'basari');
+    })
+    .catch(function() { bildirim('Bağlantı hatası.', 'hata'); });
 }
 
 // =============================================================
@@ -3956,6 +4001,15 @@ document.addEventListener('DOMContentLoaded', function() {
     durum.teslimat = 'gel-al';
     document.getElementById('btn-gelal').classList.add('secili');
     document.getElementById('btn-kurye').classList.remove('secili');
+  });
+  document.getElementById('btn-randevu').addEventListener('click', function() {
+    var tabs = document.querySelectorAll('.detay-tab');
+    var randevuIdx = tabs.length - 1; // Randevu her zaman son tab
+    if (tabs[randevuIdx]) tabSec(tabs[randevuIdx], randevuIdx);
+    document.getElementById('tab-randevu').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  document.getElementById('btn-soru-sor').addEventListener('click', function() {
+    soruModalAc();
   });
 
   // Profil formu
