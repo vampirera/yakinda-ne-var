@@ -219,10 +219,33 @@ async function tablolarOlustur() {
     var e3 = await pool.query(`INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,vergi_no,lat,lng,puan,yorum_sayisi,acik,onayli,onaylandi) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`, ['Mehmet Usta Tesisatci','hizmet','Marmaris','Yeni Mah. No:12','05005554433','1122334455',36.8580,28.2800,4.9,56,true,true,true]);
     var id3 = e3.rows[0].id;
     await pool.query('INSERT INTO urunler (esnaf_id,ad,fiyat,aciklama) VALUES ($1,$2,$3,$4),($1,$5,$6,$7)', [id3,'Musluk Tamiri',250,'Yerinde servis','Tesisat Kontrolu',150,'Genel kontrol']);
-    var e4 = await pool.query(`INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,vergi_no,lat,lng,puan,yorum_sayisi,acik,onayli,onaylandi) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`, ['Berber Murat','hizmet','Marmaris','Merkez Mah. No:8','05009876543','5566778899',36.8535,28.2740,4.7,203,true,false,true]);
+    var e4 = await pool.query(`INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,vergi_no,lat,lng,puan,yorum_sayisi,acik,onayli,onaylandi) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`, ['Berber Murat','hizmet','Marmaris','Merkez Mah. No:8','05009876543','5566778899',36.8535,28.2740,4.7,203,true,true,true]);
     var id4 = e4.rows[0].id;
     await pool.query('INSERT INTO urunler (esnaf_id,ad,fiyat,aciklama) VALUES ($1,$2,$3,$4),($1,$5,$6,$7)', [id4,'Sac Kesimi',150,'Erkek sac','Sakal Tiras',80,'Klasik tiras']);
+    var e5 = await pool.query(`INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,vergi_no,lat,lng,puan,yorum_sayisi,acik,onayli,onaylandi) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`, ['Elektrikci Ali Usta','hizmet','Marmaris','Siteler Mah. No:34','05551112233','9988776655',36.8562,28.2765,4.8,78,true,true,true]);
+    var id5 = e5.rows[0].id;
+    await pool.query('INSERT INTO urunler (esnaf_id,ad,fiyat,aciklama) VALUES ($1,$2,$3,$4),($1,$5,$6,$7),($1,$8,$9,$10)', [id5,'Priz Montaji',200,'Tek priz','Kablo Cekimi',350,'Metre basi','Sigorta Degisimi',150,'Standart']);
+    var e6 = await pool.query(`INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,vergi_no,lat,lng,puan,yorum_sayisi,acik,onayli,onaylandi) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`, ['Parlak Yildiz Temizlik','hizmet','Marmaris','Cumhuriyet Cad. No:7','05443334455','7766554433',36.8508,28.2731,4.6,112,true,true,true]);
+    var id6 = e6.rows[0].id;
+    await pool.query('INSERT INTO urunler (esnaf_id,ad,fiyat,aciklama) VALUES ($1,$2,$3,$4),($1,$5,$6,$7),($1,$8,$9,$10)', [id6,'Ev Temizligi',600,'3+1 daire','Ofis Temizligi',400,'50 m2 kadar','Cam Silme',250,'Dis cephe']);
     console.log('Ornek veriler eklendi!');
+  }
+
+  // Migration: Hizmet esnafları eksikse ekle (mevcut DB için)
+  var eksikCheck = await pool.query("SELECT COUNT(*) FROM esnaflar WHERE ad IN ('Elektrikci Ali Usta','Parlak Yildiz Temizlik')");
+  if (parseInt(eksikCheck.rows[0].count) < 2) {
+    var aliCheck = await pool.query("SELECT id FROM esnaflar WHERE ad='Elektrikci Ali Usta' LIMIT 1");
+    if (aliCheck.rows.length === 0) {
+      var ea = await pool.query(`INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,vergi_no,lat,lng,puan,yorum_sayisi,acik,onayli,onaylandi) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`, ['Elektrikci Ali Usta','hizmet','Marmaris','Siteler Mah. No:34','05551112233','9988776655',36.8562,28.2765,4.8,78,true,true,true]);
+      await pool.query('INSERT INTO urunler (esnaf_id,ad,fiyat,aciklama) VALUES ($1,$2,$3,$4),($1,$5,$6,$7),($1,$8,$9,$10)', [ea.rows[0].id,'Priz Montaji',200,'Tek priz','Kablo Cekimi',350,'Metre basi','Sigorta Degisimi',150,'Standart']);
+      console.log('Elektrikci Ali Usta eklendi.');
+    }
+    var temizlikCheck = await pool.query("SELECT id FROM esnaflar WHERE ad='Parlak Yildiz Temizlik' LIMIT 1");
+    if (temizlikCheck.rows.length === 0) {
+      var eb = await pool.query(`INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,vergi_no,lat,lng,puan,yorum_sayisi,acik,onayli,onaylandi) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`, ['Parlak Yildiz Temizlik','hizmet','Marmaris','Cumhuriyet Cad. No:7','05443334455','7766554433',36.8508,28.2731,4.6,112,true,true,true]);
+      await pool.query('INSERT INTO urunler (esnaf_id,ad,fiyat,aciklama) VALUES ($1,$2,$3,$4),($1,$5,$6,$7),($1,$8,$9,$10)', [eb.rows[0].id,'Ev Temizligi',600,'3+1 daire','Ofis Temizligi',400,'50 m2 kadar','Cam Silme',250,'Dis cephe']);
+      console.log('Parlak Yildiz Temizlik eklendi.');
+    }
   }
   console.log('Tablolar hazir!');
 }
