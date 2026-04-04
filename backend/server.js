@@ -193,6 +193,20 @@ async function tablolarOlustur() {
     olusturma TIMESTAMP DEFAULT NOW()
   )`);
 
+  // ── MÜŞTERİ SORULARI ───────────────────────────────────────────
+  await pool.query(`CREATE TABLE IF NOT EXISTS sorular (
+    id SERIAL PRIMARY KEY,
+    esnaf_id INTEGER REFERENCES esnaflar(id) ON DELETE CASCADE,
+    musteri_telefon VARCHAR(20),
+    musteri_ad VARCHAR(100),
+    soru TEXT NOT NULL,
+    cevap TEXT,
+    okundu BOOLEAN DEFAULT false,
+    cevaplandi BOOLEAN DEFAULT false,
+    olusturma TIMESTAMP DEFAULT NOW(),
+    cevap_tarihi TIMESTAMP
+  )`);
+
   var sayac = await pool.query('SELECT COUNT(*) FROM esnaflar');
   if (parseInt(sayac.rows[0].count) === 0) {
     var e1 = await pool.query(`INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,email,vergi_no,lat,lng,puan,yorum_sayisi,acik,onayli,onaylandi) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`, ['Usta Kebapci','yemek','Marmaris','Ataturk Cad. No:1','05001234567','usta@kebapci.com','1234567890',36.8550,28.2753,4.8,124,true,true,true]);
@@ -1675,6 +1689,78 @@ app.put('/api/teklif/:id/durum', async function(req, res) {
       }
     }
     res.json({ basari: true, mesaj: durum === 'kabul' ? 'Kabul edildi. Esnaf bilgilendirildi.' : 'Reddedildi.' });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// ── MÜŞTERİ SORULARI ───────────────────────────────────────────────────────
+
+// Müşteri esnafa soru sorar
+app.post('/api/sorular', async function(req, res) {
+  try {
+    var { esnaf_id, musteri_telefon, musteri_ad, soru } = req.body;
+    if (!esnaf_id || !soru || !soru.trim()) return res.status(400).json({ basari: false, mesaj: 'Esnaf ve soru zorunlu.' });
+    var r = await pool.query(
+      'INSERT INTO sorular (esnaf_id, musteri_telefon, musteri_ad, soru) VALUES ($1,$2,$3,$4) RETURNING id',
+      [esnaf_id, musteri_telefon || null, musteri_ad || null, soru.trim()]
+    );
+    // Esnafı bilgilendir
+    var esnaf = await pool.query('SELECT ad, telefon FROM esnaflar WHERE id=$1', [esnaf_id]);
+    if (esnaf.rows[0]) {
+      var gonderenAd = musteri_ad || (musteri_telefon || 'Müşteri');
+      if (esnaf.rows[0].telefon) {
+        whatsappGonder(esnaf.rows[0].telefon,
+          `💬 Yeni Soru!\n\n👤 ${gonderenAd}${musteri_telefon ? ' (' + musteri_telefon + ')' : ''}\n\n❓ ${soru.trim()}\n\nYanıtlamak için panelinize girin.`
+        ).catch(function() {});
+      }
+      await bildirimOlustur(
+        esnaf.rows[0].telefon,
+        '💬 Yeni Soru Geldi',
+        gonderenAd + ': ' + soru.trim().slice(0, 100),
+        'bilgi', null, null
+      );
+    }
+    res.json({ basari: true, mesaj: 'Sorunuz iletildi.', id: r.rows[0].id });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Esnaf kendi sorularını listeler
+app.get('/api/sorular/:esnafId', async function(req, res) {
+  try {
+    var r = await pool.query(
+      'SELECT * FROM sorular WHERE esnaf_id=$1 ORDER BY olusturma DESC LIMIT 100',
+      [req.params.esnafId]
+    );
+    res.json({ basari: true, veri: r.rows });
+  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// Esnaf soruyu cevaplar
+app.put('/api/sorular/:id/cevapla', async function(req, res) {
+  try {
+    var { cevap, esnaf_id } = req.body;
+    if (!cevap || !cevap.trim()) return res.status(400).json({ basari: false, mesaj: 'Cevap boş olamaz.' });
+    var r = await pool.query(
+      `UPDATE sorular SET cevap=$1, cevaplandi=true, okundu=true, cevap_tarihi=NOW()
+       WHERE id=$2 AND esnaf_id=$3 RETURNING *`,
+      [cevap.trim(), req.params.id, esnaf_id]
+    );
+    if (!r.rows.length) return res.status(404).json({ basari: false, mesaj: 'Soru bulunamadı.' });
+    var soru = r.rows[0];
+    // Müşteriye bildir
+    if (soru.musteri_telefon) {
+      var esnaf = await pool.query('SELECT ad FROM esnaflar WHERE id=$1', [esnaf_id]);
+      var esnafAdi = esnaf.rows[0] ? esnaf.rows[0].ad : 'İşletme';
+      whatsappGonder(soru.musteri_telefon,
+        `✅ Sorunuz Yanıtlandı!\n\n🏪 ${esnafAdi}\n\n❓ ${soru.soru}\n\n💬 ${cevap.trim()}`
+      ).catch(function() {});
+      await bildirimOlustur(
+        soru.musteri_telefon,
+        '✅ Sorunuz Yanıtlandı',
+        esnafAdi + ': ' + cevap.trim().slice(0, 100),
+        'basari', null, null
+      );
+    }
+    res.json({ basari: true, mesaj: 'Cevap gönderildi.' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
 
