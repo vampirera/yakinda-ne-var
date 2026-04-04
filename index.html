@@ -131,6 +131,7 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
 .yukleniyor{text-align:center;padding:30px;color:#aaa;font-size:.88rem}
 .yukleniyor::before{content:'';display:block;width:32px;height:32px;margin:0 auto 10px;border:3px solid #f0f0f0;border-top-color:#ff6b35;border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.bos-durum{text-align:center;padding:40px 20px;color:#aaa;font-size:.9rem}
 .hata{text-align:center;padding:30px;color:#e53935;font-size:.88rem}
 .s-title{font-weight:800;font-size:.85rem;color:#888;text-transform:uppercase;letter-spacing:.05em;margin:10px 0 7px;display:flex;justify-content:space-between;align-items:center}
 .add-btn-small{background:#ff6b35;color:#fff;border:none;border-radius:18px;padding:4px 10px;font-size:.73rem;font-weight:700;cursor:pointer}
@@ -1003,7 +1004,7 @@ firebase.initializeApp({
       </div>
     </div>
     <div class="content">
-      <div class="esnaf-grid" id="favori-listesi"><div class="yukleniyor">Favori esnaf yok.</div></div>
+      <div class="esnaf-grid" id="favori-listesi"><div class="bos-durum">Henüz favoriniz yok.</div></div>
     </div>
     <div class="bottom-nav" id="favoriler-nav"></div>
   </div>

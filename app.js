@@ -1029,7 +1029,7 @@ function favorilerSayfasiGoster() {
   var favoriler = favorileriYukle();
   var listesi = document.getElementById('favori-listesi');
   if (!favoriler.length) {
-    listesi.innerHTML = '<div class="yukleniyor">Henuz favori esnaf eklemediniz.</div>';
+    listesi.innerHTML = '<div class="bos-durum">Henüz favoriniz yok.</div>';
     return;
   }
   listesi.innerHTML = '<div class="yukleniyor"></div>';
@@ -1041,7 +1041,7 @@ function favorilerSayfasiGoster() {
       if (!data.basari) throw new Error(data.mesaj);
       var favoriEsnaflar = data.veri.filter(function(e) { return favoriler.indexOf(e.id) !== -1; });
       if (!favoriEsnaflar.length) {
-        listesi.innerHTML = '<div class="yukleniyor">Favori esnaf bulunamadi.</div>';
+        listesi.innerHTML = '<div class="bos-durum">Henüz favoriniz yok.</div>';
         return;
       }
       listesi.innerHTML = esnafKartlariOlustur(favoriEsnaflar);
