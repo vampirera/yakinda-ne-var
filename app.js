@@ -440,6 +440,7 @@ function telefon() {
 
 var _ilanFotoUrl = null;
 var _ilanSecilenKategori = null;
+var _ilanlarimVeri = [];
 
 function ilanVerSayfasiGoster() {
   var oturum = oturumAl();
@@ -580,6 +581,7 @@ function ilanlarimYukle() {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var ilanlar = data.basari ? data.veri : [];
+      _ilanlarimVeri = ilanlar;
       var html = '<div style="margin-bottom:12px;font-size:.75rem;font-weight:800;color:#1a1a2e;text-transform:uppercase">İlanlarım (' + ilanlar.length + ')</div>';
       if (!ilanlar.length) {
         html += '<div style="text-align:center;padding:40px;color:#aaa"><div style="font-size:2.5rem;margin-bottom:8px">📋</div>Henüz ilan oluşturmadınız.<br><small>Esnaflardan teklif almak için ilan açın!</small></div>';
@@ -591,10 +593,11 @@ function ilanlarimYukle() {
           var renk = durumRenk[ilan.durum] || '#888';
           var yanıtlar = (ilan.teklifler || []).filter(Boolean);
 
-          // Fotoğraf varsa göster
+          // Fotoğraf varsa göster (tıklanabilir lightbox)
+          var _fotoSrc = ilan.fotograf_url ? ilan.fotograf_url.replace(/'/g, "\\'") : '';
           var fotoHTML = ilan.fotograf_url
-            ? '<div style="margin-bottom:10px;border-radius:10px;overflow:hidden;height:120px">' +
-                '<img src="' + ilan.fotograf_url + '" style="width:100%;height:100%;object-fit:cover">' +
+            ? '<div style="margin-bottom:10px;border-radius:10px;overflow:hidden;height:120px;cursor:zoom-in" onclick="event.stopPropagation();lightboxAc(\'' + _fotoSrc + '\')">' +
+                '<img src="' + ilan.fotograf_url + '" style="width:100%;height:100%;object-fit:cover;pointer-events:none">' +
               '</div>'
             : '';
 
@@ -636,6 +639,14 @@ function ilanlarimYukle() {
             yanıtHTML = '<div style="font-size:.75rem;color:#aaa;margin-top:8px;padding:8px;background:#fafafa;border-radius:8px;text-align:center">Henüz yanıt gelmedi — esnaflar bildirim aldı</div>';
           }
 
+          var aksiyonHTML = '<div style="display:flex;gap:6px;margin-top:10px;border-top:1px solid #f0f0f0;padding-top:10px">' +
+            '<button onclick="ilanDetayGoster(' + ilan.id + ')" style="flex:1;background:#f5f5f5;color:#1a1a2e;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">📋 Detay</button>' +
+            (ilan.durum === 'acik'
+              ? '<button onclick="ilanDuzenleGoster(' + ilan.id + ')" style="flex:1;background:#f0f4ff;color:#1565c0;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">✏️ Düzenle</button>' +
+                '<button onclick="ilanKaldir(' + ilan.id + ')" style="flex:1;background:#fff0f0;color:#c62828;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">⏸ Kaldır</button>'
+              : '') +
+          '</div>';
+
           return '<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.07);border-top:4px solid ' + (katRenk[ilan.kategori] || renk) + '">' +
             '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
               '<div style="flex:1">' +
@@ -649,6 +660,7 @@ function ilanlarimYukle() {
             '</div>' +
             fotoHTML +
             yanıtHTML +
+            aksiyonHTML +
           '</div>';
         }).join('');
       }
@@ -674,6 +686,198 @@ function teklifReddet(teklifId) {
     body: JSON.stringify({ durum: 'reddedildi' })
   }).then(function(r) { return r.json(); })
   .then(function(data) { bildirim(data.mesaj, data.basari ? 'bilgi' : 'hata'); if (data.basari) ilanlarimYukle(); });
+}
+
+// ── İLAN DETAY / DÜZENLE / KALDIRMA MODALLARı ────────────────────────────
+
+function _ilanModalHazirla() {
+  var m = document.getElementById('ilan-islem-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'ilan-islem-modal';
+    m.style.cssText = 'display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9998;overflow-y:auto;padding:16px;box-sizing:border-box';
+    m.onclick = function(e) { if (e.target === m) ilanModalKapat(); };
+    m.innerHTML = '<div style="background:#fff;border-radius:18px;padding:20px;position:relative;max-width:400px;margin:40px auto;">' +
+      '<button onclick="ilanModalKapat()" style="position:absolute;top:14px;right:14px;background:#f0f0f0;border:none;border-radius:50%;width:34px;height:34px;font-size:1.1rem;cursor:pointer;z-index:1">✕</button>' +
+      '<div id="ilan-islem-modal-icerik"></div>' +
+    '</div>';
+    document.body.appendChild(m);
+  }
+  return m;
+}
+
+function ilanModalKapat() {
+  var m = document.getElementById('ilan-islem-modal');
+  if (m) m.style.display = 'none';
+}
+
+function ilanDetayGoster(ilanId) {
+  var ilan = _ilanlarimVeri.find(function(i) { return i.id === ilanId; });
+  if (!ilan) return;
+  var m = _ilanModalHazirla();
+  var katRenk = { yemek: '#e65100', urun: '#1565c0', hizmet: '#2e7d32' };
+  var katIkon = { yemek: '🍔', urun: '📦', hizmet: '🔧' };
+  var durumRenk = { acik: '#2e7d32', kapali: '#888', iptal: '#c62828' };
+  var renk = durumRenk[ilan.durum] || '#888';
+  var tarih = ilan.olusturma ? new Date(ilan.olusturma).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  var yanıtlar = (ilan.teklifler || []).filter(Boolean);
+  var fotoSrc = ilan.fotograf_url ? ilan.fotograf_url.replace(/'/g, "\\'") : '';
+
+  var fotoHTML = ilan.fotograf_url
+    ? '<img src="' + ilan.fotograf_url + '" onclick="lightboxAc(\'' + fotoSrc + '\')" style="width:100%;border-radius:10px;margin-bottom:12px;cursor:zoom-in;max-height:200px;object-fit:cover">'
+    : '';
+
+  var tekliflerHTML = '';
+  if (yanıtlar.length) {
+    tekliflerHTML = yanıtlar.map(function(t) {
+      var kabul = t.durum === 'kabul';
+      var waTel = t.esnaf_telefon ? t.esnaf_telefon.replace(/\D/g, '') : '';
+      if (waTel.startsWith('0')) waTel = '90' + waTel.slice(1);
+      return '<div style="background:' + (kabul ? '#f0fff4' : '#f9f9f9') + ';border:1px solid ' + (kabul ? '#a5d6a7' : '#eee') + ';border-radius:10px;padding:10px;margin-bottom:6px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+          '<div style="flex:1">' +
+            '<div style="font-size:.82rem;font-weight:800">' + (t.esnaf_ad || '') + '</div>' +
+            (t.aciklama ? '<div style="font-size:.72rem;color:#666;margin-top:2px">' + t.aciklama + '</div>' : '') +
+          '</div>' +
+          '<div style="text-align:right;flex-shrink:0;margin-left:8px">' +
+            (t.fiyat ? '<div style="font-size:.9rem;font-weight:800;color:#ff6b35">₺' + t.fiyat + '</div>' : '') +
+            '<div style="font-size:.65rem;font-weight:700;color:' + (kabul ? '#2e7d32' : '#888') + '">' + (kabul ? '✅ Seçildi' : 'Yanıt verdi') + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap">' +
+          (t.durum === 'bekliyor' && ilan.durum === 'acik'
+            ? '<button onclick="teklifKabul(' + t.id + ')" style="background:#e8f5e9;color:#2e7d32;border:none;border-radius:7px;padding:5px 10px;font-size:.7rem;font-weight:700;cursor:pointer">✅ Seç</button>' +
+              '<button onclick="teklifReddet(' + t.id + ')" style="background:#ffebee;color:#c62828;border:none;border-radius:7px;padding:5px 10px;font-size:.7rem;font-weight:700;cursor:pointer">✕ Geç</button>'
+            : '') +
+          (t.esnaf_telefon
+            ? '<a href="tel:' + t.esnaf_telefon + '" style="background:#f5f5f5;color:#1a1a2e;text-decoration:none;border-radius:7px;padding:5px 10px;font-size:.7rem;font-weight:700">📞 Ara</a>' +
+              '<a href="https://wa.me/' + waTel + '" target="_blank" style="background:#e8f5e9;color:#2e7d32;text-decoration:none;border-radius:7px;padding:5px 10px;font-size:.7rem;font-weight:700">💬 WA</a>'
+            : '') +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } else {
+    tekliflerHTML = '<div style="text-align:center;color:#aaa;font-size:.8rem;padding:12px;background:#fafafa;border-radius:8px">Henüz yanıt gelmedi</div>';
+  }
+
+  var html =
+    '<h3 style="margin:0 0 8px;padding-right:40px;font-size:1rem">' + ilan.baslik + '</h3>' +
+    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:14px;flex-wrap:wrap">' +
+      '<span style="font-size:.8rem;color:' + (katRenk[ilan.kategori] || '#888') + ';font-weight:600">' + (katIkon[ilan.kategori] || '📋') + ' ' + (ilan.kategori || '') + '</span>' +
+      '<span style="font-size:.7rem;font-weight:700;color:' + renk + ';padding:2px 8px;background:' + renk + '18;border-radius:8px">' + ilan.durum + '</span>' +
+      (tarih ? '<span style="font-size:.7rem;color:#aaa">' + tarih + '</span>' : '') +
+    '</div>' +
+    fotoHTML +
+    (ilan.aciklama ? '<div style="font-size:.84rem;color:#333;margin-bottom:12px;line-height:1.55;white-space:pre-wrap">' + ilan.aciklama + '</div>' : '') +
+    (ilan.butce_min ? '<div style="font-size:.78rem;color:#888;margin-bottom:12px;background:#f9f9f9;border-radius:8px;padding:8px">💰 Bütçe: ₺' + ilan.butce_min + (ilan.butce_max ? ' – ₺' + ilan.butce_max : '+') + '</div>' : '') +
+    '<div style="font-size:.72rem;font-weight:800;color:#1a1a2e;text-transform:uppercase;margin-bottom:8px">Gelen Teklifler (' + yanıtlar.length + ')</div>' +
+    tekliflerHTML +
+    (ilan.durum === 'acik'
+      ? '<div style="display:flex;gap:8px;margin-top:16px">' +
+          '<button onclick="ilanModalKapat();ilanDuzenleGoster(' + ilanId + ')" style="flex:1;background:#1a1a2e;color:#fff;border:none;border-radius:10px;padding:10px;font-size:.82rem;font-weight:700;cursor:pointer">✏️ Düzenle</button>' +
+          '<button onclick="ilanKaldir(' + ilanId + ')" style="background:#fff0f0;color:#c62828;border:1px solid #ffcdd2;border-radius:10px;padding:10px 14px;font-size:.82rem;font-weight:700;cursor:pointer">⏸ Kaldır</button>' +
+        '</div>'
+      : '');
+
+  document.getElementById('ilan-islem-modal-icerik').innerHTML = html;
+  m.style.display = 'block';
+}
+
+function ilanDuzenleGoster(ilanId) {
+  var ilan = _ilanlarimVeri.find(function(i) { return i.id === ilanId; });
+  if (!ilan) return;
+  var m = _ilanModalHazirla();
+
+  var fotoOnizleme = ilan.fotograf_url
+    ? '<div style="position:relative;display:inline-block;margin-bottom:8px">' +
+        '<img src="' + ilan.fotograf_url + '" style="width:80px;height:80px;object-fit:cover;border-radius:10px">' +
+        '<button onclick="ilanFotoKaldir()" style="position:absolute;top:-6px;right:-6px;background:#c62828;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:.65rem;cursor:pointer;line-height:20px">✕</button>' +
+      '</div>'
+    : '';
+
+  var html =
+    '<h3 style="margin:0 0 16px;padding-right:40px;font-size:1rem">✏️ İlanı Düzenle</h3>' +
+    '<div style="margin-bottom:12px">' +
+      '<label style="font-size:.75rem;font-weight:700;color:#555;display:block;margin-bottom:5px">Başlık</label>' +
+      '<input id="ilan-duzenle-baslik" value="' + (ilan.baslik || '').replace(/"/g, '&quot;') + '" style="width:100%;box-sizing:border-box;border:1.5px solid #e0e0e0;border-radius:10px;padding:10px 12px;font-size:.88rem;outline:none">' +
+    '</div>' +
+    '<div style="margin-bottom:12px">' +
+      '<label style="font-size:.75rem;font-weight:700;color:#555;display:block;margin-bottom:5px">Açıklama</label>' +
+      '<textarea id="ilan-duzenle-aciklama" rows="4" style="width:100%;box-sizing:border-box;border:1.5px solid #e0e0e0;border-radius:10px;padding:10px 12px;font-size:.88rem;resize:vertical;outline:none;font-family:inherit">' + (ilan.aciklama || '') + '</textarea>' +
+    '</div>' +
+    '<div style="margin-bottom:16px">' +
+      '<label style="font-size:.75rem;font-weight:700;color:#555;display:block;margin-bottom:5px">Fotoğraf</label>' +
+      '<div id="ilan-duzenle-foto-preview">' + fotoOnizleme + '</div>' +
+      '<input type="hidden" id="ilan-duzenle-foto-url" value="' + (ilan.fotograf_url || '') + '">' +
+      '<input type="file" id="ilan-duzenle-foto-input" accept="image/*" onchange="ilanDuzenleFotoYukle(this)" style="display:none">' +
+      '<button onclick="document.getElementById(\'ilan-duzenle-foto-input\').click()" style="background:#f5f5f5;color:#333;border:1px solid #ddd;border-radius:8px;padding:7px 12px;font-size:.78rem;font-weight:600;cursor:pointer">📷 ' + (ilan.fotograf_url ? 'Değiştir' : 'Fotoğraf Ekle') + '</button>' +
+    '</div>' +
+    '<button id="ilan-duzenle-kaydet-btn" onclick="ilanDuzenleKaydet(' + ilanId + ')" style="width:100%;background:#1a1a2e;color:#fff;border:none;border-radius:12px;padding:13px;font-size:.9rem;font-weight:700;cursor:pointer">Kaydet</button>';
+
+  document.getElementById('ilan-islem-modal-icerik').innerHTML = html;
+  m.style.display = 'block';
+}
+
+function ilanDuzenleFotoYukle(input) {
+  if (!input.files || !input.files[0]) return;
+  var formData = new FormData();
+  formData.append('foto', input.files[0]);
+  bildirim('Fotoğraf yükleniyor...', 'bilgi');
+  fetch(API_URL + '/api/is-ilani/fotograf', { method: 'POST', body: formData })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.basari) {
+        document.getElementById('ilan-duzenle-foto-url').value = data.url;
+        document.getElementById('ilan-duzenle-foto-preview').innerHTML =
+          '<div style="position:relative;display:inline-block;margin-bottom:8px">' +
+            '<img src="' + data.url + '" style="width:80px;height:80px;object-fit:cover;border-radius:10px">' +
+            '<button onclick="ilanFotoKaldir()" style="position:absolute;top:-6px;right:-6px;background:#c62828;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:.65rem;cursor:pointer;line-height:20px">✕</button>' +
+          '</div>';
+        bildirim('Fotoğraf yüklendi', 'basari');
+      } else { bildirim(data.mesaj, 'hata'); }
+    }).catch(function() { bildirim('Yükleme hatası', 'hata'); });
+}
+
+function ilanFotoKaldir() {
+  document.getElementById('ilan-duzenle-foto-url').value = '';
+  document.getElementById('ilan-duzenle-foto-preview').innerHTML = '';
+}
+
+function ilanDuzenleKaydet(ilanId) {
+  var baslik = document.getElementById('ilan-duzenle-baslik').value.trim();
+  var aciklama = document.getElementById('ilan-duzenle-aciklama').value.trim();
+  var fotoUrl = document.getElementById('ilan-duzenle-foto-url').value;
+  if (!baslik) { bildirim('Başlık zorunlu', 'hata'); return; }
+  var oturum = oturumAl();
+  var btn = document.getElementById('ilan-duzenle-kaydet-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor...'; }
+  fetch(API_URL + '/api/is-ilani/' + ilanId, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ musteri_telefon: oturum ? oturum.telefon : '', baslik: baslik, aciklama: aciklama || null, fotograf_url: fotoUrl || null })
+  }).then(function(r) { return r.json(); })
+  .then(function(data) {
+    bildirim(data.mesaj, data.basari ? 'basari' : 'hata');
+    if (data.basari) { ilanModalKapat(); ilanlarimYukle(); }
+    else if (btn) { btn.disabled = false; btn.textContent = 'Kaydet'; }
+  }).catch(function() {
+    bildirim('Bağlantı hatası', 'hata');
+    if (btn) { btn.disabled = false; btn.textContent = 'Kaydet'; }
+  });
+}
+
+function ilanKaldir(ilanId) {
+  if (!confirm('İlan yayından kaldırılsın mı?')) return;
+  var oturum = oturumAl();
+  fetch(API_URL + '/api/is-ilani/' + ilanId + '/kapat', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ musteri_telefon: oturum ? oturum.telefon : '' })
+  }).then(function(r) { return r.json(); })
+  .then(function(data) {
+    bildirim(data.mesaj, data.basari ? 'bilgi' : 'hata');
+    if (data.basari) { ilanModalKapat(); ilanlarimYukle(); }
+  }).catch(function() { bildirim('Bağlantı hatası', 'hata'); });
 }
 
 function siparislerimSayfasiAc(siparisId) {
