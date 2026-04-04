@@ -1676,6 +1676,18 @@ app.put('/api/is-ilanlari/:id', async function(req, res) {
     if (!setClauses.length) return res.status(400).json({ basari: false, mesaj: 'Güncellenecek alan yok.' });
     params.push(req.params.id);
     await pool.query('UPDATE is_ilanlari SET ' + setClauses.join(',') + ' WHERE id=$' + params.length, params);
+    // Teklif veren esnaflara bildirim gönder
+    var ilanInfo = await pool.query('SELECT baslik FROM is_ilanlari WHERE id=$1', [req.params.id]);
+    var teklifVerenler = await pool.query(
+      'SELECT e.telefon AS esnaf_tel FROM teklifler t JOIN esnaflar e ON e.id=t.esnaf_id WHERE t.ilan_id=$1',
+      [req.params.id]
+    );
+    var ilanBaslik = ilanInfo.rows[0] ? ilanInfo.rows[0].baslik : 'İlan';
+    for (var i = 0; i < teklifVerenler.rows.length; i++) {
+      var esnafTel = teklifVerenler.rows[i].esnaf_tel;
+      bildirimOlustur(esnafTel, '📝 İlan Güncellendi', '"' + ilanBaslik + '" ilanı güncellendi. Teklifiniz hâlâ aktif.', 'bilgi', 'ilan', parseInt(req.params.id));
+      whatsappGonder(esnafTel, '📝 İlan Güncellendi\n\n"' + ilanBaslik + '" başlıklı ilan güncellendi.\nTeklifiniz hâlâ aktif, durumu takip edin!').catch(function(){});
+    }
     res.json({ basari: true, mesaj: 'İlan güncellendi.' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
@@ -1685,9 +1697,20 @@ app.put('/api/is-ilanlari/:id/kaldir', async function(req, res) {
   try {
     var { musteri_telefon } = req.body;
     if (!musteri_telefon) return res.status(400).json({ basari: false, mesaj: 'Telefon zorunlu.' });
-    var kontrol = await pool.query('SELECT id FROM is_ilanlari WHERE id=$1 AND musteri_telefon=$2', [req.params.id, musteri_telefon]);
+    var kontrol = await pool.query('SELECT id, baslik FROM is_ilanlari WHERE id=$1 AND musteri_telefon=$2', [req.params.id, musteri_telefon]);
     if (!kontrol.rows.length) return res.status(403).json({ basari: false, mesaj: 'İlan bulunamadı veya yetkiniz yok.' });
     await pool.query("UPDATE is_ilanlari SET durum='kapali' WHERE id=$1", [req.params.id]);
+    // Teklif veren esnaflara bildirim gönder
+    var teklifVerenler = await pool.query(
+      'SELECT e.telefon AS esnaf_tel FROM teklifler t JOIN esnaflar e ON e.id=t.esnaf_id WHERE t.ilan_id=$1',
+      [req.params.id]
+    );
+    var ilanBaslik = kontrol.rows[0].baslik;
+    for (var i = 0; i < teklifVerenler.rows.length; i++) {
+      var esnafTel = teklifVerenler.rows[i].esnaf_tel;
+      bildirimOlustur(esnafTel, '⏸ İlan Yayından Kaldırıldı', '"' + ilanBaslik + '" ilanı yayından kaldırıldı.', 'bilgi', null, null);
+      whatsappGonder(esnafTel, '⏸ İlan Yayından Kaldırıldı\n\n"' + ilanBaslik + '" başlıklı ilana verdiğiniz teklif değerlendirildi, ilan yayından kaldırıldı.').catch(function(){});
+    }
     res.json({ basari: true, mesaj: 'İlan yayından kaldırıldı.' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
 });
