@@ -572,6 +572,14 @@ function siparislerSekmeSec(sekme) {
   }
 }
 
+function ilanTarihFormatla(tarihStr) {
+  if (!tarihStr) return '';
+  var d = new Date(tarihStr);
+  var aylar = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+  return d.getDate() + ' ' + aylar[d.getMonth()] + ' ' + d.getFullYear() + ', ' +
+    String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
 function ilanlarimYukle() {
   var oturum = oturumAl();
   if (!oturum || !oturum.telefon) return;
@@ -655,6 +663,7 @@ function ilanlarimYukle() {
                   '<span style="font-weight:800;font-size:.88rem">' + ilan.baslik + '</span>' +
                 '</div>' +
                 (ilan.butce_min ? '<div style="font-size:.7rem;color:#888">₺' + ilan.butce_min + (ilan.butce_max ? '–' + ilan.butce_max : '+') + '</div>' : '') +
+                (ilan.olusturma ? '<div style="font-size:.67rem;color:#bbb;margin-top:2px">🕐 ' + ilanTarihFormatla(ilan.olusturma) + '</div>' : '') +
               '</div>' +
               '<span style="font-size:.66rem;font-weight:700;color:' + renk + ';padding:3px 8px;background:' + renk + '18;border-radius:8px;white-space:nowrap;margin-left:8px">' + ilan.durum + '</span>' +
             '</div>' +
