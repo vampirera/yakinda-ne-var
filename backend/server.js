@@ -222,6 +222,13 @@ async function tablolarOlustur() {
     var e4 = await pool.query(`INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,vergi_no,lat,lng,puan,yorum_sayisi,acik,onayli,onaylandi) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`, ['Berber Murat','hizmet','Marmaris','Merkez Mah. No:8','05009876543','5566778899',36.8535,28.2740,4.7,203,true,false,true]);
     var id4 = e4.rows[0].id;
     await pool.query('INSERT INTO urunler (esnaf_id,ad,fiyat,aciklama) VALUES ($1,$2,$3,$4),($1,$5,$6,$7)', [id4,'Sac Kesimi',150,'Erkek sac','Sakal Tiras',80,'Klasik tiras']);
+    var e5 = await pool.query(`INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,vergi_no,lat,lng,puan,yorum_sayisi,acik,onayli,onaylandi) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`, ['Elektrikci Ali Usta','hizmet','Marmaris','Siteler Mah. No:22','05003334455','2233445566',36.8560,28.2770,4.6,78,true,true,true]);
+    var id5 = e5.rows[0].id;
+    await pool.query('INSERT INTO urunler (esnaf_id,ad,fiyat,aciklama) VALUES ($1,$2,$3,$4),($1,$5,$6,$7),($1,$8,$9,$10)', [id5,'Priz/Sigorta Tamiri',200,'Yerinde servis','Aydinlatma Montaji',350,'Malzeme haric','Elektrik Ariza Tespiti',150,'Ucretsiz keşif']);
+    var e6 = await pool.query(`INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,vergi_no,lat,lng,puan,yorum_sayisi,acik,onayli,onaylandi) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`, ['Parlakyildiz Temizlik','hizmet','Marmaris','Tepe Mah. No:3','05006667788','3344556677',36.8510,28.2730,4.8,112,true,true,true]);
+    var id6 = e6.rows[0].id;
+    await pool.query('INSERT INTO urunler (esnaf_id,ad,fiyat,aciklama) VALUES ($1,$2,$3,$4),($1,$5,$6,$7),($1,$8,$9,$10)', [id6,'Ev Temizligi',600,'3+1 daire','Ofis Temizligi',400,'Her gun','Derin Temizlik',900,'Boya oncesi']);
+    await pool.query('INSERT INTO yorumlar (esnaf_id,kullanici,puan,yorum) VALUES ($1,$2,$3,$4),($1,$5,$6,$7)', [id6,'Zeynep A.',5,'Evi pırıl pırıl bıraktılar!','Murat T.',5,'Çok titiz çalışıyorlar.']);
     console.log('Ornek veriler eklendi!');
   }
   console.log('Tablolar hazir!');

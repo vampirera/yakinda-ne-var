@@ -58,8 +58,9 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
     </div>
     <div class="action-btns">
       <button class="btn-primary secili" id="btn-kurye" onclick="moduSec('siparis')">🛵 Siparis Ver</button>
-      <button class="btn-secondary" id="btn-randevu" onclick="moduSec('randevu')" style="display:none">📅 Randevu Al</button>
+      <button class="btn-secondary" id="btn-randevu" onclick="moduSec('randevu')" style="display:none">📅 Randevu Oluştur</button>
       <button class="btn-secondary" id="btn-gelal" onclick="teslimatSec('gel-al')">🚶 Gel-Al</button>
+      <button class="btn-secondary" id="btn-soru" onclick="moduSec('soru')" style="display:none">💬 Soru Sor</button>
     </div>
   </div>
 
@@ -68,6 +69,17 @@ body{background:#f0f0f0;display:flex;justify-content:center;align-items:center;m
     <div id="siparis-modu">
       <div class="section-title">Menu</div>
       <div id="urun-listesi"><div class="yukleniyor">⏳ Yukleniyor...</div></div>
+    </div>
+
+    <!-- SORU SOR MODU -->
+    <div id="soru-modu" style="display:none">
+      <div class="section-title">Soru Sor</div>
+      <div class="randevu-panel">
+        <input type="text" id="soru-ad" placeholder="Adınız Soyadınız (opsiyonel)" style="width:100%;padding:10px;font-size:.88rem;border:1.5px solid #e0e0e0;border-radius:10px;margin-bottom:8px">
+        <input type="tel" id="soru-tel" placeholder="Telefon (opsiyonel)" style="width:100%;padding:10px;font-size:.88rem;border:1.5px solid #e0e0e0;border-radius:10px;margin-bottom:8px">
+        <textarea id="soru-metin" placeholder="Sorunuzu yazın *" style="width:100%;padding:10px;font-size:.88rem;border:1.5px solid #e0e0e0;border-radius:10px;resize:none;height:80px;margin-bottom:10px"></textarea>
+        <button onclick="soruGonder()" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:12px;padding:14px;font-weight:700;font-size:.95rem;cursor:pointer">💬 Soruyu Gönder</button>
+      </div>
     </div>
 
     <!-- RANDEVU MODU -->
@@ -139,10 +151,23 @@ function sayfayiDoldur() {
   document.getElementById('esnaf-durum').textContent = esnaf.acik ? '🟢 Acik' : '🔴 Kapali';
   document.title = esnaf.ad;
 
-  // Randevu modu aktifse butonu göster
-  if (esnaf.randevu_modu) {
+  // Hizmet kategorisi: sipariş butonlarını gizle, randevu+soru göster
+  if (esnaf.kategori === 'hizmet') {
+    document.getElementById('btn-kurye').style.display = 'none';
+    document.getElementById('btn-gelal').style.display = 'none';
+    document.querySelector('.sepet-bar').style.display = 'none';
+    var btnRandevu = document.getElementById('btn-randevu');
+    btnRandevu.style.display = '';
+    btnRandevu.classList.add('btn-primary', 'secili');
+    btnRandevu.classList.remove('btn-secondary');
+    document.getElementById('btn-soru').style.display = '';
+    var bugun = new Date().toISOString().split('T')[0];
+    document.getElementById('randevu-tarih').min = bugun;
+    document.getElementById('randevu-tarih').value = bugun;
+    hizmetleriCek();
+    moduSec('randevu');
+  } else if (esnaf.randevu_modu) {
     document.getElementById('btn-randevu').style.display = '';
-    // Minimum tarih: bugün
     var bugun = new Date().toISOString().split('T')[0];
     document.getElementById('randevu-tarih').min = bugun;
     document.getElementById('randevu-tarih').value = bugun;
@@ -166,22 +191,58 @@ function sayfayiDoldur() {
 function moduSec(mod) {
   var siparisEl = document.getElementById('siparis-modu');
   var randevuEl = document.getElementById('randevu-modu');
+  var soruEl = document.getElementById('soru-modu');
   var sepetBar = document.querySelector('.sepet-bar');
-  if (mod === 'randevu') {
-    siparisEl.style.display = 'none';
-    randevuEl.style.display = '';
-    sepetBar.style.display = 'none';
+  var isHizmet = esnaf && esnaf.kategori === 'hizmet';
+  siparisEl.style.display = 'none';
+  randevuEl.style.display = 'none';
+  soruEl.style.display = 'none';
+  if (!isHizmet) sepetBar.style.display = 'none';
+  document.getElementById('btn-randevu').classList.remove('secili', 'btn-primary');
+  document.getElementById('btn-randevu').classList.add('btn-secondary');
+  document.getElementById('btn-soru').classList.remove('secili', 'btn-primary');
+  document.getElementById('btn-soru').classList.add('btn-secondary');
+  if (!isHizmet) {
     document.getElementById('btn-kurye').classList.remove('secili');
+  }
+  if (mod === 'randevu') {
+    randevuEl.style.display = '';
     document.getElementById('btn-randevu').classList.add('secili', 'btn-primary');
     document.getElementById('btn-randevu').classList.remove('btn-secondary');
+  } else if (mod === 'soru') {
+    soruEl.style.display = '';
+    document.getElementById('btn-soru').classList.add('secili', 'btn-primary');
+    document.getElementById('btn-soru').classList.remove('btn-secondary');
   } else {
     siparisEl.style.display = '';
-    randevuEl.style.display = 'none';
     sepetBar.style.display = '';
     document.getElementById('btn-kurye').classList.add('secili');
-    document.getElementById('btn-randevu').classList.remove('secili', 'btn-primary');
-    document.getElementById('btn-randevu').classList.add('btn-secondary');
     teslimatSec('kurye');
+  }
+}
+
+async function soruGonder() {
+  var ad = document.getElementById('soru-ad').value.trim();
+  var tel = document.getElementById('soru-tel').value.trim();
+  var metin = document.getElementById('soru-metin').value.trim();
+  if (!metin) { alert('Lütfen sorunuzu yazın.'); return; }
+  try {
+    var res = await fetch(API + '/api/sorular', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ esnaf_id: parseInt(esnafId), musteri_ad: ad || null, musteri_telefon: tel || null, soru: metin })
+    });
+    var data = await res.json();
+    if (data.basari) {
+      alert('✅ Sorunuz iletildi! Esnaf en kısa sürede yanıtlayacak.');
+      document.getElementById('soru-ad').value = '';
+      document.getElementById('soru-tel').value = '';
+      document.getElementById('soru-metin').value = '';
+    } else {
+      alert('Hata: ' + (data.mesaj || 'Bilinmeyen hata.'));
+    }
+  } catch(e) {
+    alert('Bağlantı hatası. API çalışıyor mu?');
   }
 }
 
