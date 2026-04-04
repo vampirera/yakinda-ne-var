@@ -664,6 +664,7 @@ function ilanlarimYukle() {
                 '</div>' +
                 (ilan.butce_min ? '<div style="font-size:.7rem;color:#888">₺' + ilan.butce_min + (ilan.butce_max ? '–' + ilan.butce_max : '+') + '</div>' : '') +
                 (ilan.olusturma ? '<div style="font-size:.67rem;color:#bbb;margin-top:2px">🕐 ' + ilanTarihFormatla(ilan.olusturma) + '</div>' : '') +
+                (ilan.updated_at ? '<div style="font-size:.67rem;color:#b0a020;margin-top:1px">✏️ Güncellendi: ' + ilanTarihFormatla(ilan.updated_at) + '</div>' : '') +
               '</div>' +
               '<span style="font-size:.66rem;font-weight:700;color:' + renk + ';padding:3px 8px;background:' + renk + '18;border-radius:8px;white-space:nowrap;margin-left:8px">' + ilan.durum + '</span>' +
             '</div>' +

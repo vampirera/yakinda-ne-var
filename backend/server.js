@@ -183,6 +183,7 @@ async function tablolarOlustur() {
     olusturma TIMESTAMP DEFAULT NOW()
   )`);
   await pool.query(`ALTER TABLE is_ilanlari ADD COLUMN IF NOT EXISTS fotograf_url TEXT`);
+  await pool.query(`ALTER TABLE is_ilanlari ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP`);
   await pool.query(`CREATE TABLE IF NOT EXISTS teklifler (
     id SERIAL PRIMARY KEY,
     ilan_id INTEGER REFERENCES is_ilanlari(id) ON DELETE CASCADE,
@@ -1674,6 +1675,7 @@ app.put('/api/is-ilanlari/:id', async function(req, res) {
     if (aciklama !== undefined) { params.push(aciklama); setClauses.push('aciklama=$' + params.length); }
     if (fotograf_url !== undefined) { params.push(fotograf_url); setClauses.push('fotograf_url=$' + params.length); }
     if (!setClauses.length) return res.status(400).json({ basari: false, mesaj: 'Güncellenecek alan yok.' });
+    setClauses.push('updated_at=NOW()');
     params.push(req.params.id);
     await pool.query('UPDATE is_ilanlari SET ' + setClauses.join(',') + ' WHERE id=$' + params.length, params);
     // Teklif veren esnaflara bildirim gönder
