@@ -659,6 +659,7 @@ function ilanlarimYukle() {
               '<span style="font-size:.66rem;font-weight:700;color:' + renk + ';padding:3px 8px;background:' + renk + '18;border-radius:8px;white-space:nowrap;margin-left:8px">' + ilan.durum + '</span>' +
             '</div>' +
             fotoHTML +
+            (ilan.aciklama ? '<div style="font-size:.78rem;color:#555;margin-bottom:8px;line-height:1.4">' + ilan.aciklama.slice(0,120) + (ilan.aciklama.length > 120 ? '…' : '') + '</div>' : '') +
             yanıtHTML +
             aksiyonHTML +
           '</div>';
