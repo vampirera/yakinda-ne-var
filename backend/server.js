@@ -1790,7 +1790,7 @@ app.put('/api/is-ilani/:id', async function(req, res) {
     var { musteri_telefon, baslik, aciklama, fotograf_url } = req.body;
     if (!musteri_telefon || !baslik) return res.status(400).json({ basari: false, mesaj: 'Başlık zorunlu.' });
     var r = await pool.query(
-      'UPDATE is_ilanlari SET baslik=$1, aciklama=$2, fotograf_url=$3 WHERE id=$4 AND musteri_telefon=$5 RETURNING *',
+      'UPDATE is_ilanlari SET baslik=$1, aciklama=$2, fotograf_url=$3, updated_at=NOW() WHERE id=$4 AND musteri_telefon=$5 RETURNING *',
       [baslik, aciklama || null, fotograf_url || null, req.params.id, musteri_telefon]
     );
     if (!r.rows.length) return res.status(404).json({ basari: false, mesaj: 'İlan bulunamadı veya yetkiniz yok.' });
