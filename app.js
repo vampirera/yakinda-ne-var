@@ -1970,7 +1970,27 @@ function esnaflarGoster(liste) {
     listesi.innerHTML = '<div class="yukleniyor">Esnaf bulunamadi.</div>';
     return;
   }
-  listesi.innerHTML = esnafKartlariOlustur(liste);
+  var LIMIT = 5;
+  if (liste.length <= LIMIT) {
+    listesi.innerHTML = esnafKartlariOlustur(liste);
+    return;
+  }
+  listesi.innerHTML = esnafKartlariOlustur(liste.slice(0, LIMIT)) +
+    '<button id="daha-fazla-btn" onclick="tumEsnaflarGoster()" style="' +
+      'display:block;width:100%;margin-top:10px;padding:12px;' +
+      'background:#6a1b9a;color:#fff;border:none;border-radius:10px;' +
+      'font-size:.92rem;font-weight:700;cursor:pointer;letter-spacing:.02em' +
+    '">Tümünü Göster (' + liste.length + ' esnaf)</button>';
+  _tumEsnafListesi = liste;
+}
+
+var _tumEsnafListesi = [];
+
+function tumEsnaflarGoster() {
+  var listesi = document.getElementById('esnaf-listesi');
+  if (!listesi || !_tumEsnafListesi.length) return;
+  listesi.innerHTML = esnafKartlariOlustur(_tumEsnafListesi);
+  _tumEsnafListesi = [];
 }
 
 // =============================================================
