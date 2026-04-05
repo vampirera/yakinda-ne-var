@@ -1276,6 +1276,39 @@ function ikon(kategori) {
   return katIkon[kategori] || '🏪';
 }
 
+// Hizmet esnafları için kategori/ad bazlı varsayılan emoji
+var _kapakEmojiKural = [
+  [/doktor|klinik|sağlık|saglik|hastane|hekim/i, '🩺'],
+  [/berber|kuaför|kuafor|saç|sac|güzellik|guzellik/i, '✂️'],
+  [/temizlik/i, '🧹'],
+  [/elektrik/i, '⚡'],
+  [/tesisat|tesisatçı|tesisatci/i, '🔧'],
+  [/boyacı|boyaci|boya/i, '🎨'],
+  [/nakliyat|nakliye|taşıma|tasima/i, '🚚'],
+  [/avukat|hukuk/i, '⚖️'],
+  [/muhasebe|mali müşavir|mali musavir|muhasebeci/i, '📊'],
+  [/oto|araba|otomobil|tamirci|tamirhan/i, '🚗'],
+  [/diş|dis|dişçi|disci/i, '🦷'],
+  [/veteriner|hayvan/i, '🐾'],
+  [/fotoğrafçı|fotografci/i, '📸'],
+  [/düğün|dugun|organizasyon/i, '🎉'],
+  [/spor|fitness|gym/i, '💪']
+];
+
+function kapakEmoji(ad, kategori) {
+  var metin = ((ad || '') + ' ' + (kategori || '')).toLowerCase();
+  for (var i = 0; i < _kapakEmojiKural.length; i++) {
+    if (_kapakEmojiKural[i][0].test(metin)) return _kapakEmojiKural[i][1];
+  }
+  return ikon(kategori);
+}
+
+// Esnaf kartı arka plan stili: kapak_foto varsa resim, yoksa emoji + gradient
+function kapakBgStyle(e) {
+  if (e.kapak_foto) return 'background:url(' + e.kapak_foto + ') center/cover no-repeat;';
+  return 'background:linear-gradient(135deg,#1a1a2e,#16213e);';
+}
+
 function lightboxAc(src) {
   document.getElementById('lightbox-img').src = src;
   document.getElementById('lightbox').classList.add('aktif');
@@ -1861,9 +1894,14 @@ function esnafKartlariOlustur(liste) {
     var urunAdi  = (e.urunler || []).slice(0, 2).map(function(u) { return u.ad; }).join(', ');
     var kalp     = favoriMi(e.id) ? '❤️' : '🤍';
     var kampanyaVar = (e.kampanyalar || []).length > 0;
+    var kapakStyle = kapakBgStyle(e);
+    var kapakIkon = e.kapak_foto ? '' : ('<div style="font-size:1.8rem;line-height:1;opacity:.85">' + kapakEmoji(e.ad, e.kategori) + '</div>');
     return '<div class="esnaf-card" onclick="esnafDetay(' + e.id + ')">' +
+      '<div style="height:80px;' + kapakStyle + 'position:relative;border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:center">' +
+        kapakIkon +
+        (kampanyaVar ? '<div class="kart-kampanya-rozet" style="position:absolute;top:6px;right:6px">🏷️</div>' : '') +
+      '</div>' +
       '<div class="esnaf-card-top">' +
-        '<div class="esnaf-img">' + ikon(e.kategori) + (kampanyaVar ? '<div class="kart-kampanya-rozet">🏷️</div>' : '') + '</div>' +
         '<div class="esnaf-info">' +
           '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
             '<h4>' + e.ad + (e.onayli ? ' <span class="onay-rozet">✓ Onaylı</span>' : '') + '</h4>' +
@@ -2029,7 +2067,21 @@ function kampanyaBannerOlustur(kampanyalar) {
 
 function detayDoldur(e) {
   kampanyaBannerOlustur(e.kampanyalar);
-  document.getElementById('hero-icon').textContent = ikon(e.kategori);
+  var heroEl = document.querySelector('#sayfa-detay .hero');
+  var heroIcon = document.getElementById('hero-icon');
+  if (heroEl) {
+    if (e.kapak_foto) {
+      heroEl.style.backgroundImage = 'url(' + e.kapak_foto + ')';
+      heroEl.style.backgroundSize = 'cover';
+      heroEl.style.backgroundPosition = 'center';
+      heroEl.style.backgroundRepeat = 'no-repeat';
+      if (heroIcon) heroIcon.style.display = 'none';
+    } else {
+      heroEl.style.backgroundImage = '';
+      heroEl.style.background = '';
+      if (heroIcon) { heroIcon.style.display = ''; heroIcon.textContent = kapakEmoji(e.ad, e.kategori); }
+    }
+  }
   document.getElementById('detay-adi').textContent = e.ad;
   document.getElementById('detay-puan').textContent = '⭐ ' + (e.puan || 0);
   document.getElementById('detay-mesafe').textContent = e.mesafe_text ? '📍 ' + e.mesafe_text : '📍 ' + e.ilce;
@@ -3396,6 +3448,18 @@ function panelProfilFormYukle(esnafId) {
       if (igEl)  igEl.value  = e.instagram_url || '';
       if (gmEl)  gmEl.value  = e.google_maps_url || '';
 
+      // Kapak fotoğrafı önizleme
+      var preview = document.getElementById('kapak-foto-preview');
+      if (preview) {
+        if (e.kapak_foto) {
+          preview.innerHTML = '<img src="' + e.kapak_foto + '" style="width:100%;height:100%;object-fit:cover;border-radius:10px">';
+          preview.style.display = 'block';
+        } else {
+          preview.innerHTML = '';
+          preview.style.display = 'none';
+        }
+      }
+
       // İlan bildirimi toggle
       var ilanToggle  = document.getElementById('ilan-bildirimi-toggle');
       var ilanSlider  = document.getElementById('ilan-bildirimi-slider');
@@ -3445,6 +3509,32 @@ function panelProfilKaydet() {
       bildirim(data.mesaj || (data.basari ? 'Profil kaydedildi.' : 'Hata oluştu.'), data.basari ? 'basari' : 'hata');
     })
     .catch(function() { bildirim('Bağlanamadı.', 'hata'); });
+}
+
+function kapakFotoYukle(input) {
+  if (!input.files || !input.files[0]) return;
+  var esnafId = durum.panelEsnafId;
+  if (!esnafId) { bildirim('Esnaf ID bulunamadı.', 'uyari'); return; }
+  var btn = document.getElementById('kapak-foto-btn');
+  if (btn) btn.textContent = '⏳ Yükleniyor...';
+  var fd = new FormData();
+  fd.append('kapak_foto', input.files[0]);
+  fetch(API_URL + '/api/esnaflar/' + esnafId + '/kapak-foto', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (btn) btn.textContent = '📷 Kapak Fotoğrafı Yükle';
+      if (!data.basari) { bildirim(data.mesaj || 'Yükleme başarısız.', 'hata'); return; }
+      bildirim('Kapak fotoğrafı güncellendi!', 'basari');
+      var preview = document.getElementById('kapak-foto-preview');
+      if (preview) {
+        preview.innerHTML = '<img src="' + data.url + '" style="width:100%;height:100%;object-fit:cover;border-radius:10px">';
+        preview.style.display = 'block';
+      }
+    })
+    .catch(function() {
+      if (btn) btn.textContent = '📷 Kapak Fotoğrafı Yükle';
+      bildirim('Bağlanamadı.', 'hata');
+    });
 }
 
 function calismaSaatleriYukle(esnafId) {
