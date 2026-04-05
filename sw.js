@@ -1,4 +1,4 @@
-var CACHE_ADI = 'yakinda-ne-var-v6';
+var CACHE_ADI = 'yakinda-ne-var-v7';
 // Sadece Leaflet cache-first, HTML/JS her zaman ağdan
 var CACHE_STATIK = [
   '/yakinda-ne-var/manifest.json',
