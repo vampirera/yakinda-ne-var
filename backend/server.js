@@ -248,6 +248,40 @@ async function tablolarOlustur() {
       console.log('Parlak Yildiz Temizlik eklendi.');
     }
   }
+  // Migration: 30 test esnafa tamamla
+  var testEsnaflar = [
+    ['Pizza Palazzo','yemek','Marmaris','Barbaros Cad. No:22','05321234567','2233445566',36.8541,28.2780,4.6,88,true,true,true],
+    ['Sushi Marmaris','yemek','Marmaris','Marina Cad. No:5','05332345678','3344556677',36.8498,28.2701,4.7,65,true,true,true],
+    ['Burger House','yemek','Marmaris','Ulusal Egemenlik Bul. No:10','05343456789','4455667788',36.8515,28.2745,4.5,143,true,true,true],
+    ['Cafe Deniz','yemek','Marmaris','Sahil Yolu No:3','05354567890','5566778800',36.8490,28.2690,4.8,210,true,true,true],
+    ['Lahmacun Evi','yemek','Marmaris','Pazar Mah. No:18','05365678901','6677889911',36.8570,28.2810,4.4,97,true,true,true],
+    ['Teknoloji Dukkani','urun','Marmaris','Kooperatif Mah. No:6','05376789012','7788990022',36.8528,28.2755,4.3,44,true,true,true],
+    ['Giyim Merkezi','urun','Marmaris','Carsi Mah. No:14','05387890123','8899001133',36.8545,28.2770,4.5,76,true,true,true],
+    ['Kasap Cetin','urun','Marmaris','Pazar Cad. No:9','05398901234','9900112244',36.8512,28.2738,4.9,189,true,true,true],
+    ['Organik Market','urun','Marmaris','Siteler Mah. No:21','05309012345','0011223355',36.8558,28.2792,4.7,112,true,true,true],
+    ['Cicekci Gulsen','urun','Marmaris','Merkez Mah. No:3','05310123456','1122334466',36.8533,28.2748,4.6,58,true,true,true],
+    ['Ekspres Nakliyat','hizmet','Marmaris','Sanayi Sitesi No:45','05320234567','2233445577',36.8580,28.2820,4.5,34,true,true,true],
+    ['Oto Elektrik Kemal','hizmet','Marmaris','Sanayi Cad. No:12','05330345678','3344556688',36.8595,28.2835,4.8,67,true,true,true],
+    ['Boyaci Mustafa','hizmet','Marmaris','Yeni Mah. No:7','05340456789','4455667799',36.8520,28.2760,4.4,29,true,true,true],
+    ['Dogalgaz Tesisatci','hizmet','Marmaris','Baris Mah. No:33','05350567890','5566778801',36.8548,28.2785,4.7,51,true,true,true],
+    ['PC Tamircisi Hasan','hizmet','Marmaris','Atatürk Cad. No:44','05360678901','6677889912',36.8505,28.2725,4.6,83,true,true,true],
+    ['Kuafor Selin','hizmet','Marmaris','Kordon Cad. No:11','05370789012','7788990023',36.8522,28.2742,4.9,156,true,true,true],
+    ['Masaj Salonu Zen','hizmet','Marmaris','Marina Bul. No:8','05380890123','8899001134',36.8488,28.2698,4.8,94,true,true,true],
+    ['Veteriner Klinik','hizmet','Marmaris','Cumhuriyet Cad. No:26','05390901234','9900112245',36.8560,28.2800,4.7,47,true,true,true],
+    ['Eczane Saglik','urun','Marmaris','Merkez Mah. No:1','05300012345','0011223356',36.8538,28.2752,4.9,224,true,true,true],
+    ['Firin Ekmek Dunyasi','yemek','Marmaris','Pazar Mah. No:5','05311123456','1122334477',36.8565,28.2808,4.8,178,true,true,true],
+    ['Diş Protezcisi','hizmet','Marmaris','Atatürk Bul. No:15','05322234567','2233445588',36.8530,28.2762,4.5,38,true,true,true],
+    ['Fotoğrafçı Ali','hizmet','Marmaris','Carsi Mah. No:6','05333345678','3344556699',36.8510,28.2735,4.6,62,true,true,true],
+    ['Hukuk Bürosu','hizmet','Marmaris','Cumhuriyet Mah. No:20','05344456789','4455667700',36.8552,28.2790,4.4,19,true,true,true],
+    ['Muhasebe Ofisi','hizmet','Marmaris','Iskele Mah. No:3','05355567890','5566778812',36.8495,28.2708,4.5,27,true,true,true],
+  ];
+  for (var te of testEsnaflar) {
+    var teCheck = await pool.query('SELECT id FROM esnaflar WHERE ad=$1 LIMIT 1', [te[0]]);
+    if (teCheck.rows.length === 0) {
+      await pool.query(`INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,vergi_no,lat,lng,puan,yorum_sayisi,acik,onayli,onaylandi) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, te);
+      console.log('Test esnaf eklendi:', te[0]);
+    }
+  }
   console.log('Tablolar hazir!');
 }
 
