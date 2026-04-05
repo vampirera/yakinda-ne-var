@@ -1926,13 +1926,31 @@ function oneCikanlariYukle() {
     });
 }
 
-function esnaflarGoster(liste) {
+function esnaflarGoster(liste, aramaModu) {
   var listesi = document.getElementById('esnaf-listesi');
   if (!liste || !liste.length) {
     listesi.innerHTML = '<div class="yukleniyor">Esnaf bulunamadi.</div>';
     return;
   }
-  listesi.innerHTML = esnafKartlariOlustur(liste);
+  var gosterHepsi = aramaModu || !!durum.arama;
+  var LISTE_LIMIT = 5;
+  if (!gosterHepsi && liste.length > LISTE_LIMIT) {
+    var gorunen = liste.slice(0, LISTE_LIMIT);
+    listesi.innerHTML = esnafKartlariOlustur(gorunen) +
+      '<div style="text-align:center;margin:14px 0 6px">' +
+      '<button onclick="esnaflarTumunuGoster()" style="background:#ff6b35;color:#fff;border:none;border-radius:12px;padding:12px 28px;font-size:.88rem;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(255,107,53,.3)">Tumunu Goster (' + liste.length + ' esnaf)</button>' +
+      '</div>';
+    window._tumEsnafListesi = liste;
+  } else {
+    listesi.innerHTML = esnafKartlariOlustur(liste);
+  }
+}
+
+function esnaflarTumunuGoster() {
+  var listesi = document.getElementById('esnaf-listesi');
+  if (window._tumEsnafListesi) {
+    listesi.innerHTML = esnafKartlariOlustur(window._tumEsnafListesi);
+  }
 }
 
 // =============================================================
@@ -1974,7 +1992,7 @@ function gorselAramaBaslat() {
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (!data.basari) throw new Error(data.mesaj);
-        esnaflarGoster(data.veri);
+        esnaflarGoster(data.veri, true);
         if (data.anahtar_kelimeler && data.anahtar_kelimeler.length) {
           document.getElementById('arama').value = data.anahtar_kelimeler[0];
           durum.arama = data.anahtar_kelimeler[0];
