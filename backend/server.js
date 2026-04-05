@@ -115,6 +115,7 @@ async function tablolarOlustur() {
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS ilan_bildirimi BOOLEAN DEFAULT true`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS one_cikan BOOLEAN DEFAULT false`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS one_cikan_etiket TEXT`);
+  await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS kapak_foto TEXT`);
   // ── KURYE KONUM TAKİBİ ─────────────────────────────────────────
   await pool.query(`ALTER TABLE kuryeler ADD COLUMN IF NOT EXISTS lat DECIMAL(10,6)`);
   await pool.query(`ALTER TABLE kuryeler ADD COLUMN IF NOT EXISTS lng DECIMAL(10,6)`);
@@ -1119,6 +1120,24 @@ app.put('/api/esnaf-panel/:id/profil', async function(req, res) {
     cacheSil('esnaflar:');
     res.json({ basari: true, mesaj: 'Profil guncellendi.' });
   } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+});
+
+// ── KAPAK FOTOĞRAFI ────────────────────────────────────────────
+app.post('/api/esnaflar/:id/kapak-foto', upload.single('kapak_foto'), async function(req, res) {
+  try {
+    if (!req.file) return res.status(400).json({ basari: false, mesaj: 'Dosya yok.' });
+    var result = await cloudinary.uploader.upload(req.file.path, {
+      folder: 'yakinda-ne-var/kapak',
+      transformation: [{ width: 1200, crop: 'limit' }]
+    });
+    fs.unlink(req.file.path, function() {});
+    await pool.query('UPDATE esnaflar SET kapak_foto=$1 WHERE id=$2', [result.secure_url, req.params.id]);
+    cacheSil('esnaf_detay:' + req.params.id);
+    cacheSil('esnaflar:');
+    res.json({ basari: true, url: result.secure_url });
+  } catch(err) {
+    res.status(500).json({ basari: false, mesaj: err.message });
+  }
 });
 
 // ── UYGULAMA İÇİ BİLDİRİM ENDPOINTLERİ ─────────────────────────
