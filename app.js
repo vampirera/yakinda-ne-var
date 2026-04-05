@@ -1967,7 +1967,7 @@ function oneCikanlariYukle() {
 function esnaflarGoster(liste) {
   var listesi = document.getElementById('esnaf-listesi');
   if (!liste || !liste.length) {
-    listesi.innerHTML = '<div class="yukleniyor">Esnaf bulunamadi.</div>';
+    listesi.innerHTML = '<div class="bos-durum">Yakında esnaf bulunamadı.</div>';
     return;
   }
   var LIMIT = 5;
