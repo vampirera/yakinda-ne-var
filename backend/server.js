@@ -8,6 +8,7 @@ const cloudinary = require('cloudinary').v2;
 const OpenAI = require('openai');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const bcrypt = require('bcrypt');
 
 const twilio = require('twilio');
 const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -52,6 +53,72 @@ function otpDogrula(telefon, kod) {
   if (kayit.kod !== kod) return false;
   delete _otpStore[telefon];
   return true;
+}
+
+// =============================================================
+// SESSION STORE (in-memory, 7 gun TTL)
+// =============================================================
+var _sessions = {};
+var SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
+
+function generateToken() {
+  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  var token = '';
+  for (var i = 0; i < 48; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+  return token;
+}
+
+function sessionOlustur(kullanici) {
+  var token = generateToken();
+  _sessions[token] = {
+    kullanici_id: kullanici.kullanici_id || kullanici.id || 0,
+    esnaf_id: kullanici.esnaf_id || null,
+    kurye_id: kullanici.kurye_id || null,
+    tip: kullanici.tip,
+    telefon: kullanici.telefon,
+    exp: Date.now() + SESSION_TTL
+  };
+  return token;
+}
+
+function sessionDogrula(token) {
+  if (!token) return null;
+  var s = _sessions[token];
+  if (!s) return null;
+  if (Date.now() > s.exp) { delete _sessions[token]; return null; }
+  return s;
+}
+
+// =============================================================
+// AUTH MIDDLEWARE
+// =============================================================
+
+function esnafAuth(req, res, next) {
+  var auth = req.headers['authorization'];
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return res.status(401).json({ basari: false, mesaj: 'Oturum gerekli. Lutfen tekrar giris yapin.' });
+  }
+  var session = sessionDogrula(auth.slice(7));
+  if (!session) {
+    return res.status(401).json({ basari: false, mesaj: 'Oturum suresi dolmus. Tekrar giris yapin.' });
+  }
+  var urlId = (req.params && req.params.id) ? parseInt(req.params.id) : null;
+  if (urlId && session.esnaf_id !== urlId) {
+    return res.status(403).json({ basari: false, mesaj: 'Bu islem icin yetkiniz yok.' });
+  }
+  req.sessionData = session;
+  next();
+}
+
+function adminAuth(req, res, next) {
+  var auth = req.headers['authorization'];
+  if (auth && auth.startsWith('Bearer ')) {
+    var session = sessionDogrula(auth.slice(7));
+    if (session && session.tip === 'admin') { req.sessionData = session; return next(); }
+  }
+  var key = req.query.key || req.body.key;
+  if (key && key === process.env.ADMIN_SIFRE) return next();
+  return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
 }
 
 // =============================================================
@@ -358,7 +425,7 @@ app.get('/api/esnaflar', async function(req, res) {
     else if (siralama === 'puan') esnaflar.sort(function(a,b){return b.puan-a.puan;});
     else if (siralama === 'fiyat') esnaflar.sort(function(a,b){ var ma=a.urunler.length?Math.min.apply(null,a.urunler.map(function(u){return u.fiyat;})):999; var mb=b.urunler.length?Math.min.apply(null,b.urunler.map(function(u){return u.fiyat;})):999; return ma-mb; });
     res.json({ basari: true, veri: esnaflar });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 app.get('/api/esnaflar/:id', async function(req, res) {
@@ -376,7 +443,7 @@ app.get('/api/esnaflar/:id', async function(req, res) {
     var lat = parseFloat(req.query.lat), lng = parseFloat(req.query.lng);
     if (lat && lng) { var km = mesafeHesapla(lat, lng, parseFloat(e.lat), parseFloat(e.lng)); e.mesafe_km = Math.round(km*10)/10; e.mesafe_text = km < 1 ? Math.round(km*1000)+'m' : km.toFixed(1)+'km'; }
     res.json({ basari: true, veri: e });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 app.post('/api/esnaf-kayit', upload.fields([{name:'vergi_levhasi',maxCount:1},{name:'urun_fotograflari',maxCount:10}]), async function(req, res) {
@@ -412,11 +479,10 @@ app.post('/api/esnaf-kayit', upload.fields([{name:'vergi_levhasi',maxCount:1},{n
     var waMesaj = encodeURIComponent('Merhaba! Yakinda Ne Var uygulamasina kayit olmak istiyorum.\n\nIsletme: '+body.ad+'\nKategori: '+body.kategori+'\nIlce: '+body.ilce+'\nTelefon: '+body.telefon+'\nVergi No: '+body.vergi_no+'\nKayit ID: '+esnafId);
     var whatsapp_url = adminTel ? 'https://wa.me/' + adminTel + '?text=' + waMesaj : null;
     res.json({ basari: true, mesaj: 'Kaydiniz alindi! Onay icin WhatsApp mesaji gonderin.', kayit_id: esnafId, whatsapp_url: whatsapp_url });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
-app.get('/api/admin/ozet', async function(req, res) {
-  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.get('/api/admin/ozet', adminAuth, async function(req, res) {
   try {
     var [esnafOnay, esnafAktif, kuryeOnay, kuryeToplam, musteriSayi, siparisBugun, siparisAy, siparisTopTutar] = await Promise.all([
       pool.query("SELECT COUNT(*) FROM esnaflar WHERE onaylandi=false"),
@@ -439,50 +505,45 @@ app.get('/api/admin/ozet', async function(req, res) {
       ciro_ay: parseFloat(siparisAy.rows[0].tutar),
       ciro_toplam: parseFloat(siparisTopTutar.rows[0].tutar)
     }});
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
-app.get('/api/admin/bekleyenler', async function(req, res) {
-  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.get('/api/admin/bekleyenler', adminAuth, async function(req, res) {
   try {
     var result = await pool.query(`SELECT e.*, json_agg(DISTINCT jsonb_build_object('id',u.id,'ad',u.ad,'fiyat',u.fiyat,'fotograf_url',u.fotograf_url)) FILTER (WHERE u.id IS NOT NULL) as urunler FROM esnaflar e LEFT JOIN urunler u ON e.id=u.esnaf_id WHERE e.onaylandi=false GROUP BY e.id ORDER BY e.kayit_tarihi DESC`);
     res.json({ basari: true, veri: result.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
-app.get('/api/admin/aktifler', async function(req, res) {
-  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.get('/api/admin/aktifler', adminAuth, async function(req, res) {
   try {
     var result = await pool.query('SELECT * FROM esnaflar ORDER BY kayit_tarihi DESC');
     res.json({ basari: true, veri: result.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
-app.post('/api/admin/onayla/:id', async function(req, res) {
-  if (req.body.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.post('/api/admin/onayla/:id', adminAuth, async function(req, res) {
   try {
     await pool.query('UPDATE esnaflar SET onaylandi=true WHERE id=$1', [req.params.id]);
     cacheSil('esnaflar:'); cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Esnaf onaylandi!' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
-app.post('/api/admin/pasif/:id', async function(req, res) {
-  if (req.body.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.post('/api/admin/pasif/:id', adminAuth, async function(req, res) {
   try {
     await pool.query('UPDATE esnaflar SET onaylandi=false WHERE id=$1', [req.params.id]);
     cacheSil('esnaflar:'); cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Esnaf yayindan kaldirildi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
-app.post('/api/admin/aktif/:id', async function(req, res) {
-  if (req.body.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.post('/api/admin/aktif/:id', adminAuth, async function(req, res) {
   try {
     await pool.query('UPDATE esnaflar SET onaylandi=true WHERE id=$1', [req.params.id]);
     cacheSil('esnaflar:'); cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Esnaf yayina alindi!' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 async function esnafSil(id) {
@@ -494,20 +555,18 @@ async function esnafSil(id) {
   cacheSil('esnaflar:'); cacheSil('esnaf_detay:' + id);
 }
 
-app.delete('/api/admin/reddet/:id', async function(req, res) {
-  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.delete('/api/admin/reddet/:id', adminAuth, async function(req, res) {
   try {
     await esnafSil(req.params.id);
     res.json({ basari: true, mesaj: 'Esnaf reddedildi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
-app.delete('/api/admin/sil/:id', async function(req, res) {
-  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.delete('/api/admin/sil/:id', adminAuth, async function(req, res) {
   try {
     await esnafSil(req.params.id);
     res.json({ basari: true, mesaj: 'Esnaf silindi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Kurye kayıt
@@ -525,78 +584,71 @@ app.post('/api/kurye-kayit', async function(req, res) {
       whatsappGonder(process.env.ADMIN_TELEFON, '🛵 Yeni kurye başvurusu: ' + ad + ', ' + ilce + ', ' + arac_tipi);
     }
     res.json({ basari: true, mesaj: 'Basvuru alindi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Admin kurye listesi
-app.get('/api/admin/kuryeler', async function(req, res) {
-  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.get('/api/admin/kuryeler', adminAuth, async function(req, res) {
   try {
     var result = await pool.query('SELECT * FROM kuryeler ORDER BY kayit_tarihi DESC');
     res.json({ basari: true, veri: result.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Admin kurye onayla
-app.post('/api/admin/kurye-onayla/:id', async function(req, res) {
-  if (req.body.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.post('/api/admin/kurye-onayla/:id', adminAuth, async function(req, res) {
   try {
     await pool.query('UPDATE kuryeler SET onaylandi=true WHERE id=$1', [req.params.id]);
     res.json({ basari: true, mesaj: 'Kurye onaylandi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Admin kurye sil
-app.delete('/api/admin/kurye-sil/:id', async function(req, res) {
-  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.delete('/api/admin/kurye-sil/:id', adminAuth, async function(req, res) {
   try {
     await pool.query('DELETE FROM kuryeler WHERE id=$1', [req.params.id]);
     res.json({ basari: true, mesaj: 'Kurye silindi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Admin müşteriler listesi
-app.get('/api/admin/musteriler', async function(req, res) {
-  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.get('/api/admin/musteriler', adminAuth, async function(req, res) {
   try {
     var result = await pool.query("SELECT id, ad, telefon, olusturma FROM kullanicilar WHERE tip='musteri' ORDER BY olusturma DESC");
     res.json({ basari: true, veri: result.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Admin tüm siparişler
-app.get('/api/admin/siparisler', async function(req, res) {
-  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.get('/api/admin/siparisler', adminAuth, async function(req, res) {
   try {
     var where = ''; var params = [];
     if (req.query.durum) { where = ' WHERE durum=$1'; params = [req.query.durum]; }
     var result = await pool.query('SELECT * FROM siparisler' + where + ' ORDER BY tarih DESC', params);
     res.json({ basari: true, veri: result.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Admin esnaf bilgi güncelle
-app.put('/api/admin/esnaf/:id', async function(req, res) {
-  if (req.body.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.put('/api/admin/esnaf/:id', adminAuth, async function(req, res) {
   try {
     var { ad, kategori, ilce, adres, telefon } = req.body;
     await pool.query('UPDATE esnaflar SET ad=$1, kategori=$2, ilce=$3, adres=$4, telefon=$5 WHERE id=$6', [ad, kategori, ilce||'', adres||'', telefon, req.params.id]);
     cacheSil('esnaf_detay:' + req.params.id);
     cacheSil('esnaflar:');
     res.json({ basari: true, mesaj: 'Esnaf guncellendi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Admin: esnafı öne çıkar / geri al
-app.put('/api/admin/esnaf/:id/one-cikan', async function(req, res) {
-  if (req.body.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.put('/api/admin/esnaf/:id/one-cikan', adminAuth, async function(req, res) {
   try {
     var { aktif, etiket } = req.body;
     await pool.query('UPDATE esnaflar SET one_cikan=$1, one_cikan_etiket=$2 WHERE id=$3', [!!aktif, etiket || null, req.params.id]);
     cacheSil('esnaf_detay:' + req.params.id);
     cacheSil('esnaflar:');
     res.json({ basari: true, mesaj: aktif ? 'Esnaf one cikanlara eklendi.' : 'Kaldirildi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Herkese açık: öne çıkan esnaflar
@@ -612,29 +664,28 @@ app.get('/api/one-cikanlar', async function(req, res) {
       LIMIT 10
     `);
     res.json({ basari: true, veri: r.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Admin müşteri sil
-app.delete('/api/admin/musteri/:id', async function(req, res) {
-  if (req.query.key !== process.env.ADMIN_SIFRE) return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+app.delete('/api/admin/musteri/:id', adminAuth, async function(req, res) {
   try {
     await pool.query('DELETE FROM kullanicilar WHERE id=$1 AND tip=$2', [req.params.id, 'musteri']);
     res.json({ basari: true, mesaj: 'Musteri silindi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
-app.post('/api/esnaflar/:id/urunler', async function(req, res) {
+app.post('/api/esnaflar/:id/urunler', esnafAuth, async function(req, res) {
   try {
     var { ad, fiyat, aciklama } = req.body;
     if (!ad) return res.status(400).json({ basari: false, mesaj: 'Ürün adı zorunlu' });
     var result = await pool.query('INSERT INTO urunler (esnaf_id,ad,fiyat,aciklama) VALUES ($1,$2,$3,$4) RETURNING *', [req.params.id, ad, parseFloat(fiyat) || 0, aciklama || '']);
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, veri: result.rows[0] });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
-app.put('/api/esnaflar/:id/urunler/:urun_id', async function(req, res) {
+app.put('/api/esnaflar/:id/urunler/:urun_id', esnafAuth, async function(req, res) {
   try {
     var { ad, fiyat, aciklama } = req.body;
     if (!ad) return res.status(400).json({ basari: false, mesaj: 'Ürün adı zorunlu' });
@@ -645,15 +696,15 @@ app.put('/api/esnaflar/:id/urunler/:urun_id', async function(req, res) {
     if (!result.rows.length) return res.status(404).json({ basari: false, mesaj: 'Ürün bulunamadı' });
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, veri: result.rows[0] });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
-app.delete('/api/esnaflar/:id/urunler/:urun_id', async function(req, res) {
+app.delete('/api/esnaflar/:id/urunler/:urun_id', esnafAuth, async function(req, res) {
   try {
     await pool.query('DELETE FROM urunler WHERE id=$1 AND esnaf_id=$2', [req.params.urun_id, req.params.id]);
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Ürün silindi' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 app.post('/api/esnaflar/:id/yorumlar', async function(req, res) {
@@ -666,7 +717,7 @@ app.post('/api/esnaflar/:id/yorumlar', async function(req, res) {
     cacheSil('esnaf_detay:' + req.params.id);
     cacheSil('esnaflar:');
     res.json({ basari: true, mesaj: 'Yorum eklendi!' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 app.post('/api/siparisler', async function(req, res) {
@@ -719,7 +770,7 @@ app.post('/api/siparisler', async function(req, res) {
 
     cacheSil('esnaflar:');
     res.json({ basari: true, veri: siparis, whatsapp_url: whatsapp_url });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 app.post('/api/kurye-kabul', async function(req, res) {
@@ -767,7 +818,7 @@ app.post('/api/kurye-kabul', async function(req, res) {
     });
 
     res.json({ basari: true, mesaj: 'Kurye atandı.', kurye: { ad: kurye.ad, telefon: kurye.telefon } });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Kuryenin üstlendiği aktif siparişleri listele
@@ -783,7 +834,7 @@ app.get('/api/kurye-siparislerim', async function(req, res) {
       [kurye.id]
     );
     res.json({ basari: true, veri: aktif.rows, kurye_ilce: kurye.ilce });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Kuryenin bölgesindeki henüz alınmamış siparişler
@@ -796,7 +847,7 @@ app.get('/api/kurye-bekleyen', async function(req, res) {
       [ilce]
     );
     res.json({ basari: true, veri: result.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Kurye: konumunu güncelle
@@ -809,7 +860,7 @@ app.put('/api/kurye-konum', async function(req, res) {
       [parseFloat(lat), parseFloat(lng), telefon]
     );
     res.json({ basari: true });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Sipariş: atanan kuryenin konumunu al
@@ -821,7 +872,7 @@ app.get('/api/siparis/:id/kurye-konum', async function(req, res) {
     );
     if (!r.rows.length || r.rows[0].lat == null) return res.json({ basari: false, mesaj: 'Kurye konumu yok.' });
     res.json({ basari: true, veri: r.rows[0] });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 app.get('/api/siparis-detay/:id', async function(req, res) {
@@ -833,7 +884,7 @@ app.get('/api/siparis-detay/:id', async function(req, res) {
     );
     if (!result.rows.length) return res.status(404).json({ basari: false, mesaj: 'Siparis bulunamadi' });
     res.json({ basari: true, veri: result.rows[0] });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 app.put('/api/siparis-iptal/:id', async function(req, res) {
@@ -847,7 +898,7 @@ app.put('/api/siparis-iptal/:id', async function(req, res) {
     if (s.durum !== 'bekliyor') return res.status(400).json({ basari: false, mesaj: 'Sadece bekliyor durumundaki siparisler iptal edilebilir' });
     await pool.query("UPDATE siparisler SET durum='iptal' WHERE id=$1", [req.params.id]);
     res.json({ basari: true, mesaj: 'Siparis iptal edildi' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 app.get('/api/siparislerim', async function(req, res) {
@@ -856,7 +907,7 @@ app.get('/api/siparislerim', async function(req, res) {
     if (!telefon) return res.status(400).json({ basari: false, mesaj: 'Telefon gerekli' });
     var result = await pool.query('SELECT * FROM siparisler WHERE musteri_telefon=$1 ORDER BY tarih DESC', [telefon]);
     res.json({ basari: true, veri: result.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 app.get('/api/siparisler', async function(req, res) {
@@ -866,7 +917,7 @@ app.get('/api/siparisler', async function(req, res) {
       ? await pool.query('SELECT * FROM siparisler WHERE esnaf_id=$1 ORDER BY tarih DESC', [esnafId])
       : await pool.query('SELECT * FROM siparisler ORDER BY tarih DESC');
     res.json({ basari: true, veri: result.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 app.put('/api/siparisler/:id/durum', async function(req, res) {
@@ -897,7 +948,7 @@ app.put('/api/siparisler/:id/durum', async function(req, res) {
     }
 
     res.json({ basari: true, mesaj: 'Durum guncellendi' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 app.post('/api/gorsel-ara', upload.single('fotograf'), async function(req, res) {
@@ -1014,7 +1065,7 @@ app.post('/api/gorsel-ara', upload.single('fotograf'), async function(req, res) 
       mesaj: urunAdi ? ('"' + urunAdi + '" icin sonuclar') : (kategori ? kategori + ' kategorisinde esnaflar' : 'Tum esnaflar'),
       veri: esnaflar
     });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Push bildirim token kaydet
@@ -1027,7 +1078,7 @@ app.post('/api/bildirim-token', async function(req, res) {
       [token, kullanici_telefon || null]
     );
     res.json({ basari: true });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 app.get('/api/ilceler', function(req, res) {
@@ -1065,7 +1116,7 @@ app.post('/api/kayit', async function(req, res) {
       whatsappGonder(process.env.ADMIN_TELEFON, '👤 Yeni müşteri kaydı: ' + ad + ', ' + telefon);
     }
     res.json({ basari: true, mesaj: 'Kayit basarili!', kullanici_id: r.rows[0].id });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 app.post('/api/giris', async function(req, res) {
@@ -1075,26 +1126,57 @@ app.post('/api/giris', async function(req, res) {
     // Admin kontrolü (env'den)
     if (process.env.ADMIN_TELEFON && process.env.ADMIN_SIFRE &&
         telefon === process.env.ADMIN_TELEFON && sifre === process.env.ADMIN_SIFRE) {
-      return res.json({ basari: true, veri: { kullanici_id: 0, ad: 'Admin', telefon: telefon, tip: 'admin', esnaf_id: null, kurye_id: null } });
+      var adminVeri = { kullanici_id: 0, ad: 'Admin', telefon: telefon, tip: 'admin', esnaf_id: null, kurye_id: null };
+      var adminToken = sessionOlustur(adminVeri);
+      return res.json({ basari: true, veri: Object.assign({}, adminVeri, { token: adminToken }) });
     }
-    // Kullanicilar tablosu
-    var r = await pool.query('SELECT id,ad,telefon,tip,esnaf_id,kurye_id,email,adresler FROM kullanicilar WHERE telefon=$1 AND sifre=$2', [telefon, sifre]);
+    // Kullanicilar tablosu — telefon ile çek, sonra şifre doğrula (bcrypt lazy migration)
+    var r = await pool.query('SELECT id,ad,telefon,tip,esnaf_id,kurye_id,email,adresler,sifre FROM kullanicilar WHERE telefon=$1', [telefon]);
     if (r.rows.length) {
       var u = r.rows[0];
+      var sifreEslesti = false;
+      var hashli = u.sifre && (u.sifre.startsWith('$2b$') || u.sifre.startsWith('$2a$'));
+      if (hashli) {
+        sifreEslesti = await bcrypt.compare(sifre, u.sifre);
+      } else {
+        sifreEslesti = (u.sifre === sifre);
+        if (sifreEslesti) {
+          // Lazy migration: ilk girişte hashle
+          var hashed = await bcrypt.hash(sifre, 10);
+          await pool.query('UPDATE kullanicilar SET sifre=$1 WHERE id=$2', [hashed, u.id]);
+        }
+      }
+      if (!sifreEslesti) return res.status(401).json({ basari: false, mesaj: 'Telefon veya sifre yanlis' });
       var veri = { kullanici_id: u.id, ad: u.ad, telefon: u.telefon, tip: u.tip, esnaf_id: u.esnaf_id, kurye_id: u.kurye_id, email: u.email || '', adresler: u.adresler || [] };
       if (u.tip === 'kurye' && u.kurye_id) {
         var kr = await pool.query('SELECT ilce, arac_tipi, onaylandi FROM kuryeler WHERE id=$1', [u.kurye_id]);
         if (kr.rows.length) { veri.ilce = kr.rows[0].ilce; veri.arac_tipi = kr.rows[0].arac_tipi; veri.onaylandi = kr.rows[0].onaylandi; }
       }
-      return res.json({ basari: true, veri: veri });
+      var token = sessionOlustur(veri);
+      return res.json({ basari: true, veri: Object.assign({}, veri, { token: token }) });
     }
-    // Geriye dönük uyumluluk: esnaflar tablosundaki sifre
-    var er = await pool.query('SELECT id,ad FROM esnaflar WHERE telefon=$1 AND sifre=$2', [telefon, sifre]);
+    // Geriye dönük uyumluluk: esnaflar tablosundaki sifre (bcrypt lazy migration)
+    var er = await pool.query('SELECT id,ad,sifre FROM esnaflar WHERE telefon=$1', [telefon]);
     if (er.rows.length) {
-      return res.json({ basari: true, veri: { kullanici_id: null, ad: er.rows[0].ad, telefon: telefon, tip: 'esnaf', esnaf_id: er.rows[0].id, kurye_id: null } });
+      var e = er.rows[0];
+      var eSifreEslesti = false;
+      var eHashli = e.sifre && (e.sifre.startsWith('$2b$') || e.sifre.startsWith('$2a$'));
+      if (eHashli) {
+        eSifreEslesti = await bcrypt.compare(sifre, e.sifre);
+      } else {
+        eSifreEslesti = (e.sifre === sifre);
+        if (eSifreEslesti) {
+          var eHashed = await bcrypt.hash(sifre, 10);
+          await pool.query('UPDATE esnaflar SET sifre=$1 WHERE id=$2', [eHashed, e.id]);
+        }
+      }
+      if (!eSifreEslesti) return res.status(401).json({ basari: false, mesaj: 'Telefon veya sifre yanlis' });
+      var eVeri = { kullanici_id: null, ad: e.ad, telefon: telefon, tip: 'esnaf', esnaf_id: e.id, kurye_id: null };
+      var eToken = sessionOlustur(eVeri);
+      return res.json({ basari: true, veri: Object.assign({}, eVeri, { token: eToken }) });
     }
     res.status(401).json({ basari: false, mesaj: 'Telefon veya sifre yanlis' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { res.status(500).json({ basari: false, mesaj: 'Giris hatasi.' }); }
 });
 
 app.put('/api/musteri/profil', async function(req, res) {
@@ -1105,10 +1187,10 @@ app.put('/api/musteri/profil', async function(req, res) {
     if (!kontrol.rows.length) return res.status(403).json({ basari: false, mesaj: 'Yetkisiz' });
     await pool.query('UPDATE kullanicilar SET email=$1, adresler=$2 WHERE id=$3', [email || null, JSON.stringify(adresler || []), id]);
     res.json({ basari: true });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
-app.put('/api/esnaf-panel/:id/profil', async function(req, res) {
+app.put('/api/esnaf-panel/:id/profil', esnafAuth, async function(req, res) {
   try {
     var { ad, adres, telefon, kategori, instagram_url, google_maps_url } = req.body;
     if (!ad || !telefon) return res.status(400).json({ basari: false, mesaj: 'Ad ve telefon zorunlu' });
@@ -1119,11 +1201,11 @@ app.put('/api/esnaf-panel/:id/profil', async function(req, res) {
     cacheSil('esnaf_detay:' + req.params.id);
     cacheSil('esnaflar:');
     res.json({ basari: true, mesaj: 'Profil guncellendi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // ── KAPAK FOTOĞRAFI ────────────────────────────────────────────
-app.post('/api/esnaflar/:id/kapak-foto', upload.single('kapak_foto'), async function(req, res) {
+app.post('/api/esnaflar/:id/kapak-foto', esnafAuth, upload.single('kapak_foto'), async function(req, res) {
   try {
     if (!req.file) return res.status(400).json({ basari: false, mesaj: 'Dosya yok.' });
     var result = await cloudinary.uploader.upload(req.file.path, {
@@ -1136,7 +1218,7 @@ app.post('/api/esnaflar/:id/kapak-foto', upload.single('kapak_foto'), async func
     cacheSil('esnaflar:');
     res.json({ basari: true, url: result.secure_url });
   } catch(err) {
-    res.status(500).json({ basari: false, mesaj: err.message });
+    console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' });
   }
 });
 
@@ -1153,7 +1235,7 @@ app.get('/api/bildirimler', async function(req, res) {
     );
     var okunmamis = r.rows.filter(function(b) { return !b.okundu; }).length;
     res.json({ basari: true, veri: r.rows, okunmamis: okunmamis });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Tümünü okundu olarak işaretle
@@ -1163,7 +1245,7 @@ app.put('/api/bildirimler/oku', async function(req, res) {
     if (!telefon) return res.status(400).json({ basari: false });
     await pool.query('UPDATE bildirimler SET okundu=true WHERE alici_telefon=$1 AND okundu=false', [telefon]);
     res.json({ basari: true });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Tekil bildirimi sil
@@ -1171,27 +1253,27 @@ app.delete('/api/bildirim/:id', async function(req, res) {
   try {
     await pool.query('DELETE FROM bildirimler WHERE id=$1', [req.params.id]);
     res.json({ basari: true });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // İlan bildirimi tercihini güncelle
-app.put('/api/esnaf-panel/:id/ilan-bildirimi', async function(req, res) {
+app.put('/api/esnaf-panel/:id/ilan-bildirimi', esnafAuth, async function(req, res) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     await pool.query('UPDATE esnaflar SET ilan_bildirimi=$1 WHERE id=$2', [!!req.body.aktif, req.params.id]);
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: req.body.aktif ? 'İlan bildirimleri açıldı.' : 'İlan bildirimleri kapatıldı.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 app.put('/api/esnaflar/:id/goruntuleme', async function(req, res) {
   try {
     await pool.query('UPDATE esnaflar SET goruntuleme_sayisi = COALESCE(goruntuleme_sayisi,0) + 1 WHERE id=$1', [req.params.id]);
     res.json({ basari: true });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
-app.get('/api/esnaf-panel/:id/istatistik', async function(req, res) {
+app.get('/api/esnaf-panel/:id/istatistik', esnafAuth, async function(req, res) {
   try {
     var id = req.params.id;
 
@@ -1252,7 +1334,7 @@ app.get('/api/esnaf-panel/:id/istatistik', async function(req, res) {
         tekrar_musteri: parseInt(tekrarRes.rows[0]?.tekrar || 0)
       }
     });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 async function esnafDogrula(id, res) {
@@ -1261,7 +1343,7 @@ async function esnafDogrula(id, res) {
   return true;
 }
 
-app.post('/api/esnaf-panel/:id/kampanya', async function(req, res) {
+app.post('/api/esnaf-panel/:id/kampanya', esnafAuth, async function(req, res) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var { baslik, aciklama, indirim_orani, bitis_tarihi } = req.body;
@@ -1272,19 +1354,19 @@ app.post('/api/esnaf-panel/:id/kampanya', async function(req, res) {
     );
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, veri: result.rows[0] });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
-app.delete('/api/esnaf-panel/:id/kampanya/:kampanya_id', async function(req, res) {
+app.delete('/api/esnaf-panel/:id/kampanya/:kampanya_id', esnafAuth, async function(req, res) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     await pool.query('DELETE FROM kampanyalar WHERE id=$1 AND esnaf_id=$2', [req.params.kampanya_id, req.params.id]);
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Kampanya silindi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
-app.put('/api/esnaf-panel/:id/calisma-saatleri', async function(req, res) {
+app.put('/api/esnaf-panel/:id/calisma-saatleri', esnafAuth, async function(req, res) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var saatler = req.body.calisma_saatleri;
@@ -1293,7 +1375,7 @@ app.put('/api/esnaf-panel/:id/calisma-saatleri', async function(req, res) {
     cacheSil('esnaf_detay:' + req.params.id);
     cacheSil('esnaflar:');
     res.json({ basari: true, mesaj: 'Calisma saatleri guncellendi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // =============================================================
@@ -1301,16 +1383,16 @@ app.put('/api/esnaf-panel/:id/calisma-saatleri', async function(req, res) {
 // =============================================================
 
 // Randevu ayarları al
-app.get('/api/esnaf-panel/:id/randevu-ayar', async function(req, res) {
+app.get('/api/esnaf-panel/:id/randevu-ayar', esnafAuth, async function(req, res) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var r = await pool.query('SELECT randevu_modu, slot_suresi, calisma_saatleri, indirimli_saatler FROM esnaflar WHERE id=$1', [req.params.id]);
     res.json({ basari: true, veri: r.rows[0] });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Randevu ayarları güncelle (modu aç/kapat, slot süresi, indirimli saatler)
-app.put('/api/esnaf-panel/:id/randevu-ayar', async function(req, res) {
+app.put('/api/esnaf-panel/:id/randevu-ayar', esnafAuth, async function(req, res) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var { randevu_modu, slot_suresi, indirimli_saatler } = req.body;
@@ -1320,20 +1402,20 @@ app.put('/api/esnaf-panel/:id/randevu-ayar', async function(req, res) {
     );
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Randevu ayarlari guncellendi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Hizmetleri listele
-app.get('/api/esnaf-panel/:id/hizmetler', async function(req, res) {
+app.get('/api/esnaf-panel/:id/hizmetler', esnafAuth, async function(req, res) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var r = await pool.query('SELECT * FROM hizmetler WHERE esnaf_id=$1 ORDER BY id', [req.params.id]);
     res.json({ basari: true, veri: r.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Hizmet ekle
-app.post('/api/esnaf-panel/:id/hizmet', async function(req, res) {
+app.post('/api/esnaf-panel/:id/hizmet', esnafAuth, async function(req, res) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var { ad, sure, fiyat, aciklama } = req.body;
@@ -1343,11 +1425,11 @@ app.post('/api/esnaf-panel/:id/hizmet', async function(req, res) {
       [req.params.id, ad, parseInt(sure)||30, parseFloat(fiyat)||0, aciklama||null]
     );
     res.json({ basari: true, veri: r.rows[0] });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Hizmet güncelle
-app.put('/api/esnaf-panel/:id/hizmet/:hizmet_id', async function(req, res) {
+app.put('/api/esnaf-panel/:id/hizmet/:hizmet_id', esnafAuth, async function(req, res) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var { ad, sure, fiyat, aciklama, aktif } = req.body;
@@ -1356,16 +1438,16 @@ app.put('/api/esnaf-panel/:id/hizmet/:hizmet_id', async function(req, res) {
       [ad, parseInt(sure)||30, parseFloat(fiyat)||0, aciklama||null, aktif !== false, req.params.hizmet_id, req.params.id]
     );
     res.json({ basari: true, veri: r.rows[0] });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Hizmet sil
-app.delete('/api/esnaf-panel/:id/hizmet/:hizmet_id', async function(req, res) {
+app.delete('/api/esnaf-panel/:id/hizmet/:hizmet_id', esnafAuth, async function(req, res) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     await pool.query('DELETE FROM hizmetler WHERE id=$1 AND esnaf_id=$2', [req.params.hizmet_id, req.params.id]);
     res.json({ basari: true, mesaj: 'Hizmet silindi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Müşteri için: esnaf hizmetlerini al (public)
@@ -1373,7 +1455,7 @@ app.get('/api/esnaf/:id/hizmetler', async function(req, res) {
   try {
     var r = await pool.query('SELECT * FROM hizmetler WHERE esnaf_id=$1 AND aktif=true ORDER BY id', [req.params.id]);
     res.json({ basari: true, veri: r.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Müsait slotları hesapla: GET /api/esnaf/:id/musait-slotlar?tarih=2024-01-15&hizmet_id=1
@@ -1448,7 +1530,7 @@ app.get('/api/esnaf/:id/musait-slotlar', async function(req, res) {
     }
 
     res.json({ basari: true, veri: slotlar });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Randevu oluştur
@@ -1503,7 +1585,7 @@ app.post('/api/randevu', async function(req, res) {
     ]);
 
     res.json({ basari: true, veri: randevu, mesaj: 'Randevu olusturuldu.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Müşterinin randevularını listele
@@ -1522,7 +1604,7 @@ app.get('/api/randevularim', async function(req, res) {
       [telefon]
     );
     res.json({ basari: true, veri: r.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Randevu iptal (müşteri)
@@ -1553,7 +1635,7 @@ app.put('/api/randevu/:id/iptal', async function(req, res) {
     }
 
     res.json({ basari: true, mesaj: 'Randevu iptal edildi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Randevu yeniden planla (müşteri)
@@ -1589,11 +1671,11 @@ app.put('/api/randevu/:id/yeniden-planla', async function(req, res) {
     }
 
     res.json({ basari: true, mesaj: 'Randevu yeniden planlanadi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Esnaf paneli: tüm randevuları görüntüle
-app.get('/api/esnaf-panel/:id/randevular', async function(req, res) {
+app.get('/api/esnaf-panel/:id/randevular', esnafAuth, async function(req, res) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var { tarih } = req.query;
@@ -1603,11 +1685,11 @@ app.get('/api/esnaf-panel/:id/randevular', async function(req, res) {
     query += ' ORDER BY r.tarih DESC, r.saat';
     var r = await pool.query(query, params);
     res.json({ basari: true, veri: r.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Esnaf paneli: randevu durumu güncelle
-app.put('/api/esnaf-panel/:id/randevu/:randevu_id/durum', async function(req, res) {
+app.put('/api/esnaf-panel/:id/randevu/:randevu_id/durum', esnafAuth, async function(req, res) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var { durum } = req.body;
@@ -1629,7 +1711,7 @@ app.put('/api/esnaf-panel/:id/randevu/:randevu_id/durum', async function(req, re
     }
 
     res.json({ basari: true, mesaj: 'Durum guncellendi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // ── HİZMET TEKLİF SİSTEMİ ────────────────────────────────────────────
@@ -1644,7 +1726,7 @@ app.post('/api/is-ilani/fotograf', upload.single('foto'), async function(req, re
     res.json({ basari: true, url: result.secure_url });
   } catch(err) {
     if (req.file) fs.unlink(req.file.path, function() {});
-    res.status(500).json({ basari: false, mesaj: err.message });
+    console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' });
   }
 });
 
@@ -1677,7 +1759,7 @@ app.post('/api/is-ilani', async function(req, res) {
       }
     } catch(notifErr) { console.log('Bildirim hatasi:', notifErr.message); }
     res.json({ basari: true, veri: r.rows[0], mesaj: 'İlan yayınlandı! ' + (kategoriAd || '') + ' kategorisindeki esnaflar bildirim aldı.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // İlanları listele (esnaf paneli için — kategoriye göre)
@@ -1692,7 +1774,7 @@ app.get('/api/is-ilanlari', async function(req, res) {
                FROM is_ilanlari i WHERE ${where.join(' AND ')} ORDER BY i.olusturma DESC LIMIT 50`;
     var r = await pool.query(sql, params);
     res.json({ basari: true, veri: r.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Müşterinin ilanları + her ilandaki esnaf yanıtları (telefon dahil)
@@ -1712,7 +1794,7 @@ app.get('/api/ilanlarim', async function(req, res) {
       [telefon]
     );
     res.json({ basari: true, veri: r.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // İlan düzenle (sadece ilan sahibi müşteri yapabilir)
@@ -1744,7 +1826,7 @@ app.put('/api/is-ilanlari/:id', async function(req, res) {
       whatsappGonder(esnafTel, '📝 İlan Güncellendi\n\n"' + ilanBaslik + '" başlıklı ilan güncellendi.\nTeklifiniz hâlâ aktif, durumu takip edin!').catch(function(){});
     }
     res.json({ basari: true, mesaj: 'İlan güncellendi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // İlanı yayından kaldır (pasif yap)
@@ -1767,7 +1849,7 @@ app.put('/api/is-ilanlari/:id/kaldir', async function(req, res) {
       whatsappGonder(esnafTel, '⏸ İlan Yayından Kaldırıldı\n\n"' + ilanBaslik + '" başlıklı ilana verdiğiniz teklif değerlendirildi, ilan yayından kaldırıldı.').catch(function(){});
     }
     res.json({ basari: true, mesaj: 'İlan yayından kaldırıldı.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Esnaf ilgi bildir (fiyat opsiyonel)
@@ -1793,7 +1875,7 @@ app.post('/api/is-ilani/:id/teklif', async function(req, res) {
       );
     }
     res.json({ basari: true, veri: r.rows[0], mesaj: 'Yanıtınız müşteriye iletildi!' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Esnaf yanıtını kabul / reddet
@@ -1821,7 +1903,7 @@ app.put('/api/teklif/:id/durum', async function(req, res) {
       }
     }
     res.json({ basari: true, mesaj: durum === 'kabul' ? 'Kabul edildi. Esnaf bilgilendirildi.' : 'Reddedildi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // İlan düzenle (başlık, açıklama, fotoğraf)
@@ -1835,7 +1917,7 @@ app.put('/api/is-ilani/:id/kapat', async function(req, res) {
     );
     if (!r.rows.length) return res.status(404).json({ basari: false, mesaj: 'İlan bulunamadı veya zaten kapalı.' });
     res.json({ basari: true, mesaj: 'İlan yayından kaldırıldı.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 app.put('/api/is-ilani/:id', async function(req, res) {
@@ -1848,7 +1930,7 @@ app.put('/api/is-ilani/:id', async function(req, res) {
     );
     if (!r.rows.length) return res.status(404).json({ basari: false, mesaj: 'İlan bulunamadı veya yetkiniz yok.' });
     res.json({ basari: true, veri: r.rows[0], mesaj: 'İlan güncellendi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // ── MÜŞTERİ SORULARI ───────────────────────────────────────────────────────
@@ -1879,7 +1961,7 @@ app.post('/api/sorular', async function(req, res) {
       );
     }
     res.json({ basari: true, mesaj: 'Sorunuz iletildi.', id: r.rows[0].id });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Esnaf kendi sorularını listeler
@@ -1890,7 +1972,7 @@ app.get('/api/sorular/:esnafId', async function(req, res) {
       [req.params.esnafId]
     );
     res.json({ basari: true, veri: r.rows });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Esnaf soruyu cevaplar
@@ -1920,7 +2002,7 @@ app.put('/api/sorular/:id/cevapla', async function(req, res) {
       );
     }
     res.json({ basari: true, mesaj: 'Cevap gönderildi.' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: err.message }); }
+  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
 // Randevu hatırlatma scheduler — her 10 dakikada bir çalışır
@@ -1957,6 +2039,14 @@ async function randevuHatirlatmaCalistir() {
     console.error('Randevu hatirlatma hatasi:', err.message);
   }
 }
+
+// =============================================================
+// GLOBAL ERROR HANDLER
+// =============================================================
+app.use(function(err, req, res, next) {
+  console.error('[Global Hata]', err.message);
+  res.status(err.status || 500).json({ basari: false, mesaj: 'Sunucu hatasi.' });
+});
 
 tablolarOlustur().then(async function() {
   // hatirlatma_gonderildi kolonu ekle (varsa hata vermez)

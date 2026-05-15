@@ -20,6 +20,20 @@ if ('serviceWorker' in navigator) {
 
 var API_URL = 'https://yakinda-ne-var-backend-production.up.railway.app';
 
+// Auth header yardımcısı — token varsa Bearer ekler
+function authHeader() {
+  var oturum = oturumAl();
+  if (oturum && oturum.token) {
+    return { 'Authorization': 'Bearer ' + oturum.token };
+  }
+  return {};
+}
+
+// JSON + auth header
+function jsonAuthHeader() {
+  return Object.assign({ 'Content-Type': 'application/json' }, authHeader());
+}
+
 function bildirim(mesaj, tip) {
   tip = tip || 'bilgi';
   var container = document.getElementById('bildirim-toast');
@@ -50,7 +64,7 @@ function bildirimIzniAl() {
     var oturum = oturumAl();
     fetch(API_URL + '/api/bildirim-token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: jsonAuthHeader(),
       body: JSON.stringify({
         token: token,
         kullanici_telefon: oturum ? oturum.telefon : null
@@ -137,7 +151,7 @@ function profilBackendSync(profil) {
   if (!oturum || oturum.tip !== 'musteri' || !oturum.kullanici_id) return;
   fetch(API_URL + '/api/musteri/profil', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({
       id: oturum.kullanici_id,
       telefon: oturum.telefon,
@@ -525,7 +539,7 @@ function ilanVerGonder() {
   if (btn) { btn.disabled = true; btn.textContent = 'Gönderiliyor...'; }
   fetch(API_URL + '/api/is-ilani', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({
       musteri_telefon: oturum.telefon,
       musteri_ad: oturum.ad,
@@ -684,7 +698,7 @@ function teklifKabul(teklifId) {
   var oturum = oturumAl();
   fetch(API_URL + '/api/teklif/' + teklifId + '/durum', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ durum: 'kabul', musteri_telefon: oturum ? oturum.telefon : '' })
   }).then(function(r) { return r.json(); })
   .then(function(data) { bildirim(data.mesaj, data.basari ? 'basari' : 'hata'); if (data.basari) ilanlarimYukle(); });
@@ -693,7 +707,7 @@ function teklifKabul(teklifId) {
 function teklifReddet(teklifId) {
   fetch(API_URL + '/api/teklif/' + teklifId + '/durum', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ durum: 'reddedildi' })
   }).then(function(r) { return r.json(); })
   .then(function(data) { bildirim(data.mesaj, data.basari ? 'bilgi' : 'hata'); if (data.basari) ilanlarimYukle(); });
@@ -864,7 +878,7 @@ function ilanDuzenleKaydet(ilanId) {
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor...'; }
   fetch(API_URL + '/api/is-ilani/' + ilanId, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ musteri_telefon: oturum ? oturum.telefon : '', baslik: baslik, aciklama: aciklama || null, fotograf_url: fotoUrl || null })
   }).then(function(r) { return r.json(); })
   .then(function(data) {
@@ -882,7 +896,7 @@ function ilanKaldir(ilanId) {
   var oturum = oturumAl();
   fetch(API_URL + '/api/is-ilani/' + ilanId + '/kapat', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ musteri_telefon: oturum ? oturum.telefon : '' })
   }).then(function(r) { return r.json(); })
   .then(function(data) {
@@ -1048,7 +1062,7 @@ function siparisIptal(id) {
   var tel = telefon();
   fetch(API_URL + '/api/siparis-iptal/' + id, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ musteri_telefon: tel })
   })
     .then(function(r) { return r.json(); })
@@ -1192,7 +1206,7 @@ function musteriRandevuIptal(randevuId) {
   if (!tel) return;
   fetch(API_URL + '/api/randevu/' + randevuId + '/iptal', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ musteri_telefon: tel })
   })
     .then(function(r) { return r.json(); })
@@ -2282,7 +2296,7 @@ function detRandevuOlustur() {
 
   fetch(API_URL + '/api/randevu', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({
       esnaf_id: e.id,
       musteri_ad: ad,
@@ -2405,7 +2419,7 @@ function siparisVer() {
   }
   fetch(API_URL + '/api/siparisler', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({
       esnaf_id: durum.secilenEsnaf.id,
       urunler: durum.sepet,
@@ -2453,7 +2467,7 @@ function soruGonder() {
   var tel = document.getElementById('soru-telefon').value.trim();
   fetch(API_URL + '/api/sorular', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ esnaf_id: durum.secilenEsnaf.id, musteri_ad: ad || null, musteri_telefon: tel || null, soru: soru })
   })
     .then(function(r) { return r.json(); })
@@ -2478,7 +2492,7 @@ function yorumGonder() {
   }
   fetch(API_URL + '/api/esnaflar/' + durum.secilenEsnaf.id + '/yorumlar', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ kullanici: kullanici, puan: durum.secilenPuan, yorum: yorum })
   })
     .then(function(r) { return r.json(); })
@@ -2633,7 +2647,7 @@ function kuryeKayitGonder() {
   btn.disabled = true; btn.textContent = 'Gönderiliyor...'; mesaj.textContent = '';
 
   fetch(API_URL + '/api/kurye-kayit', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: jsonAuthHeader(),
     body: JSON.stringify({ ad: ad, telefon: telefon, arac_tipi: arac, ilce: ilce, sifre: sifre })
   })
     .then(function(r) { return r.json(); })
@@ -2683,7 +2697,7 @@ function musteriKayitGonder() {
   btn.disabled = true; btn.textContent = 'Kaydediliyor...'; mesaj.textContent = '';
 
   fetch(API_URL + '/api/kayit', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: jsonAuthHeader(),
     body: JSON.stringify({ ad: ad, telefon: telefon, sifre: sifre })
   })
     .then(function(r) { return r.json(); })
@@ -2707,7 +2721,7 @@ function musteriKayitGonder() {
 var adminAktifSekme = 'ozet';
 
 function adminGoster(sekme) {
-  var oturum = oturumAl(); var key = (oturum && oturum.sifre) ? oturum.sifre : prompt('Admin sifresi:');
+  var oturum = oturumAl(); // Token tabanlı auth — key artık gerekli değil
   if (!key) return;
   sayfaGoster('admin');
   if (sekme) adminAktifSekme = sekme;
@@ -2732,12 +2746,12 @@ function _adminOzetKart(ikon, baslik, ana, alt, renk) {
   '</div>';
 }
 
-function adminVerileriYukle(key, sekme) {
+function adminVerileriYukle(sekme) {
   var icerik = document.getElementById('admin-icerik');
   icerik.innerHTML = '<div class="yukleniyor"></div>';
 
   if (sekme === 'ozet') {
-    fetch(API_URL + '/api/admin/ozet?key=' + key).then(function(r) { return r.json(); })
+    fetch(API_URL + '/api/admin/ozet', { headers: authHeader() }).then(function(r) { return r.json(); })
     .then(function(result) {
       if (!result.basari) { icerik.innerHTML = '<div class="hata">Yetkisiz erişim.</div>'; return; }
       var v = result.veri;
@@ -2756,29 +2770,29 @@ function adminVerileriYukle(key, sekme) {
 
   } else if (sekme === 'esnaflar') {
     Promise.all([
-      fetch(API_URL + '/api/admin/bekleyenler?key=' + key).then(function(r) { return r.json(); }),
-      fetch(API_URL + '/api/admin/aktifler?key='    + key).then(function(r) { return r.json(); })
+      fetch(API_URL + '/api/admin/bekleyenler', { headers: authHeader() }).then(function(r) { return r.json(); }),
+      fetch(API_URL + '/api/admin/aktifler', { headers: authHeader() }).then(function(r) { return r.json(); })
     ]).then(function(results) {
       if (!results[0].basari) { icerik.innerHTML = '<div class="hata">Yetkisiz erisim.</div>'; return; }
       adminEsnaflarGoster(results[0].veri, results[1].veri || [], key);
     }).catch(function() { icerik.innerHTML = '<div class="hata">Baglanamadi.</div>'; });
 
   } else if (sekme === 'kuryeler') {
-    fetch(API_URL + '/api/admin/kuryeler?key=' + key).then(function(r) { return r.json(); })
+    fetch(API_URL + '/api/admin/kuryeler', { headers: authHeader() }).then(function(r) { return r.json(); })
     .then(function(result) {
       if (!result.basari) { icerik.innerHTML = '<div class="hata">Yetkisiz erisim.</div>'; return; }
       adminKuryelerGoster(result.veri || [], key);
     }).catch(function() { icerik.innerHTML = '<div class="hata">Baglanamadi.</div>'; });
 
   } else if (sekme === 'musteriler') {
-    fetch(API_URL + '/api/admin/musteriler?key=' + key).then(function(r) { return r.json(); })
+    fetch(API_URL + '/api/admin/musteriler', { headers: authHeader() }).then(function(r) { return r.json(); })
     .then(function(result) {
       if (!result.basari) { icerik.innerHTML = '<div class="hata">Yetkisiz erisim.</div>'; return; }
       adminMusterilerGoster(result.veri || [], key);
     }).catch(function() { icerik.innerHTML = '<div class="hata">Baglanamadi.</div>'; });
 
   } else if (sekme === 'siparisler') {
-    fetch(API_URL + '/api/admin/siparisler?key=' + key).then(function(r) { return r.json(); })
+    fetch(API_URL + '/api/admin/siparisler', { headers: authHeader() }).then(function(r) { return r.json(); })
     .then(function(result) {
       if (!result.basari) { icerik.innerHTML = '<div class="hata">Yetkisiz erisim.</div>'; return; }
       adminSiparislerGoster(result.veri || [], key, 'tumu');
@@ -2934,10 +2948,10 @@ function adminEsnafDetay(id, key) {
     var html = '<h3 style="margin:0 30px 12px 0;font-size:1rem">🏪 Esnaf Detayı</h3>' +
       '<div style="display:flex;gap:8px;margin-bottom:8px">' +
         (e.onaylandi
-          ? '<button onclick="adminIslem(\'pasif\',' + e.id + ',\'' + key + '\')" style="flex:1;background:#fff3e0;color:#e65100;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">Yayından Al</button>'
-          : '<button onclick="adminIslem(\'onayla\',' + e.id + ',\'' + key + '\')" style="flex:1;background:#e8f5e9;color:#2e7d32;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">Onayla</button>'
+          ? '<button onclick="adminIslem(\'pasif\',' + e.id + ')" style="flex:1;background:#fff3e0;color:#e65100;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">Yayından Al</button>'
+          : '<button onclick="adminIslem(\'onayla\',' + e.id + ')" style="flex:1;background:#e8f5e9;color:#2e7d32;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">Onayla</button>'
         ) +
-        '<button onclick="adminIslem(\'reddet\',' + e.id + ',\'' + key + '\')" style="flex:1;background:#ffebee;color:#c62828;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">Reddet/Sil</button>' +
+        '<button onclick="adminIslem(\'reddet\',' + e.id + ')" style="flex:1;background:#ffebee;color:#c62828;border:none;border-radius:8px;padding:8px;font-size:.75rem;font-weight:700;cursor:pointer">Reddet/Sil</button>' +
       '</div>' +
       '<div style="display:flex;gap:8px;margin-bottom:12px">' +
         (e.one_cikan
@@ -2984,7 +2998,7 @@ function adminOneCikarModal(esnafId, key) {
   if (etiket === null) return; // iptal
   fetch(API_URL + '/api/admin/esnaf/' + esnafId + '/one-cikan', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ key: key, aktif: true, etiket: etiket.trim() || null })
   }).then(function(r) { return r.json(); })
   .then(function(res) {
@@ -2996,7 +3010,7 @@ function adminOneCikarModal(esnafId, key) {
 function adminOneCikanKaldir(esnafId, key) {
   fetch(API_URL + '/api/admin/esnaf/' + esnafId + '/one-cikan', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ key: key, aktif: false })
   }).then(function(r) { return r.json(); })
   .then(function(res) {
@@ -3008,7 +3022,7 @@ function adminOneCikanKaldir(esnafId, key) {
 function adminKuryeDetay(id, key) {
   var oturum = oturumAl();
   if (!oturum) return;
-  fetch(API_URL + '/api/admin/kuryeler?key=' + key).then(function(r) { return r.json(); })
+  fetch(API_URL + '/api/admin/kuryeler', { headers: authHeader() }).then(function(r) { return r.json(); })
   .then(function(res) {
     if (!res.basari) return;
     var k = (res.veri || []).find(function(x) { return x.id === id; });
@@ -3027,9 +3041,9 @@ function adminKuryeDetay(id, key) {
       '</div>' +
       '<div style="display:flex;gap:8px">' +
         (!k.onaylandi
-          ? '<button onclick="kuryeIslem(\'onayla\',' + k.id + ',\'' + key + '\')" style="flex:1;background:#e8f5e9;color:#2e7d32;border:none;border-radius:8px;padding:9px;font-size:.8rem;font-weight:700;cursor:pointer">Onayla</button>'
+          ? '<button onclick="kuryeIslem(\'onayla\',' + k.id + ')" style="flex:1;background:#e8f5e9;color:#2e7d32;border:none;border-radius:8px;padding:9px;font-size:.8rem;font-weight:700;cursor:pointer">Onayla</button>'
           : '') +
-        '<button onclick="kuryeIslem(\'sil\',' + k.id + ',\'' + key + '\')" style="flex:1;background:#ffebee;color:#c62828;border:none;border-radius:8px;padding:9px;font-size:.8rem;font-weight:700;cursor:pointer">Sil</button>' +
+        '<button onclick="kuryeIslem(\'sil\',' + k.id + ')" style="flex:1;background:#ffebee;color:#c62828;border:none;border-radius:8px;padding:9px;font-size:.8rem;font-weight:700;cursor:pointer">Sil</button>' +
       '</div>';
     adminModalAc(html);
   });
@@ -3051,7 +3065,7 @@ function adminMusteriDetay(id, ad, telefon, tarih, key) {
     '</div>';
   adminModalAc(html);
 
-  fetch(API_URL + '/api/admin/siparisler?key=' + key).then(function(r) { return r.json(); })
+  fetch(API_URL + '/api/admin/siparisler', { headers: authHeader() }).then(function(r) { return r.json(); })
   .then(function(res) {
     var el = document.getElementById('musteri-siparis-listesi');
     if (!el) return;
@@ -3068,7 +3082,7 @@ function adminMusteriDetay(id, ad, telefon, tarih, key) {
 
 function adminMusteriSil(id, key) {
   if (!confirm('Müşteri silinecek. Emin misiniz?')) return;
-  fetch(API_URL + '/api/admin/musteri/' + id + '?key=' + key, { method: 'DELETE' })
+  fetch(API_URL + '/api/admin/musteri/' + id, { method: 'DELETE', headers: authHeader() })
   .then(function(r) { return r.json(); })
   .then(function(res) {
     if (res.basari) { adminModalKapat(); adminGoster('musteriler'); }
@@ -3123,7 +3137,7 @@ function adminSiparisGuncelle(id, key) {
   var durum = document.getElementById('siparis-durum-select').value;
   fetch(API_URL + '/api/siparisler/' + id + '/durum', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ durum: durum })
   }).then(function(r) { return r.json(); })
   .then(function(res) {
@@ -3132,11 +3146,11 @@ function adminSiparisGuncelle(id, key) {
   });
 }
 
-function kuryeIslem(tip, id, key) {
+function kuryeIslem(tip, id) {
   if (tip === 'sil' && !confirm('Kurye silinecek. Emin misiniz?')) return;
   var istek;
-  if (tip === 'onayla') istek = fetch(API_URL + '/api/admin/kurye-onayla/' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) });
-  else if (tip === 'sil') istek = fetch(API_URL + '/api/admin/kurye-sil/' + id + '?key=' + key, { method: 'DELETE' });
+  if (tip === 'onayla') istek = fetch(API_URL + '/api/admin/kurye-onayla/' + id, { method: 'POST', headers: jsonAuthHeader(), body: JSON.stringify({}) });
+  else if (tip === 'sil') istek = fetch(API_URL + '/api/admin/kurye-sil/' + id, { method: 'DELETE', headers: authHeader() });
   istek.then(function(r) { return r.json(); }).then(function(data) {
     if (!data.basari) { bildirim('Hata: ' + data.mesaj, 'hata'); return; }
     adminModalKapat();
@@ -3144,16 +3158,16 @@ function kuryeIslem(tip, id, key) {
   }).catch(function() { bildirim('Bağlantı hatası.', 'hata'); });
 }
 
-function adminIslem(tip, id, key) {
+function adminIslem(tip, id) {
   var onay = { reddet: 'Esnaf reddedilip silinecek.', sil: 'Esnaf tamamen silinecek!' };
   if (onay[tip] && !confirm(onay[tip] + ' Emin misiniz?')) return;
 
   var istek;
-  if (tip === 'onayla') istek = fetch(API_URL + '/api/admin/onayla/' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) });
-  else if (tip === 'pasif') istek = fetch(API_URL + '/api/admin/pasif/' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) });
-  else if (tip === 'aktif') istek = fetch(API_URL + '/api/admin/aktif/' + id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) });
-  else if (tip === 'reddet') istek = fetch(API_URL + '/api/admin/reddet/' + id + '?key=' + key, { method: 'DELETE' });
-  else if (tip === 'sil')    istek = fetch(API_URL + '/api/admin/sil/'    + id + '?key=' + key, { method: 'DELETE' });
+  if (tip === 'onayla') istek = fetch(API_URL + '/api/admin/onayla/' + id, { method: 'POST', headers: jsonAuthHeader(), body: JSON.stringify({}) });
+  else if (tip === 'pasif') istek = fetch(API_URL + '/api/admin/pasif/' + id, { method: 'POST', headers: jsonAuthHeader(), body: JSON.stringify({}) });
+  else if (tip === 'aktif') istek = fetch(API_URL + '/api/admin/aktif/' + id, { method: 'POST', headers: jsonAuthHeader(), body: JSON.stringify({}) });
+  else if (tip === 'reddet') istek = fetch(API_URL + '/api/admin/reddet/' + id, { method: 'DELETE', headers: authHeader() });
+  else if (tip === 'sil')    istek = fetch(API_URL + '/api/admin/sil/' + id, { method: 'DELETE', headers: authHeader() });
 
   istek.then(function(r) { return r.json(); }).then(function(data) {
     if (!data.basari) { bildirim('Hata: ' + data.mesaj, 'hata'); return; }
@@ -3191,14 +3205,14 @@ function girisYap(telefon, sifre, btn, callback) {
   if (btn) { btn.disabled = true; btn.textContent = 'Giriş yapılıyor...'; }
   fetch(API_URL + '/api/giris', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ telefon: telefon, sifre: sifre })
   })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (btn) { btn.disabled = false; btn.textContent = orijinalMetin; }
       if (!data.basari) { bildirim(data.mesaj, 'hata'); return; }
-      data.veri.sifre = sifre; oturumKaydet(data.veri);
+      oturumKaydet(data.veri); // token data.veri.token içinde gelir
       oturumaGoreNavGuncelle();
       bildirimIzniAl();
       // Müşteri ise backend'deki profil verisini localStorage'a merge et
@@ -3351,7 +3365,7 @@ function panelYukle() {
 function panelIstatistikYukle() {
   var esnafId = durum.panelEsnafId;
   if (!esnafId) return;
-  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/istatistik')
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/istatistik', { headers: authHeader() })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (!data.basari) return;
@@ -3521,7 +3535,7 @@ function panelProfilKaydet() {
   if (!ad || !telefon) { bildirim('Ad ve telefon zorunludur.', 'uyari'); return; }
   fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/profil', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ ad: ad, telefon: telefon, adres: adres, kategori: kategori, instagram_url: instagram_url, google_maps_url: google_maps_url })
   })
     .then(function(r) { return r.json(); })
@@ -3596,7 +3610,7 @@ function calismaSaatleriKaydet() {
   });
   fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/calisma-saatleri', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ calisma_saatleri: saatler })
   })
     .then(function(r) { return r.json(); })
@@ -3654,7 +3668,7 @@ function urunEkle() {
   if (!ad) { bildirim('Ürün adı zorunlu.', 'uyari'); return; }
   fetch(API_URL + '/api/esnaflar/' + esnafId + '/urunler', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ ad: ad, fiyat: fiyat, aciklama: aciklama })
   })
     .then(function(r) { return r.json(); })
@@ -3669,7 +3683,7 @@ function urunEkle() {
 
 function urunSil(esnafId, urunId) {
   if (!confirm('Ürün silinecek. Emin misiniz?')) return;
-  fetch(API_URL + '/api/esnaflar/' + esnafId + '/urunler/' + urunId, { method: 'DELETE' })
+  fetch(API_URL + '/api/esnaflar/' + esnafId + '/urunler/' + urunId, { method: 'DELETE', headers: authHeader() })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.basari) { bildirim('Ürün silindi.', 'basari'); panelUrunleriYukle(esnafId); }
@@ -3709,7 +3723,7 @@ function kampanyaEkle() {
   if (!baslik) { bildirim('Başlık zorunlu.', 'uyari'); return; }
   fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/kampanya', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ baslik: baslik, aciklama: aciklama, indirim_orani: oran, bitis_tarihi: bitis || null })
   })
     .then(function(r) { return r.json(); })
@@ -3726,7 +3740,7 @@ function kampanyaEkle() {
 
 function kampanyaSil(esnafId, kampanyaId) {
   if (!confirm('Kampanya silinecek. Emin misiniz?')) return;
-  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/kampanya/' + kampanyaId, { method: 'DELETE' })
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/kampanya/' + kampanyaId, { method: 'DELETE', headers: authHeader() })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.basari) kampanyalariYukle(esnafId);
@@ -3741,7 +3755,7 @@ function siparisKabul(id) {
 function panelSiparisDurum(id, yeniDurum) {
   fetch(API_URL + '/api/siparisler/' + id + '/durum', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ durum: yeniDurum })
   })
     .then(function(r) { return r.json(); })
@@ -3847,7 +3861,7 @@ function panelTeklifGonder(ilanId) {
   var fiyat = document.getElementById('teklif-fiyat').value;
   fetch(API_URL + '/api/is-ilani/' + ilanId + '/teklif', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({
       esnaf_id: esnafId,
       fiyat: fiyat ? parseFloat(fiyat) : null,
@@ -3872,7 +3886,7 @@ function randevuAyarlariniYukle(esnafId) {
     }
   }
 
-  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/randevu-ayar')
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/randevu-ayar', { headers: authHeader() })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (!data.basari) return;
@@ -3903,7 +3917,7 @@ function ilanBildirimiToggle() {
   knob.style.transform    = aktif ? 'translateX(20px)' : 'translateX(0)';
   fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/ilan-bildirimi', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ aktif: aktif })
   }).then(function(r) { return r.json(); })
   .then(function(data) { bildirim(data.mesaj, data.basari ? 'basari' : 'hata'); })
@@ -3925,7 +3939,7 @@ function randevuAyarKaydet() {
   var sure = parseInt(document.getElementById('randevu-slot-suresi').value) || 30;
   fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/randevu-ayar', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ randevu_modu: modu, slot_suresi: sure, indirimli_saatler: _indirimliSaatler })
   })
     .then(function(r) { return r.json(); })
@@ -3933,7 +3947,7 @@ function randevuAyarKaydet() {
 }
 
 function hizmetleriYukle(esnafId) {
-  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/hizmetler')
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/hizmetler', { headers: authHeader() })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (!data.basari) return;
@@ -3960,7 +3974,7 @@ function hizmetEkle() {
   var fiyat = parseFloat(document.getElementById('hiz-fiyat').value) || 0;
   fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/hizmet', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ ad: ad, sure: sure, fiyat: fiyat })
   })
     .then(function(r) { return r.json(); })
@@ -3975,7 +3989,7 @@ function hizmetEkle() {
 
 function hizmetSil(esnafId, hizmetId) {
   if (!confirm('Hizmet silinecek. Emin misiniz?')) return;
-  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/hizmet/' + hizmetId, { method: 'DELETE' })
+  fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/hizmet/' + hizmetId, { method: 'DELETE', headers: authHeader() })
     .then(function(r) { return r.json(); })
     .then(function(data) { if (data.basari) hizmetleriYukle(esnafId); else bildirim(data.mesaj, 'hata'); });
 }
@@ -3985,7 +3999,7 @@ function randevulariYukle() {
   if (!esnafId) return;
   var tarih = document.getElementById('randevu-tarih-filtre') ? document.getElementById('randevu-tarih-filtre').value : '';
   var url = API_URL + '/api/esnaf-panel/' + esnafId + '/randevular' + (tarih ? '?tarih=' + tarih : '');
-  fetch(url)
+  fetch(url, { headers: authHeader() })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var con = document.getElementById('panel-randevular-liste');
@@ -4014,7 +4028,7 @@ function panelRandevuOnayla(randevuId) {
   var esnafId = durum.panelEsnafId;
   fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/randevu/' + randevuId + '/durum', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ durum: 'onaylandi' })
   }).then(function() { randevulariYukle(); });
 }
@@ -4024,7 +4038,7 @@ function panelRandevuIptal(randevuId) {
   var esnafId = durum.panelEsnafId;
   fetch(API_URL + '/api/esnaf-panel/' + esnafId + '/randevu/' + randevuId + '/durum', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ durum: 'iptal' })
   }).then(function() { randevulariYukle(); });
 }
@@ -4042,7 +4056,7 @@ function kuryeKonumPaylasimiBaslat(telefon) {
     navigator.geolocation.getCurrentPosition(function(pos) {
       fetch(API_URL + '/api/kurye-konum', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonAuthHeader(),
         body: JSON.stringify({ telefon: telefon, lat: pos.coords.latitude, lng: pos.coords.longitude })
       }).catch(function() {});
     }, function() {}, { enableHighAccuracy: true, maximumAge: 20000 });
@@ -4118,7 +4132,7 @@ function kuryeSiparisKabul(siparisId) {
   if (!oturum) return;
   fetch(API_URL + '/api/kurye-kabul', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ kurye_telefon: oturum.telefon, siparis_id: siparisId })
   })
     .then(function(r) { return r.json(); })
@@ -4136,7 +4150,7 @@ function kuryeTeslimEt(siparisId) {
   if (!confirm('Siparişi teslim ettiğinizi onaylıyor musunuz?')) return;
   fetch(API_URL + '/api/siparisler/' + siparisId + '/durum', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonAuthHeader(),
     body: JSON.stringify({ durum: 'teslim_edildi' })
   })
     .then(function(r) { return r.json(); })
@@ -4233,7 +4247,7 @@ function bildirimCekmeciAc() {
       // Hepsini okundu işaretle
       fetch(API_URL + '/api/bildirimler/oku', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonAuthHeader(),
         body: JSON.stringify({ telefon: oturum.telefon })
       }).then(function() { bildirimSayisiGuncelle(); }).catch(function() {});
     })
