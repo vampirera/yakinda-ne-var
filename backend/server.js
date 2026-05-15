@@ -32,8 +32,9 @@ tablolarOlustur().then(async function() {
   await require('pg').Pool && require('./db/pool').pool.query(
     'ALTER TABLE randevular ADD COLUMN IF NOT EXISTS hatirlatma_gonderildi BOOLEAN DEFAULT false'
   ).catch(function() {});
-  app.listen(3000, function() {
-    console.log('API calisiyor: http://localhost:3000');
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, function() {
+    console.log('API calisiyor: http://localhost:' + PORT);
     setInterval(randevuHatirlatmaCalistir, 10 * 60 * 1000);
     randevuHatirlatmaCalistir();
   });
