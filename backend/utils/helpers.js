@@ -1,19 +1,37 @@
 'use strict';
-const twilio = require('twilio');
 const cloudinaryLib = require('cloudinary').v2;
-const OpenAI = require('openai');
 const multer = require('multer');
 const fs = require('fs');
 const { pool, cacheSil } = require('../db/pool');
 
-const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Twilio — opsiyonel, credentials yoksa devre dışı
+let twilioClient = null;
+try {
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+    const twilio = require('twilio');
+    twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  }
+} catch(e) { console.log('[Twilio] Baslatilmadi:', e.message); }
 
-cloudinaryLib.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
+// OpenAI — opsiyonel
+let openai = null;
+try {
+  if (process.env.OPENAI_API_KEY) {
+    const OpenAI = require('openai');
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+} catch(e) { console.log('[OpenAI] Baslatilmadi:', e.message); }
+
+// Cloudinary — opsiyonel
+try {
+  if (process.env.CLOUDINARY_CLOUD_NAME) {
+    cloudinaryLib.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET
+    });
+  }
+} catch(e) { console.log('[Cloudinary] Baslatilmadi:', e.message); }
 
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -26,12 +44,12 @@ function telefonNormalize(telefon) {
 }
 
 function whatsappGonder(telefon, mesaj) {
-  if (!telefon || !process.env.TWILIO_WHATSAPP_FROM) return Promise.resolve();
+  if (!twilioClient || !telefon || !process.env.TWILIO_WHATSAPP_FROM) return Promise.resolve();
   var normalized = telefonNormalize(telefon);
   var to = normalized.startsWith('whatsapp:') ? normalized : 'whatsapp:' + normalized;
   return twilioClient.messages.create({ from: process.env.TWILIO_WHATSAPP_FROM, to: to, body: mesaj })
     .then(function(m) { console.log('[WhatsApp] Gönderildi:', m.sid); })
-    .catch(function(e) { console.log('[WhatsApp] Hata:', e.message); throw e; });
+    .catch(function(e) { console.log('[WhatsApp] Hata:', e.message); });
 }
 
 function mesafeHesapla(lat1, lng1, lat2, lng2) {
