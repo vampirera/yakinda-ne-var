@@ -1,7 +1,7 @@
 # Yakında Ne Var? — Proje Hafızası
 
 Türkçe yerel pazar ve teslimat uygulaması (Marmaris/Muğla, Türkiye)
-Son güncelleme: 2026-05-09
+Son güncelleme: 2026-05-15
 
 ---
 
@@ -26,7 +26,7 @@ Admin girişi: `ADMIN_TELEFON` ve `ADMIN_SIFRE` env variable'larıyla çalışı
 - **Görseller:** Cloudinary
 - **AI:** OpenAI gpt-4o-mini (görsel arama / kategorizasyon)
 - **Bildirim:** WhatsApp via Twilio + uygulama içi bildirim sistemi
-- **PWA:** manifest.json + service worker (CACHE v6, network-first strateji)
+- **PWA:** manifest.json + service worker (CACHE v9, network-first strateji)
 - **CI/CD:** GitHub Actions → GitHub Pages (frontend), Railway auto-deploy (backend)
 
 ---
@@ -71,6 +71,14 @@ Boş DB'de Marmaris örnek esnafları (Usta Kebapçı, Kardeşler Market vb.) ot
 - Müşteri / esnaf / kurye listeleme ve silme
 - Sipariş görüntüleme
 
+**Güvenlik (2026-05-15 eklendi)**
+- Session token sistemi: giriş → 7 günlük Bearer token
+- Tüm esnaf-panel endpoint'leri esnafAuth middleware ile korumalı
+- Tüm admin endpoint'leri adminAuth middleware ile korumalı
+- bcrypt lazy migration: kullanıcı şifreleri giriş sırasında otomatik hash'leniyor
+- Şifreler artık localStorage'a kaydedilmiyor
+- Hata mesajları artık sunucu detayı içermiyor
+
 **PWA & UX**
 - Uygulama içi bildirim sistemi
 - Arama: ilk 5 sonuç + "Tümünü göster" butonu
@@ -81,11 +89,15 @@ Boş DB'de Marmaris örnek esnafları (Usta Kebapçı, Kardeşler Market vb.) ot
 ## Bilinen Mimari Notlar
 
 - `app.js` tek dosya ~4400 satır — yeni özellik eklerken mevcut sayfa fonksiyonlarını bozmamaya dikkat
-- `server.js` tek dosya ~1970 satır, 84 endpoint — endpoint eklerken cache invalidation'ı gözden geçir
-- Service worker `v6`: HTML/JS her zaman network-first, sadece Leaflet cache-first
-- Favoriler ve oturum bilgisi localStorage'da — farklı kullanıcılar aynı cihazı kullanırsa çakışma riski var (telefon bazlı anahtar ile çözüldü)
+- `server.js` tek dosya ~2100 satır, 84 endpoint — endpoint eklerken cache invalidation'ı gözden geçir
+- Session store in-memory: Railway restart'ta oturumlar sıfırlanır (kullanıcı tekrar giriş yapar)
+- `esnafAuth` middleware: `Authorization: Bearer <token>` header'ı + URL'deki esnaf ID'yi session ile karşılaştırır
+- `adminAuth` middleware: hem Bearer token hem eski `?key=` query param kabul eder (geçiş dönemi)
+- Service worker `v9`: HTML/JS her zaman network-first, sadece Leaflet cache-first
+- Cache-busting: `app.js?v=20260515`, SW `v9`
 - Twilio WhatsApp mesajları async — hata kullanıcıya gösteriliyor ama sipariş yine de oluşuyor
 - Esnaf/kurye kaydında OTP akışı yok (admin zaten onaylıyor), sadece müşteride OTP var
+- Favoriler ve oturum bilgisi localStorage'da — telefon bazlı anahtar ile kullanıcı çakışması çözüldü
 
 ---
 
@@ -97,6 +109,7 @@ Boş DB'de Marmaris örnek esnafları (Usta Kebapçı, Kardeşler Market vb.) ot
 - Env variable'ları asla koda yazma.
 - Hata mesajlarında stack trace veya sunucu detayı verme.
 - Cache-busting: `app.js?v=` ve SW `CACHE_ADI` versiyonunu değişiklikle birlikte güncelle.
+- Yeni endpoint eklerken: public mu, esnafAuth mı, adminAuth mı gerektiğini belirt.
 
 ---
 
