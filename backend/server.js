@@ -1,12 +1,11 @@
 'use strict';
 require('dotenv').config();
 
-// Crash koruması — unhandled rejection process'i öldürmesin
 process.on('unhandledRejection', function(reason) {
   console.error('[UnhandledRejection]', reason && reason.message ? reason.message : reason);
 });
 process.on('uncaughtException', function(err) {
-  console.error('[UncaughtException]', err.message);
+  console.error('[UncaughtException]', err.message, err.stack);
 });
 
 const express = require('express');
@@ -19,15 +18,16 @@ app.use(express.json());
 app.get('/',         (req, res) => res.json({ mesaj: 'Yakinda Ne Var API calisiyor!', versiyon: '5.1' }));
 app.get('/api/ping', (req, res) => res.sendStatus(200));
 
-app.use('/api', require('./routes/auth'));
-app.use('/api', require('./routes/esnaflar'));
-app.use('/api', require('./routes/panel'));
-app.use('/api', require('./routes/siparisler'));
-app.use('/api', require('./routes/kuryeler'));
-app.use('/api', require('./routes/admin'));
-app.use('/api', require('./routes/randevular'));
-app.use('/api', require('./routes/ilanlar'));
-app.use('/api', require('./routes/misc'));
+var routelar = ['./routes/auth','./routes/esnaflar','./routes/panel','./routes/siparisler',
+                './routes/kuryeler','./routes/admin','./routes/randevular','./routes/ilanlar','./routes/misc'];
+routelar.forEach(function(r) {
+  try {
+    app.use('/api', require(r));
+    console.log('[Route] OK:', r);
+  } catch(e) {
+    console.error('[Route] FAIL:', r, '-', e.message);
+  }
+});
 
 app.use(require('./middleware/error'));
 
