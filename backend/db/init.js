@@ -246,13 +246,6 @@ async function randevuHatirlatmaCalistir() {
   }
 }
 
-// =============================================================
-// GLOBAL ERROR HANDLER
-// =============================================================
-app.use(function(err, req, res, next) {
-  console.error('[Global Hata]', err.message);
-  res.status(err.status || 500).json({ basari: false, mesaj: 'Sunucu hatasi.' });
-});
 
 
 module.exports = { tablolarOlustur, randevuHatirlatmaCalistir };
