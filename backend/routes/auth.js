@@ -1,8 +1,8 @@
 'use strict';
 const express = require('express');
 const router = express.Router();
-const { pool, cacheAl, cacheKaydet, cacheSil } = require('../db/pool');
-const { esnafAuth, adminAuth } = require('../middleware/auth');
+const { pool, cacheAl, cacheKaydet, cacheSil, otpOlustur, otpDogrula } = require('../db/pool');
+const { bcrypt, sessionOlustur, sessionDogrula, esnafAuth, adminAuth } = require('../middleware/auth');
 const { upload, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
 const { girisLimit, otpLimit } = require('../middleware/rateLimit');
 
@@ -28,7 +28,8 @@ router.post('/kayit', async function(req, res) {
     if (sifre.length < 4) return res.status(400).json({ basari: false, mesaj: 'Sifre en az 4 karakter olmali' });
     var mevcut = await pool.query('SELECT id FROM kullanicilar WHERE telefon=$1', [telefon]);
     if (mevcut.rows.length) return res.status(400).json({ basari: false, mesaj: 'Bu telefon zaten kayitli' });
-    var r = await pool.query('INSERT INTO kullanicilar (ad,telefon,sifre,tip) VALUES ($1,$2,$3,$4) RETURNING id', [ad, telefon, sifre, 'musteri']);
+    var sifreHash = await bcrypt.hash(sifre, 10);
+    var r = await pool.query('INSERT INTO kullanicilar (ad,telefon,sifre,tip) VALUES ($1,$2,$3,$4) RETURNING id', [ad, telefon, sifreHash, 'musteri']);
     if (process.env.ADMIN_TELEFON) {
       whatsappGonder(process.env.ADMIN_TELEFON, '👤 Yeni müşteri kaydı: ' + ad + ', ' + telefon);
     }
