@@ -18,6 +18,7 @@ async function tablolarOlustur() {
   await pool.query(`CREATE TABLE IF NOT EXISTS bildirim_tokenler (id SERIAL PRIMARY KEY, token TEXT UNIQUE NOT NULL, kullanici_telefon VARCHAR(20), olusturma TIMESTAMP DEFAULT NOW())`);
   await pool.query(`ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS email TEXT`);
   await pool.query(`ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS adresler JSONB DEFAULT '[]'`);
+  await pool.query(`ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS token_version INT DEFAULT 1`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS goruntuleme_sayisi INTEGER DEFAULT 0`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS instagram_url TEXT`);
   await pool.query(`ALTER TABLE esnaflar ADD COLUMN IF NOT EXISTS google_maps_url TEXT`);

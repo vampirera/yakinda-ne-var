@@ -562,7 +562,7 @@ function menuGoster(urunler) {
   con.innerHTML = urunler.map(function(u) {
     var fiyat = parseFloat(u.fiyat) || 0;
     return '<div class="menu-item">' +
-      (u.fotograf_url ? '<img src="' + u.fotograf_url + '" loading="lazy" onclick="event.stopPropagation();lightboxAc(\'' + u.fotograf_url + '\')" style="width:50px;height:50px;object-fit:cover;border-radius:8px;margin-right:10px;cursor:zoom-in">' : '') +
+      (u.fotograf_url ? '<img src="' + encodeURI(u.fotograf_url) + '" loading="lazy" onclick="event.stopPropagation();lightboxAc(\'' + encodeURI(u.fotograf_url).replace(/'/g,"%27") + '\')" style="width:50px;height:50px;object-fit:cover;border-radius:8px;margin-right:10px;cursor:zoom-in">' : '') +
       '<div class="menu-item-info">' +
         '<h5>' + temizle(u.ad) + '</h5>' +
         '<p>' + temizle(u.aciklama || '') + '</p>' +

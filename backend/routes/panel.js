@@ -3,9 +3,9 @@ const express = require('express');
 const router = express.Router();
 const { pool, cacheAl, cacheKaydet, cacheSil } = require('../db/pool');
 const { esnafAuth, adminAuth } = require('../middleware/auth');
-const { upload, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
+const { upload, gorselMagicKontrol, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
 
-router.put('/esnaf-panel/:id/profil', esnafAuth, async function(req, res) {
+router.put('/esnaf-panel/:id/profil', esnafAuth, async function(req, res, next) {
   try {
     var { ad, adres, telefon, kategori, instagram_url, google_maps_url } = req.body;
     if (!ad || !telefon) return res.status(400).json({ basari: false, mesaj: 'Ad ve telefon zorunlu' });
@@ -16,13 +16,14 @@ router.put('/esnaf-panel/:id/profil', esnafAuth, async function(req, res) {
     cacheSil('esnaf_detay:' + req.params.id);
     cacheSil('esnaflar:');
     res.json({ basari: true, mesaj: 'Profil guncellendi.' });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 // ── KAPAK FOTOĞRAFI ────────────────────────────────────────────
 router.post('/esnaflar/:id/kapak-foto', esnafAuth, upload.single('kapak_foto'), async function(req, res) {
   try {
     if (!req.file) return res.status(400).json({ basari: false, mesaj: 'Dosya yok.' });
+    await new Promise(function(resolve, reject) { gorselMagicKontrol(req.file.path, function(e) { e ? reject(e) : resolve(); }); });
     var result = await cloudinary.uploader.upload(req.file.path, {
       folder: 'yakinda-ne-var/kapak',
       transformation: [{ width: 1200, crop: 'limit' }]
@@ -40,7 +41,7 @@ router.post('/esnaflar/:id/kapak-foto', esnafAuth, upload.single('kapak_foto'), 
 // ── UYGULAMA İÇİ BİLDİRİM ENDPOINTLERİ ─────────────────────────
 
 // Kullanıcının bildirimlerini getir
-router.get('/bildirimler', async function(req, res) {
+router.get('/bildirimler', async function(req, res, next) {
   try {
     var { telefon } = req.query;
     if (!telefon) return res.json({ basari: true, veri: [], okunmamis: 0 });
@@ -50,45 +51,45 @@ router.get('/bildirimler', async function(req, res) {
     );
     var okunmamis = r.rows.filter(function(b) { return !b.okundu; }).length;
     res.json({ basari: true, veri: r.rows, okunmamis: okunmamis });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 // Tümünü okundu olarak işaretle
-router.put('/bildirimler/oku', async function(req, res) {
+router.put('/bildirimler/oku', async function(req, res, next) {
   try {
     var { telefon } = req.body;
     if (!telefon) return res.status(400).json({ basari: false });
     await pool.query('UPDATE bildirimler SET okundu=true WHERE alici_telefon=$1 AND okundu=false', [telefon]);
     res.json({ basari: true });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 // Tekil bildirimi sil
-router.delete('/bildirim/:id', async function(req, res) {
+router.delete('/bildirim/:id', async function(req, res, next) {
   try {
     await pool.query('DELETE FROM bildirimler WHERE id=$1', [req.params.id]);
     res.json({ basari: true });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 // İlan bildirimi tercihini güncelle
-router.put('/esnaf-panel/:id/ilan-bildirimi', esnafAuth, async function(req, res) {
+router.put('/esnaf-panel/:id/ilan-bildirimi', esnafAuth, async function(req, res, next) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     await pool.query('UPDATE esnaflar SET ilan_bildirimi=$1 WHERE id=$2', [!!req.body.aktif, req.params.id]);
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: req.body.aktif ? 'İlan bildirimleri açıldı.' : 'İlan bildirimleri kapatıldı.' });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
-router.put('/esnaflar/:id/goruntuleme', async function(req, res) {
+router.put('/esnaflar/:id/goruntuleme', async function(req, res, next) {
   try {
     await pool.query('UPDATE esnaflar SET goruntuleme_sayisi = COALESCE(goruntuleme_sayisi,0) + 1 WHERE id=$1', [req.params.id]);
     res.json({ basari: true });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
-router.get('/esnaf-panel/:id/istatistik', esnafAuth, async function(req, res) {
+router.get('/esnaf-panel/:id/istatistik', esnafAuth, async function(req, res, next) {
   try {
     var id = req.params.id;
 
@@ -149,7 +150,7 @@ router.get('/esnaf-panel/:id/istatistik', esnafAuth, async function(req, res) {
         tekrar_musteri: parseInt(tekrarRes.rows[0]?.tekrar || 0)
       }
     });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 async function esnafDogrula(id, res) {
@@ -158,7 +159,7 @@ async function esnafDogrula(id, res) {
   return true;
 }
 
-router.post('/esnaf-panel/:id/kampanya', esnafAuth, async function(req, res) {
+router.post('/esnaf-panel/:id/kampanya', esnafAuth, async function(req, res, next) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var { baslik, aciklama, indirim_orani, bitis_tarihi } = req.body;
@@ -169,19 +170,19 @@ router.post('/esnaf-panel/:id/kampanya', esnafAuth, async function(req, res) {
     );
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, veri: result.rows[0] });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
-router.delete('/esnaf-panel/:id/kampanya/:kampanya_id', esnafAuth, async function(req, res) {
+router.delete('/esnaf-panel/:id/kampanya/:kampanya_id', esnafAuth, async function(req, res, next) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     await pool.query('DELETE FROM kampanyalar WHERE id=$1 AND esnaf_id=$2', [req.params.kampanya_id, req.params.id]);
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Kampanya silindi.' });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
-router.put('/esnaf-panel/:id/calisma-saatleri', esnafAuth, async function(req, res) {
+router.put('/esnaf-panel/:id/calisma-saatleri', esnafAuth, async function(req, res, next) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var saatler = req.body.calisma_saatleri;
@@ -190,7 +191,7 @@ router.put('/esnaf-panel/:id/calisma-saatleri', esnafAuth, async function(req, r
     cacheSil('esnaf_detay:' + req.params.id);
     cacheSil('esnaflar:');
     res.json({ basari: true, mesaj: 'Calisma saatleri guncellendi.' });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 // =============================================================
@@ -198,16 +199,16 @@ router.put('/esnaf-panel/:id/calisma-saatleri', esnafAuth, async function(req, r
 // =============================================================
 
 // Randevu ayarları al
-router.get('/esnaf-panel/:id/randevu-ayar', esnafAuth, async function(req, res) {
+router.get('/esnaf-panel/:id/randevu-ayar', esnafAuth, async function(req, res, next) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var r = await pool.query('SELECT randevu_modu, slot_suresi, calisma_saatleri, indirimli_saatler FROM esnaflar WHERE id=$1', [req.params.id]);
     res.json({ basari: true, veri: r.rows[0] });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 // Randevu ayarları güncelle (modu aç/kapat, slot süresi, indirimli saatler)
-router.put('/esnaf-panel/:id/randevu-ayar', esnafAuth, async function(req, res) {
+router.put('/esnaf-panel/:id/randevu-ayar', esnafAuth, async function(req, res, next) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var { randevu_modu, slot_suresi, indirimli_saatler } = req.body;
@@ -217,20 +218,20 @@ router.put('/esnaf-panel/:id/randevu-ayar', esnafAuth, async function(req, res) 
     );
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Randevu ayarlari guncellendi.' });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 // Hizmetleri listele
-router.get('/esnaf-panel/:id/hizmetler', esnafAuth, async function(req, res) {
+router.get('/esnaf-panel/:id/hizmetler', esnafAuth, async function(req, res, next) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var r = await pool.query('SELECT * FROM hizmetler WHERE esnaf_id=$1 ORDER BY id', [req.params.id]);
     res.json({ basari: true, veri: r.rows });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 // Hizmet ekle
-router.post('/esnaf-panel/:id/hizmet', esnafAuth, async function(req, res) {
+router.post('/esnaf-panel/:id/hizmet', esnafAuth, async function(req, res, next) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var { ad, sure, fiyat, aciklama } = req.body;
@@ -240,11 +241,11 @@ router.post('/esnaf-panel/:id/hizmet', esnafAuth, async function(req, res) {
       [req.params.id, ad, parseInt(sure)||30, parseFloat(fiyat)||0, aciklama||null]
     );
     res.json({ basari: true, veri: r.rows[0] });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 // Hizmet güncelle
-router.put('/esnaf-panel/:id/hizmet/:hizmet_id', esnafAuth, async function(req, res) {
+router.put('/esnaf-panel/:id/hizmet/:hizmet_id', esnafAuth, async function(req, res, next) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var { ad, sure, fiyat, aciklama, aktif } = req.body;
@@ -253,20 +254,20 @@ router.put('/esnaf-panel/:id/hizmet/:hizmet_id', esnafAuth, async function(req, 
       [ad, parseInt(sure)||30, parseFloat(fiyat)||0, aciklama||null, aktif !== false, req.params.hizmet_id, req.params.id]
     );
     res.json({ basari: true, veri: r.rows[0] });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 // Hizmet sil
-router.delete('/esnaf-panel/:id/hizmet/:hizmet_id', esnafAuth, async function(req, res) {
+router.delete('/esnaf-panel/:id/hizmet/:hizmet_id', esnafAuth, async function(req, res, next) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     await pool.query('DELETE FROM hizmetler WHERE id=$1 AND esnaf_id=$2', [req.params.hizmet_id, req.params.id]);
     res.json({ basari: true, mesaj: 'Hizmet silindi.' });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 // Müşteri için: esnaf hizmetlerini al (public)
-router.get('/esnaf-panel/:id/randevular', esnafAuth, async function(req, res) {
+router.get('/esnaf-panel/:id/randevular', esnafAuth, async function(req, res, next) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var { tarih } = req.query;
@@ -276,11 +277,11 @@ router.get('/esnaf-panel/:id/randevular', esnafAuth, async function(req, res) {
     query += ' ORDER BY r.tarih DESC, r.saat';
     var r = await pool.query(query, params);
     res.json({ basari: true, veri: r.rows });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 // Esnaf paneli: randevu durumu güncelle
-router.put('/esnaf-panel/:id/randevu/:randevu_id/durum', esnafAuth, async function(req, res) {
+router.put('/esnaf-panel/:id/randevu/:randevu_id/durum', esnafAuth, async function(req, res, next) {
   try {
     if (!await esnafDogrula(req.params.id, res)) return;
     var { durum } = req.body;
@@ -302,7 +303,7 @@ router.put('/esnaf-panel/:id/randevu/:randevu_id/durum', esnafAuth, async functi
     }
 
     res.json({ basari: true, mesaj: 'Durum guncellendi.' });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 // ── HİZMET TEKLİF SİSTEMİ ────────────────────────────────────────────

@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { pool, cacheAl, cacheKaydet, cacheSil, CACHE_TTL } = require('../db/pool');
 const { esnafAuth, adminAuth } = require('../middleware/auth');
-const { upload, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
+const { upload, gorselMagicKontrol, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
 const { listeLimit } = require('../middleware/rateLimit');
 
 router.get('/config', function(req, res) {
@@ -12,7 +12,7 @@ router.get('/config', function(req, res) {
   res.json({ admin_wa: tel ? 'https://wa.me/' + tel : null });
 });
 
-router.get('/esnaflar', listeLimit, async function(req, res) {
+router.get('/esnaflar', listeLimit, async function(req, res, next) {
   try {
     var ilce = req.query.ilce, kategori = req.query.kategori, siralama = req.query.siralama || 'mesafe';
     var lat = parseFloat(req.query.lat), lng = parseFloat(req.query.lng);
@@ -64,10 +64,10 @@ router.get('/esnaflar', listeLimit, async function(req, res) {
     else if (siralama === 'puan') esnaflar.sort(function(a,b){return b.puan-a.puan;});
     else if (siralama === 'fiyat') esnaflar.sort(function(a,b){ var ma=a.urunler.length?Math.min.apply(null,a.urunler.map(function(u){return u.fiyat;})):999; var mb=b.urunler.length?Math.min.apply(null,b.urunler.map(function(u){return u.fiyat;})):999; return ma-mb; });
     res.json({ basari: true, veri: esnaflar });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
-router.get('/esnaflar/:id', async function(req, res) {
+router.get('/esnaflar/:id', async function(req, res, next) {
   try {
     var cacheKey = 'esnaf_detay:' + req.params.id;
     var cached = cacheAl(cacheKey);
@@ -82,7 +82,7 @@ router.get('/esnaflar/:id', async function(req, res) {
     var lat = parseFloat(req.query.lat), lng = parseFloat(req.query.lng);
     if (lat && lng) { var km = mesafeHesapla(lat, lng, parseFloat(e.lat), parseFloat(e.lng)); e.mesafe_km = Math.round(km*10)/10; e.mesafe_text = km < 1 ? Math.round(km*1000)+'m' : km.toFixed(1)+'km'; }
     res.json({ basari: true, veri: e });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 router.post('/esnaf-kayit', upload.fields([{name:'vergi_levhasi',maxCount:1},{name:'urun_fotograflari',maxCount:10}]), async function(req, res) {
@@ -118,10 +118,10 @@ router.post('/esnaf-kayit', upload.fields([{name:'vergi_levhasi',maxCount:1},{na
     var waMesaj = encodeURIComponent('Merhaba! Yakinda Ne Var uygulamasina kayit olmak istiyorum.\n\nIsletme: '+body.ad+'\nKategori: '+body.kategori+'\nIlce: '+body.ilce+'\nTelefon: '+body.telefon+'\nVergi No: '+body.vergi_no+'\nKayit ID: '+esnafId);
     var whatsapp_url = adminTel ? 'https://wa.me/' + adminTel + '?text=' + waMesaj : null;
     res.json({ basari: true, mesaj: 'Kaydiniz alindi! Onay icin WhatsApp mesaji gonderin.', kayit_id: esnafId, whatsapp_url: whatsapp_url });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
-router.get('/one-cikanlar', async function(req, res) {
+router.get('/one-cikanlar', async function(req, res, next) {
   try {
     var r = await pool.query(`
       SELECT e.id, e.ad, e.kategori, e.ilce, e.puan, e.yorum_sayisi, e.acik, e.one_cikan_etiket,
@@ -133,28 +133,28 @@ router.get('/one-cikanlar', async function(req, res) {
       LIMIT 10
     `);
     res.json({ basari: true, veri: r.rows });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 // Admin müşteri sil
-router.delete('/admin/musteri/:id', adminAuth, async function(req, res) {
+router.delete('/admin/musteri/:id', adminAuth, async function(req, res, next) {
   try {
     await pool.query('DELETE FROM kullanicilar WHERE id=$1 AND tip=$2', [req.params.id, 'musteri']);
     res.json({ basari: true, mesaj: 'Musteri silindi.' });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
-router.post('/esnaflar/:id/urunler', esnafAuth, async function(req, res) {
+router.post('/esnaflar/:id/urunler', esnafAuth, async function(req, res, next) {
   try {
     var { ad, fiyat, aciklama } = req.body;
     if (!ad) return res.status(400).json({ basari: false, mesaj: 'Ürün adı zorunlu' });
     var result = await pool.query('INSERT INTO urunler (esnaf_id,ad,fiyat,aciklama) VALUES ($1,$2,$3,$4) RETURNING *', [req.params.id, ad, parseFloat(fiyat) || 0, aciklama || '']);
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, veri: result.rows[0] });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
-router.put('/esnaflar/:id/urunler/:urun_id', esnafAuth, async function(req, res) {
+router.put('/esnaflar/:id/urunler/:urun_id', esnafAuth, async function(req, res, next) {
   try {
     var { ad, fiyat, aciklama } = req.body;
     if (!ad) return res.status(400).json({ basari: false, mesaj: 'Ürün adı zorunlu' });
@@ -165,18 +165,18 @@ router.put('/esnaflar/:id/urunler/:urun_id', esnafAuth, async function(req, res)
     if (!result.rows.length) return res.status(404).json({ basari: false, mesaj: 'Ürün bulunamadı' });
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, veri: result.rows[0] });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
-router.delete('/esnaflar/:id/urunler/:urun_id', esnafAuth, async function(req, res) {
+router.delete('/esnaflar/:id/urunler/:urun_id', esnafAuth, async function(req, res, next) {
   try {
     await pool.query('DELETE FROM urunler WHERE id=$1 AND esnaf_id=$2', [req.params.urun_id, req.params.id]);
     cacheSil('esnaf_detay:' + req.params.id);
     res.json({ basari: true, mesaj: 'Ürün silindi' });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
-router.post('/esnaflar/:id/yorumlar', async function(req, res) {
+router.post('/esnaflar/:id/yorumlar', async function(req, res, next) {
   try {
     await pool.query('INSERT INTO yorumlar (esnaf_id,kullanici,puan,yorum) VALUES ($1,$2,$3,$4)', [req.params.id, req.body.kullanici, parseInt(req.body.puan), req.body.yorum]);
     var yorumlar = await pool.query('SELECT puan FROM yorumlar WHERE esnaf_id=$1', [req.params.id]);
@@ -186,12 +186,13 @@ router.post('/esnaflar/:id/yorumlar', async function(req, res) {
     cacheSil('esnaf_detay:' + req.params.id);
     cacheSil('esnaflar:');
     res.json({ basari: true, mesaj: 'Yorum eklendi!' });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 router.post('/esnaflar/:id/kapak-foto', esnafAuth, upload.single('kapak_foto'), async function(req, res) {
   try {
     if (!req.file) return res.status(400).json({ basari: false, mesaj: 'Dosya yok.' });
+    await new Promise(function(resolve, reject) { gorselMagicKontrol(req.file.path, function(e) { e ? reject(e) : resolve(); }); });
     var result = await cloudinary.uploader.upload(req.file.path, {
       folder: 'yakinda-ne-var/kapak',
       transformation: [{ width: 1200, crop: 'limit' }]
@@ -209,11 +210,11 @@ router.post('/esnaflar/:id/kapak-foto', esnafAuth, upload.single('kapak_foto'), 
 // ── UYGULAMA İÇİ BİLDİRİM ENDPOINTLERİ ─────────────────────────
 
 // Kullanıcının bildirimlerini getir
-router.put('/esnaflar/:id/goruntuleme', async function(req, res) {
+router.put('/esnaflar/:id/goruntuleme', async function(req, res, next) {
   try {
     await pool.query('UPDATE esnaflar SET goruntuleme_sayisi = COALESCE(goruntuleme_sayisi,0) + 1 WHERE id=$1', [req.params.id]);
     res.json({ basari: true });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
 

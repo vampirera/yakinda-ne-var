@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool, cacheAl, cacheKaydet, cacheSil, otpOlustur, otpDogrula } = require('../db/pool');
-const { bcrypt, sessionOlustur, sessionDogrula, esnafAuth, adminAuth } = require('../middleware/auth');
+const { bcrypt, sessionOlustur, sessionDogrula, tokenVersionKontrol, esnafAuth, adminAuth } = require('../middleware/auth');
 const { upload, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
 const { girisLimit, otpLimit } = require('../middleware/rateLimit');
 const { body, validationResult } = require('express-validator');
@@ -88,7 +88,7 @@ router.post('/giris', girisLimit, girisValidasyon, async function(req, res, next
       }
     }
     // Kullanicilar tablosu — telefon ile çek, sonra şifre doğrula (bcrypt lazy migration)
-    var r = await pool.query('SELECT id,ad,telefon,tip,esnaf_id,kurye_id,email,adresler,sifre FROM kullanicilar WHERE telefon=$1', [telefon]);
+    var r = await pool.query('SELECT id,ad,telefon,tip,esnaf_id,kurye_id,email,adresler,sifre,token_version FROM kullanicilar WHERE telefon=$1', [telefon]);
     if (r.rows.length) {
       var u = r.rows[0];
       var sifreEslesti = false;
@@ -104,7 +104,7 @@ router.post('/giris', girisLimit, girisValidasyon, async function(req, res, next
         }
       }
       if (!sifreEslesti) return res.status(401).json({ basari: false, mesaj: 'Telefon veya sifre yanlis' });
-      var veri = { kullanici_id: u.id, ad: u.ad, telefon: u.telefon, tip: u.tip, esnaf_id: u.esnaf_id, kurye_id: u.kurye_id, email: u.email || '', adresler: u.adresler || [] };
+      var veri = { kullanici_id: u.id, ad: u.ad, telefon: u.telefon, tip: u.tip, esnaf_id: u.esnaf_id, kurye_id: u.kurye_id, email: u.email || '', adresler: u.adresler || [], token_version: u.token_version || 1 };
       if (u.tip === 'kurye' && u.kurye_id) {
         var kr = await pool.query('SELECT ilce, arac_tipi, onaylandi FROM kuryeler WHERE id=$1', [u.kurye_id]);
         if (kr.rows.length) { veri.ilce = kr.rows[0].ilce; veri.arac_tipi = kr.rows[0].arac_tipi; veri.onaylandi = kr.rows[0].onaylandi; }
@@ -155,5 +155,17 @@ router.put('/musteri/profil', function(req, res, next) {
   })();
 });
 
+
+
+router.post('/cikis', async function(req, res) {
+  var auth = req.headers['authorization'];
+  if (!auth || !auth.startsWith('Bearer ')) return res.json({ basari: true });
+  var session = sessionDogrula(auth.slice(7));
+  if (session && session.kullanici_id && session.kullanici_id !== 0) {
+    // token_version artır — eski tokenlar geçersiz olur
+    await pool.query('UPDATE kullanicilar SET token_version = token_version + 1 WHERE id=$1', [session.kullanici_id]).catch(function(){});
+  }
+  res.json({ basari: true, mesaj: 'Cikis yapildi.' });
+});
 
 module.exports = router;

@@ -1,6 +1,7 @@
 'use strict';
 const cloudinaryLib = require('cloudinary').v2;
 const multer = require('multer');
+const fileType = require('file-type');
 const fs = require('fs');
 const { pool, cacheSil } = require('../db/pool');
 
@@ -46,6 +47,21 @@ const upload = multer({
   fileFilter: gorselFiltresi
 });
 
+// Magic bytes kontrolü — multer sonrası çağrılır, MIME spoofing'e karşı
+async function gorselMagicKontrol(filePath, cb) {
+  try {
+    var tip = await fileType.fromFile(filePath);
+    var izinli = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!tip || izinli.indexOf(tip.mime) === -1) {
+      fs.unlink(filePath, function() {});
+      return cb(new Error('Dosya icerigi gorsel degil. Yukleme reddedildi.'));
+    }
+    cb(null);
+  } catch(e) {
+    cb(e);
+  }
+}
+
 function telefonNormalize(telefon) {
   var t = telefon.replace(/\D/g, '');
   if (t.startsWith('90') && t.length === 12) return '+' + t;
@@ -81,4 +97,4 @@ async function esnafSil(id) {
   cacheSil('esnaf_detay:' + id);
 }
 
-module.exports = { twilioClient, openai, cloudinary: cloudinaryLib, upload, fs, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil };
+module.exports = { twilioClient, openai, cloudinary: cloudinaryLib, upload, gorselMagicKontrol, fs, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil };

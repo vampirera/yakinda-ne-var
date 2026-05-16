@@ -3,11 +3,12 @@ const express = require('express');
 const router = express.Router();
 const { pool, cacheAl, cacheKaydet, cacheSil } = require('../db/pool');
 const { esnafAuth, adminAuth } = require('../middleware/auth');
-const { upload, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
+const { upload, gorselMagicKontrol, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
 
 router.post('/is-ilani/fotograf', upload.single('foto'), async function(req, res) {
   try {
     if (!req.file) return res.status(400).json({ basari: false, mesaj: 'Dosya yok.' });
+    await new Promise(function(resolve, reject) { gorselMagicKontrol(req.file.path, function(e) { e ? reject(e) : resolve(); }); });
     var result = await cloudinary.uploader.upload(req.file.path, { folder: 'ilanlar', transformation: [{ width: 800, crop: 'limit' }] });
     fs.unlink(req.file.path, function() {});
     res.json({ basari: true, url: result.secure_url });
