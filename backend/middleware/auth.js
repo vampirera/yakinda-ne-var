@@ -12,7 +12,7 @@ var SESSION_TTL = 7 * 24 * 60 * 60; // saniye cinsinden (7 gün)
 
 if (!JWT_SECRET) {
   console.error('[Auth] HATA: JWT_SECRET env var tanimsiz. Sunucu durduruluyor.');
-  console.error('[Auth] .env dosyaniza veya Railway environment variables'a JWT_SECRET ekleyin.');
+  console.error('[Auth] .env veya Railway ortam degiskenlerine JWT_SECRET ekleyin.');
   process.exit(1);
 }
 
