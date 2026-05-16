@@ -260,7 +260,7 @@ function adresDetayGoster(index) {
   icerik.innerHTML =
     '<h3 style="margin:0 30px 14px 0;font-size:1rem">📍 ' + temizle(a.baslik || 'Adres') + '</h3>' +
     '<div style="background:#f9f9f9;border-radius:10px;padding:12px;margin-bottom:14px;font-size:.85rem;line-height:1.8;color:#444">' +
-      a.adres +
+      temizle(a.adres) +
       (a.lat && a.lng ? '<br><span style="color:#aaa;font-size:.75rem">📌 Konum: ' + parseFloat(a.lat).toFixed(5) + ', ' + parseFloat(a.lng).toFixed(5) + '</span>' : '') +
     '</div>' +
     '<div style="display:flex;gap:8px">' +
