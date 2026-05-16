@@ -33,7 +33,18 @@ try {
   }
 } catch(e) { console.log('[Cloudinary] Baslatilmadi:', e.message); }
 
-const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } });
+function gorselFiltresi(req, file, cb) {
+  var izinliTurler = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+  if (izinliTurler.indexOf(file.mimetype) === -1) {
+    return cb(new Error('Sadece gorsel dosyasi yukleyebilirsiniz (JPEG, PNG, WebP, GIF).'), false);
+  }
+  cb(null, true);
+}
+const upload = multer({
+  dest: 'uploads/',
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: gorselFiltresi
+});
 
 function telefonNormalize(telefon) {
   var t = telefon.replace(/\D/g, '');
