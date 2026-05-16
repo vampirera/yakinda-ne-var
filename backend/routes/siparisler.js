@@ -17,6 +17,7 @@ router.post('/siparisler', yazmaLimit, async function(req, res) {
     if (!req.body.musteri_telefon) {
       return res.status(400).json({ basari: false, mesaj: 'Musteri telefonu gerekli.' });
     }
+    req.body.musteri_telefon = telefonNormalize(req.body.musteri_telefon);
     var esnaf = await pool.query('SELECT * FROM esnaflar WHERE id=$1', [req.body.esnaf_id]);
     if (!esnaf.rows.length) return res.status(404).json({ basari: false, mesaj: 'Esnaf bulunamadi' });
     var toplam = 0;

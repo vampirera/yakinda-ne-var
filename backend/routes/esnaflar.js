@@ -4,7 +4,7 @@ const router = express.Router();
 const { pool, cacheAl, cacheKaydet, cacheSil, CACHE_TTL } = require('../db/pool');
 const { esnafAuth, adminAuth, sessionDogrula } = require('../middleware/auth');
 const { upload, gorselMagicKontrol, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
-const { listeLimit, girisLimit } = require('../middleware/rateLimit');
+const { listeLimit, girisLimit, yazmaLimit } = require('../middleware/rateLimit');
 
 router.get('/config', function(req, res) {
   var tel = (process.env.ADMIN_TELEFON || '').replace(/\D/g, '');
@@ -176,7 +176,7 @@ router.delete('/esnaflar/:id/urunler/:urun_id', esnafAuth, async function(req, r
   } catch(err) { next(err); }
 });
 
-router.post('/esnaflar/:id/yorumlar', girisLimit, async function(req, res, next) {
+router.post('/esnaflar/:id/yorumlar', yazmaLimit, async function(req, res, next) {
   try {
     // Token varsa kullanici adı telefon'dan türetilir (spoof önlemi)
     var auth = req.headers['authorization'];
