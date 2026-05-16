@@ -1,12 +1,22 @@
 'use strict';
 const express = require('express');
 const router = express.Router();
+const { girisLimit } = require('../middleware/rateLimit');
 const { pool, cacheAl, cacheKaydet, cacheSil } = require('../db/pool');
-const { esnafAuth, adminAuth } = require('../middleware/auth');
+const { esnafAuth, adminAuth, sessionDogrula } = require('../middleware/auth');
 const { upload, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
 
-router.post('/siparisler', async function(req, res) {
+router.post('/siparisler', girisLimit, async function(req, res) {
   try {
+    // Soft-auth: token varsa musteri_telefon token'dan alınır (spoof önlemi)
+    var auth = req.headers['authorization'];
+    if (auth && auth.startsWith('Bearer ')) {
+      var session = sessionDogrula(auth.slice(7));
+      if (session && session.telefon) req.body.musteri_telefon = session.telefon;
+    }
+    if (!req.body.musteri_telefon) {
+      return res.status(400).json({ basari: false, mesaj: 'Musteri telefonu gerekli.' });
+    }
     var esnaf = await pool.query('SELECT * FROM esnaflar WHERE id=$1', [req.body.esnaf_id]);
     if (!esnaf.rows.length) return res.status(404).json({ basari: false, mesaj: 'Esnaf bulunamadi' });
     var toplam = 0;

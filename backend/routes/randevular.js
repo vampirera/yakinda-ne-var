@@ -1,8 +1,9 @@
 'use strict';
 const express = require('express');
 const router = express.Router();
+const { girisLimit } = require('../middleware/rateLimit');
 const { pool, cacheAl, cacheKaydet, cacheSil } = require('../db/pool');
-const { esnafAuth, adminAuth } = require('../middleware/auth');
+const { esnafAuth, adminAuth, sessionDogrula } = require('../middleware/auth');
 const { upload, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
 
 router.get('/esnaf/:id/hizmetler', async function(req, res) {
@@ -88,8 +89,14 @@ router.get('/esnaf/:id/musait-slotlar', async function(req, res) {
 });
 
 // Randevu oluştur
-router.post('/randevu', async function(req, res) {
+router.post('/randevu', girisLimit, async function(req, res) {
   try {
+    // Soft-auth: token varsa musteri_telefon token'dan alınır
+    var auth = req.headers['authorization'];
+    if (auth && auth.startsWith('Bearer ')) {
+      var session = sessionDogrula(auth.slice(7));
+      if (session && session.telefon) req.body.musteri_telefon = session.telefon;
+    }
     var { esnaf_id, musteri_telefon, musteri_ad, hizmet_id, tarih, saat, notlar } = req.body;
     if (!esnaf_id || !musteri_telefon || !musteri_ad || !tarih || !saat) {
       return res.status(400).json({ basari: false, mesaj: 'Eksik bilgi.' });
