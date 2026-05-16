@@ -369,10 +369,10 @@ function detayDoldur(e) {
 
   var sosyal = [];
   if (e.instagram_url) {
-    sosyal.push('<a href="' + e.instagram_url + '" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:linear-gradient(135deg,#833ab4,#e1306c,#f77737);color:#fff;border-radius:10px;padding:9px 8px;font-size:.78rem;font-weight:700;text-decoration:none">📸 Instagram</a>');
+    sosyal.push('<a href="' + guvenliUrl(e.instagram_url) + '" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:linear-gradient(135deg,#833ab4,#e1306c,#f77737);color:#fff;border-radius:10px;padding:9px 8px;font-size:.78rem;font-weight:700;text-decoration:none">📸 Instagram</a>');
   }
   if (e.google_maps_url) {
-    sosyal.push('<a href="' + e.google_maps_url + '" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#fff;border:1.5px solid #4285f4;color:#4285f4;border-radius:10px;padding:9px 8px;font-size:.78rem;font-weight:700;text-decoration:none">⭐ Google Yorumları</a>');
+    sosyal.push('<a href="' + guvenliUrl(e.google_maps_url) + '" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#fff;border:1.5px solid #4285f4;color:#4285f4;border-radius:10px;padding:9px 8px;font-size:.78rem;font-weight:700;text-decoration:none">⭐ Google Yorumları</a>');
   }
   var sosyalEl = document.getElementById('detay-sosyal');
   if (sosyalEl) sosyalEl.innerHTML = sosyal.join('');
