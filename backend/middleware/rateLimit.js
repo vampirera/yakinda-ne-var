@@ -1,5 +1,5 @@
 'use strict';
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
 // Genel API limiti — tüm endpoint'ler
 const genelLimit = rateLimit({
@@ -25,11 +25,9 @@ const otpLimit = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
   keyGenerator: function(req) {
-    var ip = (req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim();
     var telefon = (req.body && req.body.telefon) ? String(req.body.telefon) : 'bilinmiyor';
-    return ip + ':' + telefon;
+    return ipKeyGenerator(req) + ':' + telefon;
   },
   message: { basari: false, mesaj: 'Cok fazla OTP istegi. 1 saat sonra tekrar deneyin.' }
 });
@@ -40,11 +38,9 @@ const otpDogrulaLimit = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
   keyGenerator: function(req) {
-    var ip = (req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim();
     var telefon = (req.body && req.body.telefon) ? String(req.body.telefon) : 'bilinmiyor';
-    return ip + ':' + telefon;
+    return ipKeyGenerator(req) + ':' + telefon;
   },
   message: { basari: false, mesaj: 'Cok fazla deneme. 1 saat sonra tekrar deneyin.' }
 });
