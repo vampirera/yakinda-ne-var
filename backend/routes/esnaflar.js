@@ -4,7 +4,7 @@ const router = express.Router();
 const { pool, cacheAl, cacheKaydet, cacheSil, CACHE_TTL } = require('../db/pool');
 const { esnafAuth, adminAuth } = require('../middleware/auth');
 const { upload, gorselMagicKontrol, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
-const { listeLimit } = require('../middleware/rateLimit');
+const { listeLimit, girisLimit } = require('../middleware/rateLimit');
 
 router.get('/config', function(req, res) {
   var tel = (process.env.ADMIN_TELEFON || '').replace(/\D/g, '');
@@ -176,14 +176,30 @@ router.delete('/esnaflar/:id/urunler/:urun_id', esnafAuth, async function(req, r
   } catch(err) { next(err); }
 });
 
-router.post('/esnaflar/:id/yorumlar', async function(req, res, next) {
+router.post('/esnaflar/:id/yorumlar', girisLimit, async function(req, res, next) {
   try {
-    await pool.query('INSERT INTO yorumlar (esnaf_id,kullanici,puan,yorum) VALUES ($1,$2,$3,$4)', [req.params.id, req.body.kullanici, parseInt(req.body.puan), req.body.yorum]);
-    var yorumlar = await pool.query('SELECT puan FROM yorumlar WHERE esnaf_id=$1', [req.params.id]);
+    var { kullanici, puan, yorum } = req.body;
+    // Zorunlu alan ve puan aralığı kontrolü
+    if (!kullanici || typeof kullanici !== 'string' || kullanici.trim().length < 2) {
+      return res.status(400).json({ basari: false, mesaj: 'Kullanici adi zorunlu (en az 2 karakter).' });
+    }
+    var puanInt = parseInt(puan);
+    if (!puanInt || puanInt < 1 || puanInt > 5) {
+      return res.status(400).json({ basari: false, mesaj: 'Puan 1-5 arasinda olmali.' });
+    }
+    if (yorum && yorum.length > 1000) {
+      return res.status(400).json({ basari: false, mesaj: 'Yorum en fazla 1000 karakter olabilir.' });
+    }
+    var esnafId = parseInt(req.params.id);
+    if (!esnafId) return res.status(400).json({ basari: false, mesaj: 'Gecersiz esnaf ID.' });
+
+    await pool.query('INSERT INTO yorumlar (esnaf_id,kullanici,puan,yorum) VALUES ($1,$2,$3,$4)',
+      [esnafId, kullanici.trim().slice(0,100), puanInt, (yorum || '').trim().slice(0,1000)]);
+    var yorumlar = await pool.query('SELECT puan FROM yorumlar WHERE esnaf_id=$1', [esnafId]);
     var toplam = yorumlar.rows.reduce(function(t,y){return t+y.puan;},0);
     var ort = Math.round((toplam/yorumlar.rows.length)*10)/10;
-    await pool.query('UPDATE esnaflar SET puan=$1, yorum_sayisi=$2 WHERE id=$3', [ort, yorumlar.rows.length, req.params.id]);
-    cacheSil('esnaf_detay:' + req.params.id);
+    await pool.query('UPDATE esnaflar SET puan=$1, yorum_sayisi=$2 WHERE id=$3', [ort, yorumlar.rows.length, esnafId]);
+    cacheSil('esnaf_detay:' + esnafId);
     cacheSil('esnaflar:');
     res.json({ basari: true, mesaj: 'Yorum eklendi!' });
   } catch(err) { next(err); }

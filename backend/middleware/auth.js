@@ -11,12 +11,9 @@ var JWT_SECRET  = process.env.JWT_SECRET || null;
 var SESSION_TTL = 7 * 24 * 60 * 60; // saniye cinsinden (7 gün)
 
 if (!JWT_SECRET) {
-  if (process.env.NODE_ENV === 'production') {
-    console.error('[Auth] HATA: JWT_SECRET env var production ortaminda tanimsiz. Sunucu durduruluyor.');
-    process.exit(1);
-  }
-  console.warn('[Auth] UYARI: JWT_SECRET tanimsiz — gecici secret uretildi. Her restart oturum kapatir.');
-  JWT_SECRET = require('crypto').randomBytes(64).toString('hex');
+  console.error('[Auth] HATA: JWT_SECRET env var tanimsiz. Sunucu durduruluyor.');
+  console.error('[Auth] .env dosyaniza veya Railway environment variables'a JWT_SECRET ekleyin.');
+  process.exit(1);
 }
 
 function sessionOlustur(kullanici) {
@@ -43,17 +40,18 @@ function sessionDogrula(token) {
 // AUTH MIDDLEWARE
 // =============================================================
 
-function esnafAuth(req, res, next) {
-  var auth = req.headers['authorization'];
-  if (!auth || !auth.startsWith('Bearer ')) {
-    return res.status(401).json({ basari: false, mesaj: 'Oturum gerekli. Lutfen tekrar giris yapin.' });
-  }
-  var session = sessionDogrula(auth.slice(7));
-  if (!session) {
-    return res.status(401).json({ basari: false, mesaj: 'Oturum suresi dolmus. Tekrar giris yapin.' });
-  }
-  // token_version doğrulaması — revoke/logout kontrolü
-  tokenVersionKontrol(session).then(function(gecerli) {
+async function esnafAuth(req, res, next) {
+  try {
+    var auth = req.headers['authorization'];
+    if (!auth || !auth.startsWith('Bearer ')) {
+      return res.status(401).json({ basari: false, mesaj: 'Oturum gerekli. Lutfen tekrar giris yapin.' });
+    }
+    var session = sessionDogrula(auth.slice(7));
+    if (!session) {
+      return res.status(401).json({ basari: false, mesaj: 'Oturum suresi dolmus. Tekrar giris yapin.' });
+    }
+    // token_version doğrulaması — revoke/logout kontrolü
+    var gecerli = await tokenVersionKontrol(session);
     if (!gecerli) {
       return res.status(401).json({ basari: false, mesaj: 'Oturum iptal edilmis. Tekrar giris yapin.' });
     }
@@ -68,16 +66,10 @@ function esnafAuth(req, res, next) {
     }
     req.sessionData = session;
     next();
-  }).catch(function() { next(); }); // DB hatası durumunda bloklama
-}
-
-function adminAuth(req, res, next) {
-  var auth = req.headers['authorization'];
-  if (auth && auth.startsWith('Bearer ')) {
-    var session = sessionDogrula(auth.slice(7));
-    if (session && session.tip === 'admin') { req.sessionData = session; return next(); }
+  } catch(err) {
+    console.error('[esnafAuth] Hata:', err.message);
+    return res.status(500).json({ basari: false, mesaj: 'Kimlik dogrulama hatasi.' });
   }
-  return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
 }
 
 // =============================================================
@@ -95,4 +87,24 @@ async function tokenVersionKontrol(session) {
   }
 }
 
-module.exports = { bcrypt, sessionOlustur, sessionDogrula, tokenVersionKontrol, esnafAuth, adminAuth };
+// Admin token blacklist (in-memory) — server restart'ta temizlenir, yeterli MVP için
+var _adminBlacklist = new Set();
+
+function adminTokenIptal(token) {
+  _adminBlacklist.add(token);
+}
+
+function adminAuth(req, res, next) {
+  var auth = req.headers['authorization'];
+  if (auth && auth.startsWith('Bearer ')) {
+    var token = auth.slice(7);
+    if (_adminBlacklist.has(token)) {
+      return res.status(401).json({ basari: false, mesaj: 'Oturum iptal edilmis.' });
+    }
+    var session = sessionDogrula(token);
+    if (session && session.tip === 'admin') { req.sessionData = session; return next(); }
+  }
+  return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
+}
+
+module.exports = { bcrypt, sessionOlustur, sessionDogrula, tokenVersionKontrol, esnafAuth, adminAuth, adminTokenIptal };

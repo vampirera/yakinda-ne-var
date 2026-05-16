@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool, cacheAl, cacheKaydet, cacheSil, otpOlustur, otpDogrula } = require('../db/pool');
-const { bcrypt, sessionOlustur, sessionDogrula, tokenVersionKontrol, esnafAuth, adminAuth } = require('../middleware/auth');
+const { bcrypt, sessionOlustur, sessionDogrula, tokenVersionKontrol, esnafAuth, adminAuth, adminTokenIptal } = require('../middleware/auth');
 const { upload, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
 const { girisLimit, otpLimit } = require('../middleware/rateLimit');
 const { body, validationResult } = require('express-validator');
@@ -50,7 +50,7 @@ router.post('/kayit', kayitValidasyon, async function(req, res, next) {
     if (sifre.length < 4) return res.status(400).json({ basari: false, mesaj: 'Sifre en az 4 karakter olmali' });
     var mevcut = await pool.query('SELECT id FROM kullanicilar WHERE telefon=$1', [telefon]);
     if (mevcut.rows.length) return res.status(400).json({ basari: false, mesaj: 'Bu telefon zaten kayitli' });
-    var sifreHash = await bcrypt.hash(sifre, 10);
+    var sifreHash = await bcrypt.hash(sifre, 12);
     var r = await pool.query('INSERT INTO kullanicilar (ad,telefon,sifre,tip) VALUES ($1,$2,$3,$4) RETURNING id', [ad, telefon, sifreHash, 'musteri']);
     if (process.env.ADMIN_TELEFON) {
       whatsappGonder(process.env.ADMIN_TELEFON, '👤 Yeni müşteri kaydı: ' + ad + ', ' + telefon);
@@ -99,7 +99,7 @@ router.post('/giris', girisLimit, girisValidasyon, async function(req, res, next
         sifreEslesti = (u.sifre === sifre);
         if (sifreEslesti) {
           // Lazy migration: ilk girişte hashle
-          var hashed = await bcrypt.hash(sifre, 10);
+          var hashed = await bcrypt.hash(sifre, 12);
           await pool.query('UPDATE kullanicilar SET sifre=$1 WHERE id=$2', [hashed, u.id]);
         }
       }
@@ -123,7 +123,7 @@ router.post('/giris', girisLimit, girisValidasyon, async function(req, res, next
       } else {
         eSifreEslesti = (e.sifre === sifre);
         if (eSifreEslesti) {
-          var eHashed = await bcrypt.hash(sifre, 10);
+          var eHashed = await bcrypt.hash(sifre, 12);
           await pool.query('UPDATE esnaflar SET sifre=$1 WHERE id=$2', [eHashed, e.id]);
         }
       }
@@ -160,10 +160,16 @@ router.put('/musteri/profil', function(req, res, next) {
 router.post('/cikis', async function(req, res) {
   var auth = req.headers['authorization'];
   if (!auth || !auth.startsWith('Bearer ')) return res.json({ basari: true });
-  var session = sessionDogrula(auth.slice(7));
-  if (session && session.kullanici_id && session.kullanici_id !== 0) {
-    // token_version artır — eski tokenlar geçersiz olur
-    await pool.query('UPDATE kullanicilar SET token_version = token_version + 1 WHERE id=$1', [session.kullanici_id]).catch(function(){});
+  var token = auth.slice(7);
+  var session = sessionDogrula(token);
+  if (session) {
+    if (session.tip === 'admin') {
+      // Admin: in-memory blacklist'e ekle
+      adminTokenIptal(token);
+    } else if (session.kullanici_id && session.kullanici_id !== 0) {
+      // Kullanıcı: token_version artır — tüm cihazlardaki tokenlar geçersiz olur
+      await pool.query('UPDATE kullanicilar SET token_version = token_version + 1 WHERE id=$1', [session.kullanici_id]).catch(function(){});
+    }
   }
   res.json({ basari: true, mesaj: 'Cikis yapildi.' });
 });
