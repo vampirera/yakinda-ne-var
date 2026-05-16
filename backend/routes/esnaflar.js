@@ -17,8 +17,11 @@ router.get('/esnaflar', listeLimit, async function(req, res) {
     var ilce = req.query.ilce, kategori = req.query.kategori, siralama = req.query.siralama || 'mesafe';
     var lat = parseFloat(req.query.lat), lng = parseFloat(req.query.lng);
     var arama = req.query.arama ? req.query.arama.toLowerCase() : null;
+    // Harita viewport bbox filtresi (opsiyonel)
+    var swLat = parseFloat(req.query.swLat), swLng = parseFloat(req.query.swLng);
+    var neLat = parseFloat(req.query.neLat), neLng = parseFloat(req.query.neLng);
+    var bboxAktif = !isNaN(swLat) && !isNaN(swLng) && !isNaN(neLat) && !isNaN(neLng);
 
-    // Cache key: konum hariç parametreler (konum bazlı sıralama/mesafe client'ta da yapılabilir)
     var cacheKey = 'esnaflar:' + (ilce||'') + ':' + (kategori||'') + ':' + (arama||'');
     var cached = cacheAl(cacheKey);
     if (cached) {
@@ -39,6 +42,7 @@ router.get('/esnaflar', listeLimit, async function(req, res) {
       json_agg(DISTINCT jsonb_build_object('id',u.id,'ad',u.ad,'fiyat',u.fiyat,'aciklama',u.aciklama,'fotograf_url',u.fotograf_url)) FILTER (WHERE u.id IS NOT NULL) as urunler
       FROM esnaflar e LEFT JOIN urunler u ON e.id=u.esnaf_id WHERE e.onaylandi=true`;
     var params = [], pi = 1;
+    if (bboxAktif) { query += ' AND e.lat BETWEEN $'+pi+' AND $'+(pi+1)+' AND e.lng BETWEEN $'+(pi+2)+' AND $'+(pi+3); params.push(swLat,neLat,swLng,neLng); pi+=4; }
     if (ilce) { query += ' AND LOWER(e.ilce)=$'+pi; params.push(ilce.toLowerCase()); pi++; }
     if (kategori) { query += ' AND e.kategori=$'+pi; params.push(kategori); pi++; }
     if (arama) { query += ' AND (LOWER(e.ad) LIKE $'+pi+' OR LOWER(e.kategori) LIKE $'+pi+' OR EXISTS (SELECT 1 FROM urunler u2 WHERE u2.esnaf_id=e.id AND LOWER(u2.ad) LIKE $'+pi+'))'; params.push('%'+arama+'%'); pi++; }
