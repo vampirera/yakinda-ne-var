@@ -242,8 +242,8 @@ function adresListesiGoster() {
     return '<div onclick="adresDetayGoster(' + i + ')" style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;margin-bottom:6px;cursor:pointer;border:2px solid ' + (secili ? '#ff6b35' : '#eee') + ';background:' + (secili ? '#fff8f5' : '#fafafa') + '">' +
       '<div style="width:18px;height:18px;border-radius:50%;border:2px solid ' + (secili ? '#ff6b35' : '#ccc') + ';background:' + (secili ? '#ff6b35' : '#fff') + ';flex-shrink:0"></div>' +
       '<div style="flex:1;min-width:0">' +
-        '<div style="font-weight:700;font-size:.82rem;color:#333">' + (a.baslik || 'Adres') + (secili ? ' <span style="color:#ff6b35;font-size:.7rem">● Seçili</span>' : '') + '</div>' +
-        '<div style="font-size:.75rem;color:#777;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + a.adres + '</div>' +
+        '<div style="font-weight:700;font-size:.82rem;color:#333">' + temizle(a.baslik || 'Adres') + (secili ? ' <span style="color:#ff6b35;font-size:.7rem">● Seçili</span>' : '') + '</div>' +
+        '<div style="font-size:.75rem;color:#777;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + temizle(a.adres) + '</div>' +
       '</div>' +
       '<span style="color:#bbb;font-size:1rem">›</span>' +
     '</div>';
@@ -258,7 +258,7 @@ function adresDetayGoster(index) {
 
   var icerik = document.getElementById('adres-modal-icerik');
   icerik.innerHTML =
-    '<h3 style="margin:0 30px 14px 0;font-size:1rem">📍 ' + (a.baslik || 'Adres') + '</h3>' +
+    '<h3 style="margin:0 30px 14px 0;font-size:1rem">📍 ' + temizle(a.baslik || 'Adres') + '</h3>' +
     '<div style="background:#f9f9f9;border-radius:10px;padding:12px;margin-bottom:14px;font-size:.85rem;line-height:1.8;color:#444">' +
       a.adres +
       (a.lat && a.lng ? '<br><span style="color:#aaa;font-size:.75rem">📌 Konum: ' + parseFloat(a.lat).toFixed(5) + ', ' + parseFloat(a.lng).toFixed(5) + '</span>' : '') +
@@ -682,7 +682,7 @@ function ilanlarimYukle() {
               '<div style="flex:1">' +
                 '<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">' +
                   '<span style="font-size:.9rem">' + (katIkon[ilan.kategori] || '📋') + '</span>' +
-                  '<span style="font-weight:800;font-size:.88rem">' + ilan.baslik + '</span>' +
+                  '<span style="font-weight:800;font-size:.88rem">' + temizle(ilan.baslik) + '</span>' +
                 '</div>' +
                 (ilan.butce_min ? '<div style="font-size:.7rem;color:#888">₺' + ilan.butce_min + (ilan.butce_max ? '–' + ilan.butce_max : '+') + '</div>' : '') +
                 (ilan.olusturma ? '<div style="font-size:.67rem;color:#bbb;margin-top:2px">🕐 ' + ilanTarihFormatla(ilan.olusturma) + '</div>' : '') +
@@ -794,7 +794,7 @@ function ilanDetayGoster(ilanId) {
   }
 
   var html =
-    '<h3 style="margin:0 0 8px;padding-right:40px;font-size:1rem">' + ilan.baslik + '</h3>' +
+    '<h3 style="margin:0 0 8px;padding-right:40px;font-size:1rem">' + temizle(ilan.baslik) + '</h3>' +
     '<div style="display:flex;align-items:center;gap:6px;margin-bottom:14px;flex-wrap:wrap">' +
       '<span style="font-size:.8rem;color:' + (katRenk[ilan.kategori] || '#888') + ';font-weight:600">' + (katIkon[ilan.kategori] || '📋') + ' ' + (ilan.kategori || '') + '</span>' +
       '<span style="font-size:.7rem;font-weight:700;color:' + renk + ';padding:2px 8px;background:' + renk + '18;border-radius:8px">' + ilan.durum + '</span>' +
@@ -1014,7 +1014,7 @@ function aktifSiparisKart(s) {
     '<div style="font-size:.78rem;font-weight:700;color:#888;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Ürünler</div>' +
     urunlerHtml +
     '<div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:2px solid #f5f5f5">' +
-      '<span style="font-size:.83rem;color:#666">' + (s.teslimat_turu === 'kurye' ? '🛵 Kurye ile teslimat' : '🚶 Gel-al') + (s.adres ? ' · ' + s.adres : '') + '</span>' +
+      '<span style="font-size:.83rem;color:#666">' + (s.teslimat_turu === 'kurye' ? '🛵 Kurye ile teslimat' : '🚶 Gel-al') + (s.adres ? ' · ' + temizle(s.adres) : '') + '</span>' +
       '<span style="font-weight:900;font-size:1rem;color:#ff6b35">₺' + (parseFloat(s.genel_toplam) || 0) + '</span>' +
     '</div>' +
     iptalBtn +
