@@ -9,6 +9,7 @@ process.on('uncaughtException', function(err) {
 });
 
 const express = require('express');
+const helmet = require('helmet');
 const cors    = require('cors');
 
 const app = express();
@@ -27,7 +28,8 @@ app.use(cors({
   methods: ['GET','POST','PUT','DELETE'],
   allowedHeaders: ['Content-Type','Authorization']
 }));
-app.set('trust proxy', 1); // Railway/Nginx arkası — rate limit doğru IP görsün
+app.set('trust proxy', 1);
+app.use(helmet({ contentSecurityPolicy: false })); // CSP false: GitHub Pages script'leri için // Railway/Nginx arkası — rate limit doğru IP görsün
 app.use(express.json());
 
 // Rate limiting

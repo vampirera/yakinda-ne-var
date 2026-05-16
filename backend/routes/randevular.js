@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
 const router = express.Router();
-const { girisLimit } = require('../middleware/rateLimit');
+const { girisLimit, yazmaLimit } = require('../middleware/rateLimit');
 const { pool, cacheAl, cacheKaydet, cacheSil } = require('../db/pool');
 const { esnafAuth, adminAuth, sessionDogrula } = require('../middleware/auth');
 const { upload, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
@@ -89,7 +89,7 @@ router.get('/esnaf/:id/musait-slotlar', async function(req, res) {
 });
 
 // Randevu oluştur
-router.post('/randevu', girisLimit, async function(req, res) {
+router.post('/randevu', yazmaLimit, async function(req, res) {
   try {
     // Soft-auth: token varsa musteri_telefon token'dan alınır
     var auth = req.headers['authorization'];

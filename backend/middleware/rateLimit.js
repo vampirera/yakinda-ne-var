@@ -54,4 +54,18 @@ const listeLimit = rateLimit({
   message: { basari: false, mesaj: 'Cok fazla istek. Lutfen bekleyin.' }
 });
 
-module.exports = { genelLimit, girisLimit, otpLimit, otpDogrulaLimit, listeLimit };
+
+// Write endpoint limiti — sipariş, randevu, ilan oluşturma (spam önlemi)
+const yazmaLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: function(req) {
+    var telefon = (req.body && req.body.musteri_telefon) ? String(req.body.musteri_telefon) : 'anonim';
+    return ipKeyGenerator(req) + ':' + telefon;
+  },
+  message: { basari: false, mesaj: 'Cok fazla istek. 15 dakika sonra tekrar deneyin.' }
+});
+
+module.exports = { genelLimit, girisLimit, otpLimit, otpDogrulaLimit, listeLimit, yazmaLimit };

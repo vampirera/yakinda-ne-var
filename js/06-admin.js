@@ -93,7 +93,7 @@ var adminAktifSekme = 'ozet';
 
 function adminGoster(sekme) {
   var oturum = oturumAl(); // Token tabanlı auth — key artık gerekli değil
-  if (!key) return;
+  if (!oturum || oturum.tip !== 'admin') return;
   sayfaGoster('admin');
   if (sekme) adminAktifSekme = sekme;
   adminSekmeGuncelle(adminAktifSekme);
@@ -179,7 +179,7 @@ function adminEsnaflarGoster(bekleyenler, aktifler, key) {
     html += bekleyenler.map(function(e) {
       return '<div class="admin-card" onclick="adminEsnafDetay(' + e.id + ',\'' + key + '\')" style="cursor:pointer">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
-          '<div><b>' + e.ad + '</b><br><small>' + e.kategori + ' · ' + e.ilce + '</small><br><small style="color:#e65100">⏳ Onay Bekliyor</small></div>' +
+          '<div><b>' + temizle(e.ad) + '</b><br><small>' + temizle(e.kategori) + ' · ' + temizle(e.ilce) + '</small><br><small style="color:#e65100">⏳ Onay Bekliyor</small></div>' +
           '<div style="color:#aaa;font-size:1.2rem">›</div>' +
         '</div></div>';
     }).join('');
@@ -192,7 +192,7 @@ function adminEsnaflarGoster(bekleyenler, aktifler, key) {
     html += aktifler.map(function(e) {
       return '<div class="admin-card" onclick="adminEsnafDetay(' + e.id + ',\'' + key + '\')" style="cursor:pointer">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
-          '<div><b>' + e.ad + '</b><br>' +
+          '<div><b>' + temizle(e.ad) + '</b><br>' +
             '<small>' + e.kategori + ' · ' + e.ilce + '</small><br>' +
             '<small style="color:' + (e.onaylandi ? '#2e7d32' : '#e65100') + '">' + (e.onaylandi ? '✅ Yayında' : '⏳ Bekliyor') + '</small>' +
           '</div>' +
@@ -212,8 +212,8 @@ function adminKuryelerGoster(kuryeler, key) {
     html += kuryeler.map(function(k) {
       return '<div class="admin-card" onclick="adminKuryeDetay(' + k.id + ',\'' + key + '\')" style="cursor:pointer">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
-          '<div><b>' + k.ad + '</b><br>' +
-            '<small>' + k.telefon + ' · ' + k.arac_tipi + ' · ' + k.ilce + '</small><br>' +
+          '<div><b>' + temizle(k.ad) + '</b><br>' +
+            '<small>' + temizle(k.telefon) + ' · ' + temizle(k.arac_tipi) + ' · ' + temizle(k.ilce) + '</small><br>' +
             '<small style="color:' + (k.onaylandi ? '#2e7d32' : '#e65100') + '">' + (k.onaylandi ? '✅ Onaylı' : '⏳ Bekliyor') + '</small>' +
           '</div>' +
           '<div style="color:#aaa;font-size:1.2rem">›</div>' +
@@ -232,7 +232,7 @@ function adminMusterilerGoster(musteriler, key) {
       var tarih = m.olusturma ? new Date(m.olusturma).toLocaleDateString('tr-TR') : '-';
       return '<div class="admin-card" onclick="adminMusteriDetay(' + m.id + ',\'' + m.ad + '\',\'' + m.telefon + '\',\'' + tarih + '\',\'' + key + '\')" style="cursor:pointer">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
-          '<div><b>' + (m.ad || 'İsimsiz') + '</b><br><small>' + m.telefon + '</small><br><small style="color:#999">Kayıt: ' + tarih + '</small></div>' +
+          '<div><b>' + temizle(m.ad || 'İsimsiz') + '</b><br><small>' + temizle(m.telefon) + '</small><br><small style="color:#999">Kayıt: ' + tarih + '</small></div>' +
           '<div style="color:#aaa;font-size:1.2rem">›</div>' +
         '</div></div>';
     }).join('');
@@ -313,7 +313,7 @@ function adminEsnafDetay(id, key) {
     if (!res.basari) { adminModalAc('<div class="hata">Yüklenemedi.</div>'); return; }
     var e = res.veri;
     var urunlerHTML = (e.urunler && e.urunler.length)
-      ? e.urunler.map(function(u) { return '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0f0f0"><span>' + u.ad + '</span><b>₺' + u.fiyat + '</b></div>'; }).join('')
+      ? e.urunler.map(function(u) { return '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0f0f0"><span>' + temizle(u.ad) + '</span><b>₺' + u.fiyat + '</b></div>'; }).join('')
       : '<div style="color:#aaa;font-size:.8rem">Ürün yok</div>';
 
     var html = '<h3 style="margin:0 30px 12px 0;font-size:1rem">🏪 Esnaf Detayı</h3>' +
@@ -401,7 +401,7 @@ function adminKuryeDetay(id, key) {
     var tarih = k.kayit_tarihi ? new Date(k.kayit_tarihi).toLocaleDateString('tr-TR') : '-';
     var html = '<h3 style="margin:0 30px 12px 0;font-size:1rem">🛵 Kurye Detayı</h3>' +
       '<div style="background:#f9f9f9;border-radius:10px;padding:12px;margin-bottom:14px">' +
-        '<div style="margin-bottom:5px"><b>' + k.ad + '</b></div>' +
+        '<div style="margin-bottom:5px"><b>' + temizle(k.ad) + '</b></div>' +
         '<div style="font-size:.83rem;color:#555;line-height:1.8">' +
           '📞 ' + k.telefon + '<br>' +
           '🚗 ' + k.arac_tipi + '<br>' +
@@ -472,7 +472,7 @@ function adminSiparisDetay(id, key) {
       var urunler = typeof s.urunler === 'string' ? JSON.parse(s.urunler) : s.urunler;
       urunlerHTML = (urunler || []).map(function(u) {
         return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f5f5f5;font-size:.8rem">' +
-          '<span>' + u.ad + ' × ' + u.adet + '</span><b>₺' + (u.fiyat * u.adet) + '</b></div>';
+          '<span>' + temizle(u.ad) + ' × ' + u.adet + '</span>'<b>₺' + (u.fiyat * u.adet) + '</b></div>';
       }).join('');
     } catch(e) { urunlerHTML = '<div style="font-size:.8rem;color:#aaa">Ürün verisi okunamadı</div>'; }
 

@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const router = express.Router();
+const { yazmaLimit } = require('../middleware/rateLimit');
 const { pool, cacheAl, cacheKaydet, cacheSil } = require('../db/pool');
 const { esnafAuth, adminAuth } = require('../middleware/auth');
 const { upload, gorselMagicKontrol, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
@@ -19,7 +20,7 @@ router.post('/is-ilani/fotograf', upload.single('foto'), async function(req, res
 });
 
 // İlan oluştur
-router.post('/is-ilani', async function(req, res) {
+router.post('/is-ilani', yazmaLimit, async function(req, res) {
   try {
     var { musteri_telefon, musteri_ad, baslik, aciklama, kategori, ilce, butce_min, butce_max, fotograf_url } = req.body;
     if (!musteri_telefon || !baslik) return res.status(400).json({ basari: false, mesaj: 'Telefon ve başlık zorunlu.' });

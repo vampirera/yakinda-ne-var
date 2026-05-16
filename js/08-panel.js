@@ -22,7 +22,7 @@ function panelYukle() {
       con.innerHTML = siparisler.slice(0, 30).map(function(s) {
         var urunler = Array.isArray(s.urunler) ? s.urunler :
           (typeof s.urunler === 'string' ? JSON.parse(s.urunler) : []);
-        var urunText = urunler.map(function(u) { return u.ad + ' x' + u.adet; }).join(', ');
+        var urunText = urunler.map(function(u) { return temizle(u.ad) + ' x' + parseInt(u.adet||0); }).join(', ');
         var sonDurum = s.durum === 'tamamlandi' || s.durum === 'teslim_edildi' || s.durum === 'iptal';
         var sonrakiButon = '';
         if (!sonDurum) {
@@ -44,7 +44,7 @@ function panelYukle() {
             '<span class="order-badge" style="background:' + (durumRenk[s.durum] || '#888') + ';color:#fff;border-radius:6px;padding:2px 7px;font-size:.68rem;font-weight:700">' + (durumMetin[s.durum] || s.durum) + '</span>' +
           '</div>' +
           '<div class="order-items">' + urunText +
-            '<br><small>' + (s.teslimat_turu === 'kurye' ? '🛵 Kurye' : '🚶 Gel-Al') + (s.adres ? ' — ' + s.adres : '') + '</small>' +
+            '<br><small>' + (s.teslimat_turu === 'kurye' ? '🛵 Kurye' : '🚶 Gel-Al') + (s.adres ? ' — ' + temizle(s.adres) : '') + '</small>' +
           '</div>' +
           '<div class="order-footer">' +
             '<span class="order-price">₺' + (parseFloat(s.genel_toplam) || 0) + '</span>' +
@@ -96,7 +96,7 @@ function panelIstatistikYukle() {
             var yuzde = Math.round((u.adet / maxAdet) * 100);
             return '<div style="margin-bottom:8px">' +
               '<div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:3px">' +
-                '<span>' + madalya + ' ' + u.ad + '</span>' +
+                '<span>' + madalya + ' ' + temizle(u.ad) + '</span>' +
                 '<span style="font-weight:800;color:#ff6b35">' + u.adet + ' adet</span>' +
               '</div>' +
               '<div style="background:#f0f0f0;border-radius:6px;height:5px">' +
@@ -336,8 +336,8 @@ function panelUrunleriYukle(esnafId) {
       con.innerHTML = urunler.map(function(u) {
         return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0">' +
           '<div style="flex:1">' +
-            '<div style="font-size:.84rem;font-weight:700">' + u.ad + '</div>' +
-            (u.aciklama ? '<div style="font-size:.72rem;color:#888">' + u.aciklama + '</div>' : '') +
+            '<div style="font-size:.84rem;font-weight:700">' + temizle(u.ad) + '</div>' +
+            (u.aciklama ? '<div style="font-size:.72rem;color:#888">' + temizle(u.aciklama) + '</div>' : '') +
           '</div>' +
           '<div style="display:flex;align-items:center;gap:8px">' +
             '<span style="font-weight:800;color:#ff6b35;font-size:.88rem">₺' + parseFloat(u.fiyat || 0).toFixed(2) + '</span>' +
@@ -406,9 +406,9 @@ function kampanyalariYukle(esnafId) {
         var bitis = k.bitis_tarihi ? new Date(k.bitis_tarihi).toLocaleDateString('tr-TR') : '—';
         return '<div class="kampanya-satir">' +
           '<div class="kampanya-satir-bilgi">' +
-            '<b>' + k.baslik + '</b>' +
+            '<b>' + temizle(k.baslik) + '</b>' +
             (k.indirim_orani ? ' <span class="kampanya-rozet">%' + k.indirim_orani + '</span>' : '') +
-            '<div style="font-size:.72rem;color:#888">' + (k.aciklama || '') + ' · Son: ' + bitis + '</div>' +
+            '<div style="font-size:.72rem;color:#888">' + temizle(k.aciklama || '') + ' · Son: ' + temizle(bitis) + '</div>' +
           '</div>' +
           '<button class="kampanya-sil-btn" onclick="kampanyaSil(' + esnafId + ',' + k.id + ')">🗑</button>' +
         '</div>';
@@ -527,13 +527,13 @@ function panelIlanlarYukle() {
           : '';
         return '<div style="border:1px solid #f0f0f0;border-radius:12px;padding:10px;margin-bottom:8px;background:#fff">' +
           '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">' +
-            '<div style="font-weight:700;font-size:.82rem;flex:1;padding-right:8px">' + ilan.baslik + '</div>' +
+            '<div style="font-weight:700;font-size:.82rem;flex:1;padding-right:8px">' + temizle(ilan.baslik) + '</div>' +
             '<span style="font-size:.66rem;color:#888;white-space:nowrap;background:#f5f5f5;padding:2px 6px;border-radius:6px">👥 ' + ilan.teklif_sayisi + '</span>' +
           '</div>' +
           fotoHTML +
-          (ilan.aciklama ? '<div style="font-size:.72rem;color:#666;margin-bottom:4px">' + ilan.aciklama.slice(0,80) + (ilan.aciklama.length > 80 ? '...' : '') + '</div>' : '') +
+          (ilan.aciklama ? '<div style="font-size:.72rem;color:#666;margin-bottom:4px">' + temizle(ilan.aciklama.slice(0,80)) + (ilan.aciklama.length > 80 ? '...' : '') + '</div>' : '') +
           (ilan.butce_min ? '<div style="font-size:.72rem;color:#2e7d32;font-weight:700;margin-bottom:6px">₺' + ilan.butce_min + (ilan.butce_max ? '–₺' + ilan.butce_max : '+') + '</div>' : '') +
-          '<button onclick="panelTeklifModal(' + ilan.id + ',\'' + (ilan.baslik||'').replace(/'/g, '') + '\')" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:8px;padding:9px;font-size:.76rem;font-weight:700;cursor:pointer">🙋 İlgileniyorum</button>' +
+          '<button onclick="panelTeklifModal(' + ilan.id + ',\'' + temizle(ilan.baslik||'').replace(/'/g, '') + '\')" style="width:100%;background:#ff6b35;color:#fff;border:none;border-radius:8px;padding:9px;font-size:.76rem;font-weight:700;cursor:pointer">🙋 İlgileniyorum</button>' +
         '</div>';
       }).join('');
     }).catch(function() { con.innerHTML = '<div class="hata">Yüklenemedi.</div>'; });
@@ -659,7 +659,7 @@ function hizmetleriYukle(esnafId) {
       con.innerHTML = data.veri.map(function(h) {
         return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f0f0f0">' +
           '<div>' +
-            '<span style="font-size:.84rem;font-weight:700">' + h.ad + '</span>' +
+            '<span style="font-size:.84rem;font-weight:700">' + temizle(h.ad) + '</span>' +
             '<span style="font-size:.75rem;color:#888;margin-left:6px">' + h.sure + ' dk · ₺' + h.fiyat + '</span>' +
           '</div>' +
           '<button onclick="hizmetSil(' + esnafId + ',' + h.id + ')" style="background:none;border:none;color:#ff4444;cursor:pointer;font-size:1rem">🗑</button>' +
