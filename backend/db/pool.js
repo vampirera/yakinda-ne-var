@@ -253,4 +253,4 @@ async function bildirimOlustur(aliciTelefon, baslik, mesaj, tip, linkTip, linkId
   } catch(err) { console.log('[Bildirim] Olusturulamadi:', err.message); }
 }
 
-module.exports = { pool, cacheAl, cacheKaydet, cacheSil, otpOlustur, otpDogrula };
+module.exports = { pool, cacheAl, cacheKaydet, cacheSil, otpOlustur, otpDogrula, CACHE_TTL };

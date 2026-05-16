@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
 const router = express.Router();
-const { pool, cacheAl, cacheKaydet, cacheSil } = require('../db/pool');
+const { pool, cacheAl, cacheKaydet, cacheSil, CACHE_TTL } = require('../db/pool');
 const { esnafAuth, adminAuth } = require('../middleware/auth');
 const { upload, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
 
