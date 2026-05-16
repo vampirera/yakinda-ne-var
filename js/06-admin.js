@@ -193,7 +193,7 @@ function adminEsnaflarGoster(bekleyenler, aktifler, key) {
       return '<div class="admin-card" onclick="adminEsnafDetay(' + e.id + ',\'' + key + '\')" style="cursor:pointer">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
           '<div><b>' + temizle(e.ad) + '</b><br>' +
-            '<small>' + e.kategori + ' · ' + e.ilce + '</small><br>' +
+            '<small>' + temizle(e.kategori) + ' · ' + temizle(e.ilce) + '</small><br>' +
             '<small style="color:' + (e.onaylandi ? '#2e7d32' : '#e65100') + '">' + (e.onaylandi ? '✅ Yayında' : '⏳ Bekliyor') + '</small>' +
           '</div>' +
           '<div style="color:#aaa;font-size:1.2rem">›</div>' +
@@ -278,8 +278,8 @@ function adminSiparislerGoster(siparisler, key, filtre) {
               '<b>#' + s.id + '</b>' +
               '<span style="background:' + renk + ';color:#fff;border-radius:6px;padding:2px 7px;font-size:.65rem;font-weight:700">' + (s.durum || 'bekliyor') + '</span>' +
             '</div>' +
-            '<small>' + (s.esnaf_adi || '-') + '</small><br>' +
-            '<small style="color:#888">' + (s.musteri_telefon || '-') + ' · ' + tarih + '</small>' +
+            '<small>' + temizle(s.esnaf_adi || '-') + '</small><br>' +
+            '<small style="color:#888">' + temizle(s.musteri_telefon || '-') + ' · ' + tarih + '</small>' +
           '</div>' +
           '<div style="text-align:right"><b style="color:#1a1a2e">₺' + (s.genel_toplam || 0) + '</b><div style="color:#aaa;font-size:1rem">›</div></div>' +
         '</div></div>';
@@ -445,7 +445,7 @@ function adminMusteriDetay(id, ad, telefon, tarih, key) {
     el.innerHTML = liste.slice(0, 10).map(function(s) {
       var t = s.tarih ? new Date(s.tarih).toLocaleDateString('tr-TR') : '-';
       return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:.78rem">' +
-        '<span><b>#' + s.id + '</b> ' + (s.esnaf_adi||'-') + ' · ' + t + '</span>' +
+        '<span><b>#' + s.id + '</b> ' + temizle(s.esnaf_adi||'-') + ' · ' + t + '</span>' +
         '<b>₺' + (s.genel_toplam||0) + '</b></div>';
     }).join('');
   });
@@ -483,9 +483,9 @@ function adminSiparisDetay(id, key) {
 
     var html = '<h3 style="margin:0 30px 12px 0;font-size:1rem">📦 Sipariş #' + s.id + '</h3>' +
       '<div style="background:#f9f9f9;border-radius:10px;padding:12px;margin-bottom:12px;font-size:.82rem;line-height:1.9">' +
-        '🏪 <b>' + (s.esnaf_adi||'-') + '</b><br>' +
-        '👤 ' + (s.musteri_telefon||'-') + '<br>' +
-        '📍 ' + (s.teslimat_turu||'-') + (s.adres ? ' · ' + s.adres : '') + '<br>' +
+        '🏪 <b>' + temizle(s.esnaf_adi||'-') + '</b><br>' +
+        '👤 ' + temizle(s.musteri_telefon||'-') + '<br>' +
+        '📍 ' + temizle(s.teslimat_turu||'-') + (s.adres ? ' · ' + temizle(s.adres) : '') + '<br>' +
         '📅 ' + tarih +
       '</div>' +
       '<div style="font-weight:700;font-size:.82rem;margin-bottom:6px">Ürünler</div>' +

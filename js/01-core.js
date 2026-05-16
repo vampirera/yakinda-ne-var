@@ -26,6 +26,14 @@ function temizle(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
 }
 
+// URL güvenliği — javascript: injection önlemi (href attribute'larında kullan)
+function guvenliUrl(url) {
+  if (!url || typeof url !== 'string') return '#';
+  var temiz = url.trim().toLowerCase();
+  if (temiz.startsWith('javascript:') || temiz.startsWith('data:') || temiz.startsWith('vbscript:')) return '#';
+  return url;
+}
+
 var API_URL = 'https://yakinda-ne-var-backend-production.up.railway.app';
 
 // Auth header yardımcısı — token varsa Bearer ekler
@@ -983,8 +991,8 @@ function aktifSiparisKart(s) {
         '<span style="font-size:1.6rem">🛵</span>' +
         '<div>' +
           '<div style="font-size:.78rem;color:#7b3fa0;font-weight:700">Kuryeniz yolda!</div>' +
-          '<div style="font-size:.82rem;font-weight:800">' + s.kurye_ad + '</div>' +
-          (s.kurye_arac ? '<div style="font-size:.72rem;color:#888">' + s.kurye_arac + '</div>' : '') +
+          '<div style="font-size:.82rem;font-weight:800">' + temizle(s.kurye_ad) + '</div>' +
+          (s.kurye_arac ? '<div style="font-size:.72rem;color:#888">' + temizle(s.kurye_arac) + '</div>' : '') +
           (s.kurye_telefon ? '<a href="tel:' + s.kurye_telefon + '" style="font-size:.75rem;color:#9c27b0;font-weight:700;text-decoration:none">📞 ' + s.kurye_telefon + '</a>' : '') +
         '</div>' +
       '</div>' +
@@ -1092,7 +1100,7 @@ function siparisGecmisKart(s) {
   var urunOzet = urunler.slice(0, 2).map(function(u) { return u.ad; }).join(', ') + (urunler.length > 2 ? ' +' + (urunler.length - 2) : '');
   return '<div style="background:#fff;border-radius:14px;padding:13px 15px;box-shadow:0 1px 6px rgba(0,0,0,.06);margin-bottom:8px">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">' +
-      '<span style="font-weight:800;font-size:.9rem">' + (s.esnaf_adi || 'Esnaf') + '</span>' +
+      '<span style="font-weight:800;font-size:.9rem">' + temizle(s.esnaf_adi || 'Esnaf') + '</span>' +
       '<span style="background:' + renk + ';color:#fff;padding:2px 8px;border-radius:12px;font-size:.68rem;font-weight:700">' + (durumIkon[s.durum] || '') + ' ' + (s.durum || '') + '</span>' +
     '</div>' +
     (urunOzet ? '<div style="font-size:.78rem;color:#888;margin-bottom:3px">' + urunOzet + '</div>' : '') +
@@ -1148,9 +1156,9 @@ function siparislerListele() {
           return '<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.06);border-left:4px solid ' + renk + '">' +
             '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
               '<div>' +
-                '<div style="font-weight:800;font-size:.9rem">' + (r.esnaf_adi || 'İşletme') + '</div>' +
+                '<div style="font-weight:800;font-size:.9rem">' + temizle(r.esnaf_adi || 'İşletme') + '</div>' +
                 '<div style="font-size:.8rem;color:#555;margin-top:3px">📅 ' + tarihStr + ' · ' + (r.saat||'').slice(0,5) + '</div>' +
-                (r.hizmet_adi ? '<div style="font-size:.75rem;color:#888;margin-top:2px">💼 ' + r.hizmet_adi + '</div>' : '') +
+                (r.hizmet_adi ? '<div style="font-size:.75rem;color:#888;margin-top:2px">💼 ' + temizle(r.hizmet_adi) + '</div>' : '') +
               '</div>' +
               '<span style="font-size:.72rem;font-weight:700;color:' + renk + ';padding:3px 8px;background:' + renk + '18;border-radius:8px">' + (durumMetin[r.durum] || r.durum) + '</span>' +
             '</div>' +

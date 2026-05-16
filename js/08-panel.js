@@ -713,9 +713,9 @@ function randevulariYukle() {
         var tarihStr = new Date(r.tarih).toLocaleDateString('tr-TR', { day:'numeric', month:'short' });
         return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0">' +
           '<div>' +
-            '<div style="font-size:.84rem;font-weight:700">' + r.musteri_ad + '</div>' +
+            '<div style="font-size:.84rem;font-weight:700">' + temizle(r.musteri_ad) + '</div>' +
             '<div style="font-size:.72rem;color:#888">' + tarihStr + ' · ' + (r.saat||'').slice(0,5) + ' · ' + (r.hizmet_adi||'Genel') + '</div>' +
-            '<div style="font-size:.7rem;color:#aaa">' + r.musteri_telefon + '</div>' +
+            '<div style="font-size:.7rem;color:#aaa">' + temizle(r.musteri_telefon) + '</div>' +
           '</div>' +
           '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">' +
             '<span style="font-size:.7rem;font-weight:700;color:' + (durumRenk[r.durum]||'#888') + '">' + (durumMetin[r.durum]||r.durum) + '</span>' +
