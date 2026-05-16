@@ -134,7 +134,7 @@ function esnafKartlariOlustur(liste) {
   return liste.map(function(e) {
     var fiyatlar = (e.urunler || []).map(function(u) { return parseFloat(u.fiyat) || 0; });
     var minFiyat = fiyatlar.length ? Math.min.apply(null, fiyatlar) : null;
-    var urunAdi  = (e.urunler || []).slice(0, 2).map(function(u) { return u.ad; }).join(', ');
+    var urunAdi  = (e.urunler || []).slice(0, 2).map(function(u) { return temizle(u.ad); }).join(', ');
     var kalp     = favoriMi(e.id) ? '❤️' : '🤍';
     var kampanyaVar = (e.kampanyalar || []).length > 0;
     var kapakStyle = kapakBgStyle(e);

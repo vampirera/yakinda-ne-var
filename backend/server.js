@@ -27,6 +27,7 @@ app.use(cors({
   methods: ['GET','POST','PUT','DELETE'],
   allowedHeaders: ['Content-Type','Authorization']
 }));
+app.set('trust proxy', 1); // Railway/Nginx arkası — rate limit doğru IP görsün
 app.use(express.json());
 
 // Rate limiting

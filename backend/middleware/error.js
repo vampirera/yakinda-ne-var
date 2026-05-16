@@ -13,6 +13,11 @@ module.exports = function errorHandler(err, req, res, next) {
   if (err && err.message && err.message.includes('gorsel dosyasi')) {
     return res.status(400).json({ basari: false, mesaj: err.message });
   }
-  console.error('[Global Hata]', err.message);
+  // Prod'da stack trace loglanmaz (PII/secret sızıntısı riski)
+  if (process.env.NODE_ENV !== 'production') {
+    console.error('[Global Hata]', err.stack || err.message);
+  } else {
+    console.error('[Global Hata]', err.message);
+  }
   res.status(err.status || 500).json({ basari: false, mesaj: 'Sunucu hatasi.' });
 };

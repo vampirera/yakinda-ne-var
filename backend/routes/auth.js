@@ -5,8 +5,20 @@ const { pool, cacheAl, cacheKaydet, cacheSil, otpOlustur, otpDogrula } = require
 const { bcrypt, sessionOlustur, sessionDogrula, esnafAuth, adminAuth } = require('../middleware/auth');
 const { upload, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
 const { girisLimit, otpLimit } = require('../middleware/rateLimit');
+const { body, validationResult } = require('express-validator');
 
-router.post('/otp-gonder', otpLimit, async function(req, res) {
+// Validasyon kuralları
+var kayitValidasyon = [
+  body('ad').trim().isLength({ min: 2, max: 50 }).withMessage('Ad 2-50 karakter olmali'),
+  body('telefon').matches(/^90\d{10}$/).withMessage('Telefon 905xxxxxxxxx formatinda olmali'),
+  body('sifre').isLength({ min: 8 }).withMessage('Sifre en az 8 karakter olmali')
+];
+var girisValidasyon = [
+  body('telefon').notEmpty().withMessage('Telefon zorunlu'),
+  body('sifre').notEmpty().withMessage('Sifre zorunlu')
+];
+
+router.post('/otp-gonder', otpLimit, async function(req, res, next) {
   var telefon = req.body.telefon;
   if (!telefon) return res.status(400).json({ basari: false, mesaj: 'Telefon zorunlu' });
   if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_WHATSAPP_FROM) {
@@ -21,7 +33,17 @@ router.post('/otp-gonder', otpLimit, async function(req, res) {
   }
 });
 
-router.post('/kayit', async function(req, res) {
+router.post('/otp-dogrula', otpLimit, async function(req, res, next) {
+  var { telefon, kod } = req.body;
+  if (!telefon || !kod) return res.status(400).json({ basari: false, mesaj: 'Telefon ve kod zorunlu' });
+  var gecerli = otpDogrula(telefon, kod);
+  if (!gecerli) return res.status(400).json({ basari: false, mesaj: 'Kod gecersiz, suresi dolmus veya cok fazla deneme yapildi' });
+  res.json({ basari: true, mesaj: 'OTP dogrulandi' });
+});
+
+router.post('/kayit', kayitValidasyon, async function(req, res, next) {
+  var hatalar = validationResult(req);
+  if (!hatalar.isEmpty()) return res.status(400).json({ basari: false, mesaj: hatalar.array()[0].msg });
   try {
     var { ad, telefon, sifre } = req.body;
     if (!ad || !telefon || !sifre) return res.status(400).json({ basari: false, mesaj: 'Ad, telefon ve sifre zorunlu' });
@@ -34,19 +56,36 @@ router.post('/kayit', async function(req, res) {
       whatsappGonder(process.env.ADMIN_TELEFON, '👤 Yeni müşteri kaydı: ' + ad + ', ' + telefon);
     }
     res.json({ basari: true, mesaj: 'Kayit basarili!', kullanici_id: r.rows[0].id });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
-router.post('/giris', girisLimit, async function(req, res) {
+router.post('/giris', girisLimit, girisValidasyon, async function(req, res, next) {
+  var hatalar = validationResult(req);
+  if (!hatalar.isEmpty()) return res.status(400).json({ basari: false, mesaj: hatalar.array()[0].msg });
   try {
     var { telefon, sifre } = req.body;
     if (!telefon || !sifre) return res.status(400).json({ basari: false, mesaj: 'Telefon ve sifre zorunlu' });
-    // Admin kontrolü (env'den)
-    if (process.env.ADMIN_TELEFON && process.env.ADMIN_SIFRE &&
-        telefon === process.env.ADMIN_TELEFON && sifre === process.env.ADMIN_SIFRE) {
-      var adminVeri = { kullanici_id: 0, ad: 'Admin', telefon: telefon, tip: 'admin', esnaf_id: null, kurye_id: null };
-      var adminToken = sessionOlustur(adminVeri);
-      return res.json({ basari: true, veri: Object.assign({}, adminVeri, { token: adminToken }) });
+    // Admin kontrolü (env'den) — timing attack'ı önlemek için her zaman bcrypt.compare çalıştır
+    if (process.env.ADMIN_TELEFON && process.env.ADMIN_SIFRE) {
+      // telefon karşılaştırması sabit zamanlı değil ama bcrypt timing'i domine eder
+      var telefonEslesti = telefon === process.env.ADMIN_TELEFON;
+      // ADMIN_SIFRE düz metin olabilir; bcrypt hash'se compare, değilse timingSafeEqual
+      var adminSifreDogrulandi = false;
+      var adminSifre = process.env.ADMIN_SIFRE;
+      if (adminSifre.startsWith('$2b$') || adminSifre.startsWith('$2a$')) {
+        adminSifreDogrulandi = await bcrypt.compare(sifre, adminSifre);
+      } else {
+        // Düz metin karşılaştırma — timingSafeEqual ile
+        try {
+          var a = Buffer.from(sifre), b = Buffer.from(adminSifre);
+          adminSifreDogrulandi = a.length === b.length && require('crypto').timingSafeEqual(a, b);
+        } catch(e) { adminSifreDogrulandi = false; }
+      }
+      if (telefonEslesti && adminSifreDogrulandi) {
+        var adminVeri = { kullanici_id: 0, ad: 'Admin', telefon: telefon, tip: 'admin', esnaf_id: null, kurye_id: null };
+        var adminToken = sessionOlustur(adminVeri);
+        return res.json({ basari: true, veri: Object.assign({}, adminVeri, { token: adminToken }) });
+      }
     }
     // Kullanicilar tablosu — telefon ile çek, sonra şifre doğrula (bcrypt lazy migration)
     var r = await pool.query('SELECT id,ad,telefon,tip,esnaf_id,kurye_id,email,adresler,sifre FROM kullanicilar WHERE telefon=$1', [telefon]);
@@ -94,18 +133,26 @@ router.post('/giris', girisLimit, async function(req, res) {
       return res.json({ basari: true, veri: Object.assign({}, eVeri, { token: eToken }) });
     }
     res.status(401).json({ basari: false, mesaj: 'Telefon veya sifre yanlis' });
-  } catch(err) { res.status(500).json({ basari: false, mesaj: 'Giris hatasi.' }); }
+  } catch(err) { next(err); }
 });
 
-router.put('/musteri/profil', async function(req, res) {
-  try {
-    var { id, telefon, email, adresler } = req.body;
-    if (!id || !telefon) return res.status(400).json({ basari: false, mesaj: 'id ve telefon zorunlu' });
-    var kontrol = await pool.query('SELECT id FROM kullanicilar WHERE id=$1 AND telefon=$2', [id, telefon]);
-    if (!kontrol.rows.length) return res.status(403).json({ basari: false, mesaj: 'Yetkisiz' });
-    await pool.query('UPDATE kullanicilar SET email=$1, adresler=$2 WHERE id=$3', [email || null, JSON.stringify(adresler || []), id]);
-    res.json({ basari: true });
-  } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
+router.put('/musteri/profil', function(req, res, next) {
+  // JWT doğrulaması zorunlu — id body'den değil token'dan gelir
+  var auth = req.headers['authorization'];
+  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ basari: false, mesaj: 'Oturum gerekli' });
+  var session = sessionDogrula(auth.slice(7));
+  if (!session) return res.status(401).json({ basari: false, mesaj: 'Oturum suresi dolmus' });
+  var kullaniciId = session.kullanici_id;
+  if (!kullaniciId) return res.status(403).json({ basari: false, mesaj: 'Yetkisiz' });
+
+  (async function() {
+    try {
+      var { email, adresler } = req.body;
+      // id token'dan gelir, body'den kabul edilmez
+      await pool.query('UPDATE kullanicilar SET email=$1, adresler=$2 WHERE id=$3', [email || null, JSON.stringify(adresler || []), kullaniciId]);
+      res.json({ basari: true });
+    } catch(err) { next(err); }
+  })();
 });
 
 
