@@ -197,6 +197,14 @@ async function tablolarOlustur() {
       console.log('Test esnaf eklendi:', te[0]);
     }
   }
+  // Cografi indexler
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_esnaflar_lat_lng ON esnaflar (lat, lng)').catch(function() {});
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_esnaflar_kategori ON esnaflar (kategori)').catch(function() {});
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_esnaflar_ilce ON esnaflar (ilce)').catch(function() {});
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_esnaflar_onaylandi ON esnaflar (onaylandi)').catch(function() {});
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_urunler_esnaf_id ON urunler (esnaf_id)').catch(function() {});
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_siparisler_esnaf_id ON siparisler (esnaf_id)').catch(function() {});
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_siparisler_musteri ON siparisler (musteri_telefon)').catch(function() {});
   console.log('Tablolar hazir!');
 }
 
