@@ -147,7 +147,7 @@ function esnafKartlariOlustur(liste) {
       '<div class="esnaf-card-top">' +
         '<div class="esnaf-info">' +
           '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
-            '<h4>' + e.ad + (e.onayli ? ' <span class="onay-rozet">✓ Onaylı</span>' : '') + '</h4>' +
+            '<h4>' + temizle(e.ad) + (e.onayli ? ' <span class="onay-rozet">✓ Onaylı</span>' : '') + '</h4>' +
             '<button class="kalp-btn" data-id="' + e.id + '" onclick="favoriToggle(' + e.id + ',event)" ' +
               'style="background:none;border:none;font-size:1.2rem;cursor:pointer;padding:0 4px;line-height:1">' +
               kalp + '</button>' +
@@ -156,11 +156,11 @@ function esnafKartlariOlustur(liste) {
             '<span>⭐ ' + (e.puan || 0) + '</span>' +
             '<span>(' + (e.yorum_sayisi || 0) + ' yorum)</span>' +
             (e.mesafe_text ? '<span>📍 ' + e.mesafe_text + '</span>' : '') +
-            '<span>' + e.ilce + '</span>' +
+            '<span>' + temizle(e.ilce) + '</span>' +
           '</div>' +
           '<div class="esnaf-tags">' +
             acikDurumHtml(e) +
-            '<span class="tag">' + (e.kategori || '') + '</span>' +
+            '<span class="tag">' + temizle(e.kategori || '') + '</span>' +
             (parseInt(e.ay_siparis_sayisi) > 0
               ? '<span class="tag" style="background:#fff3e0;color:#e65100;font-weight:700">🔥 Bu ay ' + e.ay_siparis_sayisi + ' sipariş</span>'
               : '') +
@@ -189,11 +189,11 @@ function oneCikanlariYukle() {
             : 'background:linear-gradient(135deg,#6a1b9a,#ab47bc);';
           return '<div onclick="esnafDetay(' + e.id + ')" style="min-width:130px;border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.12);cursor:pointer;flex-shrink:0">' +
             '<div style="height:80px;' + fotoStyle + 'position:relative">' +
-              (e.one_cikan_etiket ? '<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.7));padding:4px 6px;font-size:.6rem;color:#fff;font-weight:700">' + e.one_cikan_etiket + '</div>' : '') +
+              (e.one_cikan_etiket ? '<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.7));padding:4px 6px;font-size:.6rem;color:#fff;font-weight:700">' + temizle(e.one_cikan_etiket) + '</div>' : '') +
             '</div>' +
             '<div style="padding:7px 8px;background:#fff">' +
-              '<div style="font-size:.78rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + e.ad + '</div>' +
-              '<div style="font-size:.68rem;color:#888">' + e.kategori + '</div>' +
+              '<div style="font-size:.78rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + temizle(e.ad) + '</div>' +
+              '<div style="font-size:.68rem;color:#888">' + temizle(e.kategori) + '</div>' +
               '<div style="font-size:.68rem;color:#ff6b35;font-weight:700">⭐ ' + (parseFloat(e.puan)||0).toFixed(1) + '</div>' +
             '</div>' +
           '</div>';
@@ -564,8 +564,8 @@ function menuGoster(urunler) {
     return '<div class="menu-item">' +
       (u.fotograf_url ? '<img src="' + u.fotograf_url + '" loading="lazy" onclick="event.stopPropagation();lightboxAc(\'' + u.fotograf_url + '\')" style="width:50px;height:50px;object-fit:cover;border-radius:8px;margin-right:10px;cursor:zoom-in">' : '') +
       '<div class="menu-item-info">' +
-        '<h5>' + u.ad + '</h5>' +
-        '<p>' + (u.aciklama || '') + '</p>' +
+        '<h5>' + temizle(u.ad) + '</h5>' +
+        '<p>' + temizle(u.aciklama || '') + '</p>' +
         '<button class="add-btn" onclick="sepeteEkle(' + u.id + ',\'' + u.ad.replace(/'/g, "\\'") + '\',' + fiyat + ')">+</button>' +
       '</div>' +
       '<span class="menu-price">₺' + fiyat + '</span>' +
@@ -579,11 +579,11 @@ function yorumlarGoster(yorumlar) {
   con.innerHTML = yorumlar.map(function(y) {
     return '<div class="yorum-card">' +
       '<div class="yorum-header">' +
-        '<span class="yorum-kullanici">' + (y.kullanici || 'Anonim') + '</span>' +
+        '<span class="yorum-kullanici">' + temizle(y.kullanici || 'Anonim') + '</span>' +
         '<span class="yorum-tarih">' + (y.tarih ? new Date(y.tarih).toLocaleDateString('tr-TR') : '') + '</span>' +
       '</div>' +
       '<div class="yorum-puan">' + '⭐'.repeat(parseInt(y.puan) || 0) + '</div>' +
-      '<div class="yorum-text">' + (y.yorum || '') + '</div>' +
+      '<div class="yorum-text">' + temizle(y.yorum || '') + '</div>' +
     '</div>';
   }).join('');
 }
