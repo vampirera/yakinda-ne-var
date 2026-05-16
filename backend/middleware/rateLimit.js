@@ -68,4 +68,14 @@ const yazmaLimit = rateLimit({
   message: { basari: false, mesaj: 'Cok fazla istek. 15 dakika sonra tekrar deneyin.' }
 });
 
-module.exports = { genelLimit, girisLimit, otpLimit, otpDogrulaLimit, listeLimit, yazmaLimit };
+// Yorum spam koruması — günlük IP bazlı max 3 yorum (puan manipülasyonu önlemi)
+const yorumLimit = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: function(req) { return ipKeyGenerator(req); },
+  message: { basari: false, mesaj: 'Gunluk yorum limitine ulastiniz. Yarin tekrar deneyin.' }
+});
+
+module.exports = { genelLimit, girisLimit, otpLimit, otpDogrulaLimit, listeLimit, yazmaLimit, yorumLimit };

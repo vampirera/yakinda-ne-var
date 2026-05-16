@@ -4,7 +4,7 @@ const router = express.Router();
 const { pool, cacheAl, cacheKaydet, cacheSil, CACHE_TTL } = require('../db/pool');
 const { esnafAuth, adminAuth, sessionDogrula } = require('../middleware/auth');
 const { upload, gorselMagicKontrol, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
-const { listeLimit, girisLimit, yazmaLimit } = require('../middleware/rateLimit');
+const { listeLimit, girisLimit, yazmaLimit, yorumLimit } = require('../middleware/rateLimit');
 
 router.get('/config', function(req, res) {
   var tel = (process.env.ADMIN_TELEFON || '').replace(/\D/g, '');
@@ -85,10 +85,20 @@ router.get('/esnaflar/:id', async function(req, res, next) {
   } catch(err) { next(err); }
 });
 
-router.post('/esnaf-kayit', upload.fields([{name:'vergi_levhasi',maxCount:1},{name:'urun_fotograflari',maxCount:10}]), async function(req, res) {
+router.post('/esnaf-kayit', upload.fields([{name:'vergi_levhasi',maxCount:1},{name:'urun_fotograflari',maxCount:10}]), async function(req, res, next) {
   try {
     var body = req.body;
     if (!body.ad||!body.kategori||!body.ilce||!body.telefon||!body.vergi_no) return res.status(400).json({ basari: false, mesaj: 'Lutfen tum zorunlu alanlari doldurun' });
+    // Magic bytes kontrolü — tüm yüklenen dosyalar için (polyglot/malicious file upload önlemi)
+    var tumDosyalar = [].concat(
+      (req.files['vergi_levhasi'] || []),
+      (req.files['urun_fotograflari'] || [])
+    );
+    for (var i = 0; i < tumDosyalar.length; i++) {
+      await new Promise(function(resolve, reject) {
+        gorselMagicKontrol(tumDosyalar[i].path, function(e) { e ? reject(e) : resolve(); });
+      });
+    }
     var result = await pool.query('INSERT INTO esnaflar (ad,kategori,ilce,adres,telefon,email,vergi_no,lat,lng,onaylandi,sifre) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,$10) RETURNING id', [body.ad, body.kategori, body.ilce, body.adres||'', body.telefon, body.email||'', body.vergi_no, parseFloat(body.lat)||36.8550, parseFloat(body.lng)||28.2753, body.sifre||null]);
     var esnafId = result.rows[0].id;
     if (body.sifre) {
@@ -176,7 +186,7 @@ router.delete('/esnaflar/:id/urunler/:urun_id', esnafAuth, async function(req, r
   } catch(err) { next(err); }
 });
 
-router.post('/esnaflar/:id/yorumlar', yazmaLimit, async function(req, res, next) {
+router.post('/esnaflar/:id/yorumlar', yazmaLimit, yorumLimit, async function(req, res, next) {
   try {
     // Token varsa kullanici adı telefon'dan türetilir (spoof önlemi)
     var auth = req.headers['authorization'];
