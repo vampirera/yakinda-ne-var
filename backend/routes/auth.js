@@ -4,8 +4,9 @@ const router = express.Router();
 const { pool, cacheAl, cacheKaydet, cacheSil } = require('../db/pool');
 const { esnafAuth, adminAuth } = require('../middleware/auth');
 const { upload, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
+const { girisLimit, otpLimit } = require('../middleware/rateLimit');
 
-router.post('/otp-gonder', async function(req, res) {
+router.post('/otp-gonder', otpLimit, async function(req, res) {
   var telefon = req.body.telefon;
   if (!telefon) return res.status(400).json({ basari: false, mesaj: 'Telefon zorunlu' });
   if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_WHATSAPP_FROM) {
@@ -35,7 +36,7 @@ router.post('/kayit', async function(req, res) {
   } catch(err) { console.error(err); res.status(500).json({ basari: false, mesaj: 'Sunucu hatasi.' }); }
 });
 
-router.post('/giris', async function(req, res) {
+router.post('/giris', girisLimit, async function(req, res) {
   try {
     var { telefon, sifre } = req.body;
     if (!telefon || !sifre) return res.status(400).json({ basari: false, mesaj: 'Telefon ve sifre zorunlu' });

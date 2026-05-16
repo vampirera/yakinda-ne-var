@@ -4,6 +4,7 @@ const router = express.Router();
 const { pool, cacheAl, cacheKaydet, cacheSil, CACHE_TTL } = require('../db/pool');
 const { esnafAuth, adminAuth } = require('../middleware/auth');
 const { upload, cloudinary, openai, telefonNormalize, whatsappGonder, mesafeHesapla, esnafSil, fs } = require('../utils/helpers');
+const { listeLimit } = require('../middleware/rateLimit');
 
 router.get('/config', function(req, res) {
   var tel = (process.env.ADMIN_TELEFON || '').replace(/\D/g, '');
@@ -11,7 +12,7 @@ router.get('/config', function(req, res) {
   res.json({ admin_wa: tel ? 'https://wa.me/' + tel : null });
 });
 
-router.get('/esnaflar', async function(req, res) {
+router.get('/esnaflar', listeLimit, async function(req, res) {
   try {
     var ilce = req.query.ilce, kategori = req.query.kategori, siralama = req.query.siralama || 'mesafe';
     var lat = parseFloat(req.query.lat), lng = parseFloat(req.query.lng);

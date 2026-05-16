@@ -15,6 +15,10 @@ const app = express();
 app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE'], allowedHeaders: ['Content-Type','Authorization'] }));
 app.use(express.json());
 
+// Rate limiting
+const { genelLimit } = require('./middleware/rateLimit');
+app.use('/api', genelLimit);
+
 app.get('/',         (req, res) => res.json({ mesaj: 'Yakinda Ne Var API calisiyor!', versiyon: '5.1' }));
 app.get('/api/ping', (req, res) => res.sendStatus(200));
 
@@ -38,7 +42,7 @@ tablolarOlustur().then(function() {
     'ALTER TABLE randevular ADD COLUMN IF NOT EXISTS hatirlatma_gonderildi BOOLEAN DEFAULT false'
   ).catch(function() {});
 
-  const PORT = process.env.PORT || 3000;
+  const PORT = parseInt(process.env.PORT) || 3000;
   app.listen(PORT, '0.0.0.0', function() {
     console.log('API calisiyor: http://0.0.0.0:' + PORT);
     setInterval(randevuHatirlatmaCalistir, 10 * 60 * 1000);
