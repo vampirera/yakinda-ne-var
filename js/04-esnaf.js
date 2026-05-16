@@ -102,6 +102,19 @@ function esnaflarYukle() {
   if (durum.kategori) { params.append('kategori', durum.kategori); }
   if (durum.siralama) { params.append('siralama', durum.siralama); }
   if (durum.arama)    { params.append('arama', durum.arama); }
+  // Harita viewport bbox — sadece görünen alanı yükle
+  if (window.harita) {
+    try {
+      var bounds = window.harita.getBounds();
+      var sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
+      // Viewport'u %20 genişlet (kenardaki esnaflar kaybolmasın)
+      var latPad = (ne.lat - sw.lat) * 0.2, lngPad = (ne.lng - sw.lng) * 0.2;
+      params.append('swLat', (sw.lat - latPad).toFixed(6));
+      params.append('swLng', (sw.lng - lngPad).toFixed(6));
+      params.append('neLat', (ne.lat + latPad).toFixed(6));
+      params.append('neLng', (ne.lng + lngPad).toFixed(6));
+    } catch(e) {}
+  }
 
   fetch(API_URL + '/api/esnaflar?' + params.toString())
     .then(function(r) { return r.json(); })
