@@ -39,7 +39,10 @@ function otpDogrula(telefon, kod) {
   var kayit = _otpStore[telefon];
   if (!kayit) return false;
   if (Date.now() > kayit.exp) { delete _otpStore[telefon]; return false; }
-  if (kayit.kod !== kod) return false;
+  // Brute-force koruması: max 5 hatalı deneme
+  kayit.denemeler = (kayit.denemeler || 0) + 1;
+  if (kayit.denemeler > 5) { delete _otpStore[telefon]; return false; }
+  if (kayit.kod !== String(kod)) return false;
   delete _otpStore[telefon];
   return true;
 }
