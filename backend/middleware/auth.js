@@ -8,10 +8,7 @@ var _sessions = {};
 var SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 
 function generateToken() {
-  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  var token = '';
-  for (var i = 0; i < 48; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
-  return token;
+  return require('crypto').randomBytes(64).toString('hex');
 }
 
 function sessionOlustur(kullanici) {
@@ -62,8 +59,6 @@ function adminAuth(req, res, next) {
     var session = sessionDogrula(auth.slice(7));
     if (session && session.tip === 'admin') { req.sessionData = session; return next(); }
   }
-  var key = req.query.key || req.body.key;
-  if (key && key === process.env.ADMIN_SIFRE) return next();
   return res.status(401).json({ basari: false, mesaj: 'Yetkisiz' });
 }
 

@@ -18,6 +18,14 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+
+// XSS koruması — DOMPurify ile metin temizle
+function temizle(str) {
+  if (str === null || str === undefined) return '';
+  if (typeof DOMPurify !== 'undefined') return DOMPurify.sanitize(String(str), { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
+}
+
 var API_URL = 'https://yakinda-ne-var-backend-production.up.railway.app';
 
 // Auth header yardımcısı — token varsa Bearer ekler

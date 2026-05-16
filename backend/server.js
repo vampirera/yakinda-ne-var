@@ -12,7 +12,21 @@ const express = require('express');
 const cors    = require('cors');
 
 const app = express();
-app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE'], allowedHeaders: ['Content-Type','Authorization'] }));
+var izinliOriginler = [
+  'https://vampirera.github.io',
+  'http://localhost:3000',
+  'http://localhost:5500',
+  'http://127.0.0.1:5500'
+];
+app.use(cors({
+  origin: function(origin, callback) {
+    // origin yoksa (curl, Postman, server-to-server) veya izinliyse geçir
+    if (!origin || izinliOriginler.indexOf(origin) !== -1) return callback(null, true);
+    return callback(new Error('CORS: izin verilmeyen origin: ' + origin));
+  },
+  methods: ['GET','POST','PUT','DELETE'],
+  allowedHeaders: ['Content-Type','Authorization']
+}));
 app.use(express.json());
 
 // Rate limiting

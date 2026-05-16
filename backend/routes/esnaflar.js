@@ -22,7 +22,10 @@ router.get('/esnaflar', listeLimit, async function(req, res) {
     var neLat = parseFloat(req.query.neLat), neLng = parseFloat(req.query.neLng);
     var bboxAktif = !isNaN(swLat) && !isNaN(swLng) && !isNaN(neLat) && !isNaN(neLng);
 
-    var cacheKey = 'esnaflar:' + (ilce||'') + ':' + (kategori||'') + ':' + (arama||'');
+    // bbox varsa lat/lng grid'e (2 ondalık = ~1km) dahil et
+    var latGrid = bboxAktif ? parseFloat(swLat).toFixed(2) + '_' + parseFloat(neLat).toFixed(2) : '';
+    var lngGrid = bboxAktif ? parseFloat(swLng).toFixed(2) + '_' + parseFloat(neLng).toFixed(2) : '';
+    var cacheKey = 'esnaflar:' + (ilce||'') + ':' + (kategori||'') + ':' + (arama||'') + ':' + latGrid + ':' + lngGrid;
     var cached = cacheAl(cacheKey);
     if (cached) {
       var esnaflar = cached.map(function(e) {
